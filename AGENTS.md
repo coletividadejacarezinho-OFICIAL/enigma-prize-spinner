@@ -28,3 +28,12 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules (Enigma Premiado)
+
+- All app data lives in the browser's localStorage via `src/lib/enigma/store.ts` (useSyncExternalStore, null on the server); no database, auth or external services in this stage — the owner asked for local-only data.
+- Pure draw rules (wheel angle math, duplicates, date format, new-round defaults) live in `src/lib/enigma/logic.ts` with tests in `src/test/enigma-logic.test.ts`; keep UI files free of that logic so it stays testable.
+- A spin saves its result (winner, index, final rotation) before the animation starts, so reloads, tab changes and double taps can never change the winner; a new spin only happens through a new round.
+- Wheel angles run clockwise from the top pointer; `targetRotation` and `segmentAtPointer` must stay inverse of each other.
+- Picked images are shrunk to small data URLs before saving, to stay within localStorage limits.
+- The app is phone-first: content sits in a `max-w-md` column with a fixed four-tab bottom bar from `__root.tsx`; every screen must fit 360 × 740.

@@ -10,33 +10,73 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AjustesRouteImport } from './routes/ajustes'
+import { Route as NomesRouteImport } from './routes/nomes'
+import { Route as SorteiosIndexRouteImport } from './routes/sorteios.index'
+import { Route as SorteiosNovoRouteImport } from './routes/sorteios.novo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AjustesRoute = AjustesRouteImport.update({
+  id: '/ajustes',
+  path: '/ajustes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NomesRoute = NomesRouteImport.update({
+  id: '/nomes',
+  path: '/nomes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SorteiosIndexRoute = SorteiosIndexRouteImport.update({
+  id: '/sorteios/',
+  path: '/sorteios/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SorteiosNovoRoute = SorteiosNovoRouteImport.update({
+  id: '/sorteios/novo',
+  path: '/sorteios/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
+  '/nomes': typeof NomesRoute
+  '/sorteios/novo': typeof SorteiosNovoRoute
+  '/sorteios/': typeof SorteiosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
+  '/nomes': typeof NomesRoute
+  '/sorteios/novo': typeof SorteiosNovoRoute
+  '/sorteios': typeof SorteiosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ajustes': typeof AjustesRoute
+  '/nomes': typeof NomesRoute
+  '/sorteios/novo': typeof SorteiosNovoRoute
+  '/sorteios/': typeof SorteiosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios'
+  id: '__root__' | '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AjustesRoute: typeof AjustesRoute
+  NomesRoute: typeof NomesRoute
+  SorteiosNovoRoute: typeof SorteiosNovoRoute
+  SorteiosIndexRoute: typeof SorteiosIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +88,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ajustes': {
+      id: '/ajustes'
+      path: '/ajustes'
+      fullPath: '/ajustes'
+      preLoaderRoute: typeof AjustesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nomes': {
+      id: '/nomes'
+      path: '/nomes'
+      fullPath: '/nomes'
+      preLoaderRoute: typeof NomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sorteios/': {
+      id: '/sorteios/'
+      path: '/sorteios'
+      fullPath: '/sorteios/'
+      preLoaderRoute: typeof SorteiosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sorteios/novo': {
+      id: '/sorteios/novo'
+      path: '/sorteios/novo'
+      fullPath: '/sorteios/novo'
+      preLoaderRoute: typeof SorteiosNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AjustesRoute: AjustesRoute,
+  NomesRoute: NomesRoute,
+  SorteiosNovoRoute: SorteiosNovoRoute,
+  SorteiosIndexRoute: SorteiosIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
