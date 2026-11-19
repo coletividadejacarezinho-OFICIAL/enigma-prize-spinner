@@ -9,7 +9,7 @@ import {
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { BottomNav } from "../components/enigma/BottomNav";
@@ -162,14 +162,23 @@ function RootComponent() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const needsDraw = path === "/" || path === "/nomes" || path.startsWith("/convite");
   const empty = store?.kind === "ok" && !store.state.draws.some((d) => !d.draft) && needsDraw;
-  useEffect(() => {
-    // A restore interrupted by closing the page is finished or undone before anything else.
-    void settleOnOpen().then((r) => {
-      if (r === "pending") toast.error("A restauração precisa de espaço para terminar. Libere espaço e reabra o aplicativo.");
-      if (r === "finished") toast.success("A restauração da cópia foi concluída.");
-      if (r === "rolledBack") toast.info("A restauração anterior não terminou e foi desfeita. Seus dados estão como antes.");
-    });
-  }, []);
+  const [recovery, setRecovery] = useState<"opening" | "ready" | "pending">("opening");
+  const recover = async () => {
+    setRecovery("opening");
+    try {
+      const result = await settleOnOpen();
+      if (result === "pending") {
+        setRecovery("pending");
+        return;
+      }
+      setRecovery("ready");
+      if (result === "finished") toast.success("A restauração da cópia foi concluída.");
+      if (result === "rolledBack") toast.info("A restauração anterior foi desfeita.");
+    } catch {
+      setRecovery("pending");
+    }
+  };
+  useEffect(() => { void recover(); }, []);
   useEffect(() => initInstallPrompt(), []);
 
   return (
@@ -184,7 +193,15 @@ function RootComponent() {
             : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
         }
       >
-        {store === null ? (
+        {recovery === "pending" ? (
+          <main className="px-5 py-10">
+            <h1 className="text-2xl font-extrabold">Recuperar cópia interrompida</h1>
+            <p className="mt-3">Libere espaço no aparelho e tente novamente para continuar usando o aplicativo.</p>
+            <button onClick={() => void recover()} className="mt-5 h-14 w-full rounded-2xl bg-primary font-bold text-primary-foreground">
+              Tentar recuperar novamente
+            </button>
+          </main>
+        ) : recovery === "opening" || store === null ? (
           <Opening />
         ) : broken ? (
           <DataRecovery raw={store.raw} />
@@ -195,7 +212,7 @@ function RootComponent() {
         )}
         <OfflineNotice />
       </div>
-      {!isViewerPage && !presenting && store !== null && !broken && <BottomNav />}
+      {recovery === "ready" && !isViewerPage && !presenting && store !== null && !broken && <BottomNav />}
       <Toaster
         position="top-center"
         richColors

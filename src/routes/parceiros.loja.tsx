@@ -1,16 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, PackageCheck } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { LogoPicker } from "@/components/enigma/LogoPicker";
 import { ENSAIO_TAG } from "@/components/enigma/Partners";
 import { areaClass, fieldClass } from "@/components/enigma/fields";
-import { report } from "@/lib/enigma/feedback";
+import { report, reportPartner } from "@/lib/enigma/feedback";
 import { cleanName, formatDateBR, newId } from "@/lib/enigma/logic";
 import { cleanWhatsapp, formatWhatsapp, type Account } from "@/lib/enigma/partners";
-import { updateSim, useSim } from "@/lib/enigma/partners-store";
+import { PartnerRecovery } from "@/components/enigma/PartnerRecovery";
+import { partnersRepo, usePartnerSnapshot } from "@/lib/enigma/partners-repo";
 import { repo, useAppState } from "@/lib/enigma/repo";
 
 export const Route = createFileRoute("/parceiros/loja")({
@@ -26,14 +27,18 @@ export const Route = createFileRoute("/parceiros/loja")({
   component: Loja,
 });
 
-const saveFail = () => toast.error("Não foi possível salvar. Libere espaço e tente de novo.");
 
 function Loja() {
   const state = useAppState();
-  const sim = useSim();
+  const partnerSnapshot = usePartnerSnapshot();
+  const sim = partnerSnapshot?.kind === "ok" ? partnerSnapshot.state : null;
   const { convite } = Route.useSearch();
   const [step, setStep] = useState<"perfil" | "pergunta" | "oferta" | "pronto">("perfil");
   const [prize, setPrize] = useState("");
+  const [offerIdentity, setOfferIdentity] = useState(() => ({ id: newId(), createdAt: Date.now() }));
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  if (partnerSnapshot?.kind === "broken") return <div className="p-4"><PartnerRecovery /></div>;
   if (!state || !sim) return <div className="h-dvh" aria-busy="true" />;
 
   const invite = convite ? sim.invites.find((i) => i.id === convite) : undefined;
@@ -42,9 +47,9 @@ function Loja() {
   const target = invite?.merchantId ? state.merchants.find((m) => m.id === invite.merchantId) : undefined;
   const notices = shop ? sim.notices.filter((n) => n.merchantId === shop.id) : [];
 
-  const login = () => {
+  const login = async () => {
     const a: Account = { id: newId(), email: "dono.teste@exemplo.com" };
-    if (!updateSim((s) => ({ ...s, accounts: [...s.accounts, a], session: a.id }))) saveFail();
+    reportPartner(await partnersRepo.signIn(a));
   };
 
   return (
@@ -76,13 +81,9 @@ function Loja() {
           </p>
           <GoldButton
             className="mt-4"
-            onClick={() => {
-              const ok = updateSim((s) => ({
-                ...s,
-                accounts: s.accounts.map((a) => (a.id === account.id ? { ...a, merchantId: target.id } : a)),
-              }));
-              if (ok) toast.success(`Conta vinculada ao ${target.name}.`);
-              else saveFail();
+            onClick={async () => {
+              const result = await partnersRepo.attachShop({ accountId: account.id, merchantId: target.id });
+              if (reportPartner(result)) toast.success(`Conta vinculada ao ${target.name}.`);
             }}
           >
             Vincular minha conta ao {target.name}
@@ -104,41 +105,38 @@ function Loja() {
         <section className="rounded-2xl bg-card p-4">
           <label className="block">
             <span className="mb-1.5 block text-xl font-extrabold">Qual é o prêmio?</span>
-            <textarea value={prize} onChange={(e) => setPrize(e.target.value)} rows={3} placeholder="Ex.: Um hambúrguer com batata" className={areaClass} />
+            <textarea disabled={sending} value={prize} onChange={(e) => setPrize(e.target.value)} rows={3} placeholder="Ex.: Um hambúrguer com batata" className={areaClass} />
           </label>
           <GoldButton
             className="mt-4"
-            disabled={!prize.trim()}
-            onClick={() => {
-              const fresh = sim.accounts.find((a) => a.id === account.id) ?? account;
-              const m = fresh.merchantId ? state.merchants.find((x) => x.id === fresh.merchantId) : undefined;
-              const name = m?.name ?? fresh.name ?? "";
-              const ok = updateSim((s) => ({
-                ...s,
-                offers: [
-                  ...s.offers,
-                  {
-                    id: newId(),
-                    accountId: fresh.id,
-                    ...(m ? { merchantId: m.id } : {}),
-                    name,
-                    whatsapp: m?.whatsapp ?? fresh.whatsapp ?? "",
-                    ...((m?.logo ?? fresh.logo) ? { logo: (m?.logo ?? fresh.logo)! } : {}),
-                    prize: prize.trim(),
-                    createdAt: Date.now(),
-                  },
-                ],
-              }));
-              if (!ok) {
-                saveFail();
-                return;
+            disabled={sending || !prize.trim()}
+            onClick={async () => {
+              if (sendingRef.current) return;
+              sendingRef.current = true;
+              setSending(true);
+              try {
+                const fresh = sim.accounts.find((a) => a.id === account.id) ?? account;
+                const m = fresh.merchantId ? state.merchants.find((x) => x.id === fresh.merchantId) : undefined;
+                const result = await partnersRepo.submitOffer({
+                  id: offerIdentity.id, accountId: fresh.id,
+                  ...(m ? { merchantId: m.id } : {}),
+                  name: m?.name ?? fresh.name ?? "",
+                  whatsapp: m?.whatsapp ?? fresh.whatsapp ?? "",
+                  ...((m?.logo ?? fresh.logo) ? { logo: (m?.logo ?? fresh.logo)! } : {}),
+                  prize: prize.trim(), createdAt: offerIdentity.createdAt,
+                });
+                if (!reportPartner(result)) return;
+                setOfferIdentity({ id: newId(), createdAt: Date.now() });
+                setPrize("");
+                setStep("pronto");
+                toast.success("Oferta guardada para a administradora (ensaio).");
+              } finally {
+                sendingRef.current = false;
+                setSending(false);
               }
-              setPrize("");
-              setStep("pronto");
-              toast.success("Oferta guardada para a administradora (ensaio).");
             }}
           >
-            Enviar para a administradora
+            {sending ? "Enviando…" : "Enviar para a administradora"}
           </GoldButton>
         </section>
       ) : (
@@ -216,13 +214,10 @@ function Profile({
           const { logo: _l, ...rest } = shop;
           if (!report(await repo.saveMerchant({ ...rest, name: cleanName(name), whatsapp: w, ...(logo ? { logo } : {}) }))) return;
         } else {
-          const ok = updateSim((s) => ({
-            ...s,
-            accounts: s.accounts.map((a) =>
-              a.id === account.id ? { ...a, name: cleanName(name), whatsapp: w, ...(logo ? { logo } : {}) } : a,
-            ),
-          }));
-          if (!ok) return void toast.error("Não foi possível salvar.");
+          const result = await partnersRepo.saveProfile(account.id, {
+            name: cleanName(name), whatsapp: w, ...(logo ? { logo } : {}),
+          });
+          if (!reportPartner(result)) return;
         }
         onDone();
       }}

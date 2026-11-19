@@ -48,7 +48,8 @@ export function RestoreCard() {
   };
 
   const plan = preview?.plan;
-  const nothingNew = plan && plan.newRaw === null && plan.writeVideos.size === 0;
+  const partnersChanged = preview?.newPartnerRaw !== undefined && preview.newPartnerRaw !== preview.prevPartnerRaw;
+  const nothingNew = plan && plan.newRaw === null && plan.writeVideos.size === 0 && !partnersChanged;
   const date = preview ? new Date(preview.backup.exportedAt).toLocaleString("pt-BR") : "";
 
   return (

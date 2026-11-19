@@ -266,11 +266,52 @@ it("preserva alterações locais feitas enquanto o vídeo da cópia está sendo 
   const videos = await import("@/lib/enigma/videos");
   const write = vi.spyOn(videos, "putVideoOrThrow").mockImplementationOnce(async (videoId, blob) => {
     files.set(videoId, blob);
-    await repo.saveMerchant({ id: "durante", name: "Novo comércio", createdAt: 1 });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...saved(), merchants: [{ id: "durante", name: "Novo comércio", createdAt: 1 }] }));
   });
   expect((await applyRestore(preview)).ok).toBe(false);
   write.mockRestore();
   expect(saved().merchants.map((m) => m.id)).toEqual(["durante"]);
   expect(saved().draws).toHaveLength(0);
   expect(files.has("v")).toBe(false);
+});
+
+it("permite confirmar pela tela uma restauração com apenas parceiros novos", async () => {
+  const { RestoreCard } = await import("@/components/enigma/RestoreCard");
+  updateSim(() => ({ ...emptySim(), accounts: [{ id: "unica", email: "teste@exemplo.com" }] }));
+  await repo.startRehearsal();
+  const backup = await prepareBackup();
+  if (!backup.ok) throw new Error(backup.message);
+  updateSim(emptySim);
+  render(<RestoreCard />);
+  const file = new File([backup.blob], "parceiros.zip");
+  fireEvent.change(screen.getByTestId("restore-file"), { target: { files: [file] } });
+  const button = await screen.findByText("Confirmar e restaurar");
+  fireEvent.click(button);
+  await waitFor(() => expect(sim().accounts[0]?.id).toBe("unica"));
+  expect(saved().draws).toHaveLength(1);
+});
+
+it("mantém a oferta ao falhar e reutiliza seu ID quando a operação demora", async () => {
+  const { partnersRepo } = await import("@/lib/enigma/partners-repo");
+  await partnersRepo.signIn({ id: "conta", email: "teste@exemplo.com", name: "Loja teste", whatsapp: "43999990000" });
+  render(<Shop />);
+  fireEvent.click(screen.getByText("Salvar e continuar"));
+  await screen.findByText("Oferecer agora");
+  fireEvent.click(screen.getByText("Oferecer agora"));
+  fireEvent.change(screen.getByLabelText("Qual é o prêmio?"), { target: { value: "Um pão" } });
+  let finish: (result: import("@/lib/enigma/repo").RepoResult) => void = () => {};
+  const send = vi.spyOn(partnersRepo, "submitOffer").mockImplementationOnce(() =>
+    new Promise((resolve) => { finish = resolve; }));
+  const button = screen.getByText("Enviar para a administradora");
+  act(() => { button.click(); button.click(); });
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("Enviando…")).toBeDisabled();
+  await act(async () => { finish({ ok: false, error: "write", message: "Falha simulada" }); });
+  expect(screen.getByLabelText("Qual é o prêmio?")).toHaveValue("Um pão");
+  const first = send.mock.calls[0]![0];
+  send.mockResolvedValueOnce({ ok: true, value: undefined });
+  fireEvent.click(screen.getByText("Enviar para a administradora"));
+  await screen.findByText("Tudo certo!");
+  expect(send.mock.calls[1]![0]).toEqual(first);
+  send.mockRestore();
 });

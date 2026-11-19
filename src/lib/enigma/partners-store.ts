@@ -1,55 +1,88 @@
-/** P1 simulated partner data, in its own key so it never mixes with the real draws. */
-import { useSyncExternalStore } from "react";
+/** Local adapter for simulated partner records. */
 import { emptySim, type PartnerSim } from "./partners";
+import { restorePending } from "./restore-lock";
 
 export const SIM_KEY = "enigma-premiado:p1-ensaio";
+export type PartnerSnapshot =
+  | { kind: "ok"; state: PartnerSim }
+  | { kind: "broken"; raw: string | null };
+
 const subs = new Set<() => void>();
-let cache: PartnerSim | null = null;
 let cachedRaw: string | null | undefined;
+let cached: PartnerSnapshot | null = null;
 
-function read(): PartnerSim {
+export function partnerSnapshot(): PartnerSnapshot {
+  let raw: string | null;
   try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SIM_KEY) : null;
-    if (cache && raw === cachedRaw) return cache;
-    cachedRaw = raw;
-    cache = raw ? { ...emptySim(), ...(JSON.parse(raw) as PartnerSim) } : emptySim();
+    raw = localStorage.getItem(SIM_KEY);
   } catch {
-    cache = emptySim();
+    cachedRaw = undefined;
+    if (cached?.kind !== "broken") cached = { kind: "broken", raw: null };
+    return cached;
   }
-  return cache;
+  if (cached && cachedRaw === raw) return cached;
+  cachedRaw = raw;
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Formato inválido");
+    const state: PartnerSim = { ...emptySim(), ...parsed };
+    for (const key of ["invites", "accounts", "offers", "notices"] as const) {
+      if (!Array.isArray(state[key])) throw new Error("Formato inválido");
+    }
+    if (state.accounts.some((a) => !a || typeof a.id !== "string" || typeof a.email !== "string") ||
+        state.invites.some((i) => !i || typeof i.id !== "string" || !["geral", "individual"].includes(i.kind)) ||
+        state.offers.some((o) => !o || typeof o.id !== "string" || typeof o.name !== "string" ||
+          typeof o.prize !== "string" || typeof o.whatsapp !== "string" ||
+          (o.confirmed && (typeof o.confirmed.drawId !== "string" || typeof o.confirmed.roundId !== "string"))) ||
+        state.notices.some((n) => !n || typeof n.id !== "string" || typeof n.winner !== "string" ||
+          typeof n.phone !== "string" || typeof n.drawId !== "string" || typeof n.roundId !== "string"))
+      throw new Error("Registros inválidos");
+    cached = { kind: "ok", state };
+  } catch {
+    cached = { kind: "broken", raw };
+  }
+  return cached;
 }
 
-/** Saves; false when the phone refused (nothing changes on screen then). */
+export function subscribePartners(cb: () => void): () => void {
+  subs.add(cb);
+  const storage = (event: StorageEvent) => {
+    if (event.key === SIM_KEY || event.key === null) {
+      cached = null;
+      cb();
+    }
+  };
+  window.addEventListener("storage", storage);
+  return () => {
+    subs.delete(cb);
+    window.removeEventListener("storage", storage);
+  };
+}
+
+export function reloadPartners() {
+  cached = null;
+  subs.forEach((cb) => cb());
+}
+
+export function tryUpdatePartners(fn: (s: PartnerSim) => PartnerSim): "ok" | "read" | "write" | "restore" {
+  if (restorePending()) return "restore";
+  const snapshot = partnerSnapshot();
+  if (snapshot.kind !== "ok") return "read";
+  const next = fn(snapshot.state);
+  const raw = JSON.stringify(next);
+  try {
+    localStorage.setItem(SIM_KEY, raw);
+  } catch {
+    return "write";
+  }
+  cachedRaw = raw;
+  cached = { kind: "ok", state: next };
+  subs.forEach((cb) => cb());
+  return "ok";
+}
+
+/** Compatibility for local fixtures and older callers. Screens use partners-repo. */
 export function updateSim(fn: (s: PartnerSim) => PartnerSim): boolean {
-  const next = fn(read());
-  try {
-    localStorage.setItem(SIM_KEY, JSON.stringify(next));
-  } catch {
-    return false;
-  }
-  cachedRaw = JSON.stringify(next);
-  cache = next;
-  subs.forEach((f) => f());
-  return true;
+  return tryUpdatePartners(fn) === "ok";
 }
 
-export function useSim(): PartnerSim | null {
-  return useSyncExternalStore(
-    (cb) => {
-      subs.add(cb);
-      const onStorage = (e: StorageEvent) => {
-        if (e.key === SIM_KEY) {
-          cache = null;
-          cb();
-        }
-      };
-      window.addEventListener("storage", onStorage);
-      return () => {
-        subs.delete(cb);
-        window.removeEventListener("storage", onStorage);
-      };
-    },
-    read,
-    () => null,
-  );
-}

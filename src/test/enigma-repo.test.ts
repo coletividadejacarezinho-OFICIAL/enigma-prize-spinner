@@ -166,3 +166,23 @@ describe("Dados antigos e ilegíveis", () => {
     expect(localStorage.getItem(KEY)).toBe("{x");
   });
 });
+
+it("repetir a criação pelo mesmo ID preserva uma única rodada e recusa conteúdo diferente", async () => {
+  const repo = await fresh();
+  await repo.saveMerchant(burger);
+  const draw = createDraw({ date: "2026-11-19", merchant: burger, prize: "Lanche", confirmed: true });
+  expect((await repo.createDraw(draw, { makeCurrent: false })).ok).toBe(true);
+  expect((await repo.createDraw(draw, { makeCurrent: false })).ok).toBe(true);
+  expect(stateOf().draws).toHaveLength(1);
+  expect(await repo.createDraw({ ...draw, prize: "Outro prêmio" }, { makeCurrent: false }))
+    .toMatchObject({ ok: false, error: "conflict" });
+  expect(stateOf().draws[0].prize).toBe("Lanche");
+});
+
+it("o contrato recusa colocar rascunho na roleta durante criação", async () => {
+  const repo = await fresh();
+  await repo.saveMerchant(burger);
+  const draw = createDraw({ date: "2026-11-19", merchant: burger, prize: "Lanche", confirmed: true });
+  expect(await repo.createDraw({ ...draw, draft: true }, { makeCurrent: true }))
+    .toMatchObject({ ok: false, error: "conflict" });
+});
