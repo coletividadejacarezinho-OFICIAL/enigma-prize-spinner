@@ -51,6 +51,10 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
   expect(rim.contains(pointer)).toBe(false);
   expect(focus.hidden).toBe(false);
   expect(focus.textContent).toBe("Pessoa 250");
+  expect(onSpinEnd).not.toHaveBeenCalled();
+  act(() => frame(5999));
+  expect(onSpinEnd).not.toHaveBeenCalled();
+  act(() => frame(6000));
   expect(onSpinEnd).toHaveBeenCalledTimes(1);
   rerender(<Wheel names={names} rotation={rotation} />);
   expect(rim.style.transform).toBe("");
@@ -61,4 +65,26 @@ it("scales dense labels and skips zoom with reduced motion", () => {
   expect(wheelFontSize(250)).toBeLessThan(wheelFontSize(101));
   expect(wheelZoom(0.7, true)).toBeGreaterThan(1);
   expect(wheelZoom(1, false)).toBe(1);
+});
+
+it("rotates gently while waiting and stops the idle animation on a spin", () => {
+  let frame: FrameRequestCallback = () => {};
+  vi.spyOn(performance, "now").mockReturnValue(0);
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
+  const cancel = vi.fn();
+  vi.stubGlobal("cancelAnimationFrame", cancel);
+  const onIdleRotation = vi.fn();
+  const { container, rerender } = render(
+    <Wheel names={names} rotation={0} idle onIdleRotation={onIdleRotation} />,
+  );
+  const wheel = container.querySelector<SVGSVGElement>('svg[aria-label="Roleta"]')!;
+  act(() => frame(22500));
+  expect(wheel.style.transform).toBe("rotate(90deg)");
+  expect(onIdleRotation).toHaveBeenLastCalledWith(90);
+  rerender(<Wheel names={names} rotation={0} idle={false} />);
+  expect(cancel).toHaveBeenCalled();
+  expect(wheel.style.transform).toBe("rotate(0deg)");
 });
