@@ -12,12 +12,14 @@ export function wheelFontSize(count: number): number {
 /** Short labels affect presentation only; the registered names remain untouched. */
 export function wheelLabel(name: string, count: number): string {
   const max = count <= 10 ? 14 : count <= 30 ? 18 : count <= 80 ? 24 : count <= 120 ? 22 : 18;
-  const clean = name.trim().replace(/\\s+/g, " ");
+  const clean = name.trim().replace(/\s+/g, " ");
   const chars = Array.from(clean);
   if (chars.length <= max) return clean;
   const excerpt = chars.slice(0, max - 1).join("");
   // A word boundary looks better than cutting someone's surname in half.
   const boundary = excerpt.lastIndexOf(" ");
+  // If the last character already finishes a word, keep that complete word.
+  if (chars[max - 1] === " ") return excerpt + "…";
   return (boundary >= Math.ceil(max * 0.58) ? excerpt.slice(0, boundary) : excerpt) + "…";
 }
 
