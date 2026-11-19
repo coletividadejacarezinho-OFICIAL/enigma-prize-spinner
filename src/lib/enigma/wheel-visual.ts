@@ -4,7 +4,9 @@ export function wheelFontSize(count: number): number {
   if (count <= 10) return 7.5;
   if (count <= 16) return 6;
   if (count <= 30) return 4.5;
-  return Math.min(3.2, (Math.PI * 2 * 67) / count);
+  // Use most of each slice's available width at the name radius, without
+  // allowing adjacent labels to overlap on dense wheels.
+  return Math.min(4.3, (Math.PI * 2 * 70 * 0.78) / count);
 }
 
 export function wheelLabel(name: string, count: number): string {
