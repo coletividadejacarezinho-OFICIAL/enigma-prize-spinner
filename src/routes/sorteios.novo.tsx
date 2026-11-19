@@ -102,7 +102,7 @@ function NovoSorteio() {
         }}
         actions={(submit) => (
           <>
-            <GoldButton type="submit">Lançar rodada e ir para os nomes</GoldButton>
+            <GoldButton type="submit">Ir para os nomes</GoldButton>
             <SecondaryButton type="button" onClick={() => submit("draft")}>
               Salvar rascunho
             </SecondaryButton>

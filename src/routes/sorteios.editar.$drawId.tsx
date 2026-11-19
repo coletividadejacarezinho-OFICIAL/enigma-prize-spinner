@@ -105,7 +105,7 @@ function EditarSorteio() {
           actions={(submit) =>
             draw.draft ? (
               <>
-                <GoldButton type="submit">Lançar rodada</GoldButton>
+                <GoldButton type="submit">Ir para os nomes</GoldButton>
                 <SecondaryButton type="button" onClick={() => submit("draft")}>
                   Salvar rascunho
                 </SecondaryButton>

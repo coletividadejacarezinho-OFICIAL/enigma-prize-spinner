@@ -2,7 +2,6 @@ import { ImagePlus, X } from "lucide-react";
 import { useRef } from "react";
 import { toast } from "sonner";
 
-import { areaClass } from "./fields";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
 import type { Riddle } from "@/lib/enigma/types";
 
@@ -69,7 +68,10 @@ function ImageField({
   );
 }
 
-/** "Enigma do dia": riddle and answer, each with an optional picture. All optional. */
+/**
+ * "Anexar artes da rodada (opcional)": ready-made pictures of the question and the answer,
+ * closed by default. Older riddle text/answer stay saved untouched (no input for them anymore).
+ */
 export function RiddleFields({
   value,
   onChange,
@@ -84,41 +86,22 @@ export function RiddleFields({
     onChange(next);
   };
   return (
-    <fieldset className="space-y-3 rounded-2xl border-2 border-border p-3">
-      <legend className="px-1 text-sm font-bold text-gold">Enigma do dia</legend>
-      <label className="block">
-        <span className="mb-1.5 block text-base font-bold">Enigma</span>
-        <textarea
-          value={value.text ?? ""}
-          onChange={(e) => set("text", e.target.value)}
-          rows={2}
-          placeholder="Ex.: O que é, o que é…"
-          className={areaClass}
-        />
-      </label>
-      <ImageField label="Imagem do enigma" value={value.image} onChange={(v) => set("image", v)} />
-      <div className="rounded-xl border-2 border-dashed border-gold/50 p-3">
-        <p className="mb-2 text-sm text-muted-foreground">
-          A resposta fica só com você. Ela não aparece na arte do enigma.
+    <details className="rounded-2xl border-2 border-border p-3">
+      <summary className="cursor-pointer select-none text-base font-bold text-gold">
+        Anexar artes da rodada (opcional)
+      </summary>
+      <div className="mt-3 space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Guarde aqui as imagens prontas da pergunta e da resposta, se quiser.
         </p>
-        <label className="block">
-          <span className="mb-1.5 block text-base font-bold">Resposta</span>
-          <input
-            value={value.answer ?? ""}
-            onChange={(e) => set("answer", e.target.value)}
-            placeholder="Ex.: A sombra"
-            className={`${areaClass} h-12`}
-          />
-        </label>
-        <div className="mt-3">
-          <ImageField
-            label="Imagem da resposta"
-            value={value.answerImage}
-            onChange={(v) => set("answerImage", v)}
-          />
-        </div>
+        <ImageField label="Arte da pergunta" value={value.image} onChange={(v) => set("image", v)} />
+        <ImageField
+          label="Arte da resposta"
+          value={value.answerImage}
+          onChange={(v) => set("answerImage", v)}
+        />
       </div>
-    </fieldset>
+    </details>
   );
 }
 

@@ -170,8 +170,6 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
           />
         </label>
 
-        <RiddleFields value={values.riddle} onChange={(riddle) => set({ riddle })} />
-
         <div className="space-y-3">
           {values.prizes.map((row, i) => {
             const merchant = merchants.find((m) => m.id === row.merchantId);
@@ -312,6 +310,8 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
             </span>
           )}
         </fieldset>
+
+        <RiddleFields value={values.riddle} onChange={(riddle) => set({ riddle })} />
 
         <div className="space-y-1">{actions(submit, values)}</div>
       </form>

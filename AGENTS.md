@@ -55,3 +55,5 @@ use the editor.
 - Several courtesies (stage 8): the first stays in the draw's own merchant/prize/result fields, the rest in `extraPrizes`; read them only through `roundsOf()` in `src/lib/enigma/rounds.ts` (tested in `src/test/enigma-rounds.test.ts`). Rounds are spun in order, so `draw.result` set still means "list locked".
 - Each round's wheel comes from `poolFor()` (earlier winners removed when `repeatWinners === false`); results are saved with `withRoundResult()` and the Roleta moves on only via `nextRound()`. The WhatsApp result for any draw comes from `drawResultMessage()`.
 - Rules for `src/lib/enigma` modules (backup, share-as-image) live in its own AGENTS.md.
+
+- "Nova rodada" has no riddle/answer text inputs: only the optional, closed-by-default "Anexar artes da rodada" with two ready images (arts are made outside the app); older saved riddle text stays untouched.

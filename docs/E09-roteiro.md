@@ -20,10 +20,10 @@ Aparelho: ______  Sistema: ______  Navegador: ______  (faça primeiro no Android
 | # | O que tocar | Resultado esperado | Android | iPhone |
 |---|---|---|---|---|
 | 1 | Abra o endereço → menu do navegador → "Instalar app" / "Adicionar à tela inicial" | Ícone CJ na tela inicial; abre em tela cheia | Pendente no aparelho real | Pendente no aparelho real |
-| 2 | Sorteios → "Novo sorteio" → Enigma do dia: escolha 2 fotos da galeria → 2 cortesias → "Salvar rascunho" | Rascunho aparece na agenda com o próximo passo | Pendente no aparelho real | Pendente no aparelho real |
+| 2 | Sorteios → "Novo sorteio" → data, empresa e cortesia → "Adicionar outra cortesia" (outra empresa) → no fim, abra "Anexar artes da rodada (opcional)" e escolha as 2 imagens prontas da galeria (ou pule) → "Salvar rascunho" | Rascunho aparece na agenda com o próximo passo | Pendente no aparelho real | Pendente no aparelho real |
 | 3 | Confira o horário mostrado em Sorteios | Igual ao relógio de Jacarezinho; 19:00–19:29 "aberta" | Pendente no aparelho real | Pendente no aparelho real |
-| 4 | Abra o rascunho → "Lançar rodada" → digite 3 nomes → "Confirmar lista" → Roleta → girar as 2 cortesias (Ajustes: Ferramentas de demonstração desligado) | Dois ganhadores diferentes, salvos | Pendente no aparelho real | Pendente no aparelho real |
-| 5 | Sorteio → "Arte do enigma", "Arte da resposta", "Arte do ganhador" → Compartilhar em conversa de teste | Enigma sem a resposta; resposta separada; cada ganhador com sua cortesia | Pendente no aparelho real | Pendente no aparelho real |
+| 4 | Abra o rascunho → "Ir para os nomes" → digite 3 nomes → "Confirmar lista" → Roleta → girar as 2 cortesias (Ajustes: Ferramentas de demonstração desligado) | Dois ganhadores diferentes, salvos | Pendente no aparelho real | Pendente no aparelho real |
+| 5 | As artes são feitas no ChatGPT e publicadas à mão no WhatsApp. No app, confira em Sorteios → a rodada: cada ganhador com o prêmio e a empresa certos | Cada cortesia mostra seu ganhador, prêmio e empresa; a rodada termina quando o último resultado é salvo | Pendente no aparelho real | Pendente no aparelho real |
 | 6 | Ensaio com 250 nomes → "Ver lista numerada" → busque 250 → girar | Nº 250 encontrado; marcações legíveis; giro fluido; trilha toca | Pendente no aparelho real | Pendente no aparelho real |
 | 7 | Ajustes → Som: volume, "Sem som"; ligar "Reduzir movimento" no celular | Volume muda; sem som não toca; giro curto | Pendente no aparelho real | Pendente no aparelho real |
 | 8 | Roleta → "Gravar comigo" → "Roleta com meu rosto" → girar → abrir gravação em Sorteios | Rosto, ponteiro, ganhador e voz claros e sincronizados | Pendente no aparelho real | Pendente no aparelho real |
@@ -42,6 +42,11 @@ Aparelho: ______  Sistema: ______  Navegador: ______  (faça primeiro no Android
 | 17 | Retorno de versão: no histórico do Lovable, abra numa prévia separada a revisão estável anterior **ac640a0 / 3618e67 (E07)** e restaure a cópia | A E07 abre cópias formato v1. Campos da E08 (enigma, entregas, rascunho) não aparecem nela; caminho seguro: não salvar nada na versão antiga e voltar para d56eeaf, onde a mesma cópia restaura completa | Pendente no aparelho real | Pendente no aparelho real |
 
 Nunca restaure ou teste por cima dos dados reais da administradora: use aba anônima ou outro navegador.
+
+## Rodada sem imagens (conferido no navegador do computador)
+| Cenário | Resultado |
+|---|---|
+| Nova rodada com 2 empresas, 2 cortesias, nenhuma imagem anexada → nomes → girar as duas | Aprovado (computador) / Pendente no aparelho real |
 
 ## Falhas encontradas
 Nenhuma falha reproduzida nesta etapa; nenhum código mudou.
