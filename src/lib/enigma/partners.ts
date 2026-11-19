@@ -188,3 +188,33 @@ export function appendOffers(
   }
   return next;
 }
+
+export type OfferPlan = {
+  /** Offers already saved in a round (earlier half-finished try): only their link is completed. */
+  recovered: { offer: Offer; drawId: string; roundId: string }[];
+  /** Offers not saved anywhere yet. */
+  fresh: Offer[];
+};
+
+/** Before creating or adding: find, by offer id, which selected offers already sit in a round. */
+export function planOffers(draws: Draw[], selected: Offer[]): OfferPlan {
+  const plan: OfferPlan = { recovered: [], fresh: [] };
+  for (const o of selected) {
+    const p = placementOf(draws, o);
+    if (p) plan.recovered.push({ offer: o, ...p });
+    else plan.fresh.push(o);
+  }
+  return plan;
+}
+
+/** Message for a recovery: says exactly which offers were finished and where; the rest wait. */
+export function recoveryMessage(plan: OfferPlan, draws: Draw[], fmtDate: (iso: string) => string): string {
+  const parts = plan.recovered.map((r) => {
+    const d = draws.find((x) => x.id === r.drawId);
+    return `“${r.offer.prize}” (${r.offer.name}) já estava na rodada de ${d ? fmtDate(d.date) : "?"}`;
+  });
+  const left = plan.fresh.length
+    ? ` ${plan.fresh.length === 1 ? "A outra oferta continua pendente" : `As outras ${plan.fresh.length} ofertas continuam pendentes`}: escolha o destino de novo.`
+    : "";
+  return `Recuperado: ${parts.join("; ")}.${left}`;
+}

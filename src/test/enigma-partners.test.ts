@@ -75,3 +75,37 @@ describe("P1 várias ofertas", () => {
     expect(roundsOf(twice, shops).map((r) => r.prize)).toEqual(["Pão", "X"]);
   });
 });
+
+import { planOffers, recoveryMessage } from "@/lib/enigma/partners";
+const fmt = (iso: string) => iso.split("-").reverse().join("/");
+
+describe("P1 recuperação de falha parcial", () => {
+  it("caso 1: A salva sem confirmar, depois A+B → só A é recuperada; B segue pendente; nada criado", () => {
+    const A = off("A", "b7", "Hambúrguer"), B = off("B", "p", "Pão");
+    const saved = [draftFromOffers([A], shops, "2026-11-20", 0)!]; // round saved, link failed
+    const plan = planOffers(saved, [A, B]);
+    expect(plan.recovered.map((r) => [r.offer.id, r.drawId, r.roundId])).toEqual([["A", "rd-A", "rd-A"]]);
+    expect(plan.fresh.map((o) => o.id)).toEqual(["B"]);
+    expect(roundsOf(saved[0]!, shops).map((r) => r.prize)).toEqual(["Hambúrguer"]);
+    expect(recoveryMessage(plan, saved, fmt)).toBe(
+      "Recuperado: “Hambúrguer” () já estava na rodada de 20/11/2026. A outra oferta continua pendente: escolha o destino de novo.",
+    );
+  });
+  it("caso 2: oferta salva na rodada A; nova tentativa escolhendo B fica em A, B não muda", () => {
+    const X = off("X", "c", "Café");
+    const a = appendOffers(createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true }), [X], shops);
+    const b = createDraw({ date: "2026-11-21", merchant: burger, prize: "Lanche", confirmed: true });
+    const plan = planOffers([a, b], [X]);
+    expect(plan.recovered[0]).toMatchObject({ drawId: a.id, roundId: "of-X" });
+    expect(plan.fresh).toEqual([]);
+    expect(roundsOf(b, shops).map((r) => r.prize)).toEqual(["Lanche"]);
+  });
+  it("toque duplo / depois de recarregar: o lugar vem só das rodadas salvas, sem duplicar", () => {
+    const X = off("X", "c", "Café");
+    const a = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
+    const once = appendOffers(a, [X], shops);
+    const reloaded = JSON.parse(JSON.stringify(once));
+    expect(appendOffers(reloaded, [X], shops).extraPrizes).toHaveLength(1);
+    expect(planOffers([reloaded], [X]).recovered).toHaveLength(1);
+  });
+});

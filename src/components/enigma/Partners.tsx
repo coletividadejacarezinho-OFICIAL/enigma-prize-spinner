@@ -15,6 +15,8 @@ import {
   fakePhone,
   offerMerchantId,
   placementOf,
+  planOffers,
+  recoveryMessage,
   findExisting,
   formatWhatsapp,
   offerText,
@@ -95,7 +97,11 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   /** Records each offer's link, but only for offers whose prize is really saved in a round. */
-  const finish = (offers: Offer[], extra: Record<string, { drawId: string; roundId: string }>) => {
+  const finish = (
+    offers: Offer[],
+    extra: Record<string, { drawId: string; roundId: string }>,
+    explicit = true,
+  ) => {
     const now = latest();
     if (!now) return false;
     const found = offers.map((o) => [o, extra[o.id] ?? placementOf(now.draws, o)] as const);
@@ -104,7 +110,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
       offers: s.offers.map((x) => {
         const f = found.find(([o]) => o.id === x.id)?.[1];
         return f && !x.confirmed
-          ? { ...x, confirmed: { ...f, at: Date.now(), linked: !!extra[x.id] } }
+          ? { ...x, confirmed: { ...f, at: Date.now(), linked: explicit && !!extra[x.id] } }
           : x;
       }),
     }));
@@ -126,21 +132,33 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     }
   };
 
+  /** If any selected offer is already in a round, finish only those and keep the others pending. */
+  const recover = (): boolean | null => {
+    const now = latest();
+    if (!now) return false;
+    const plan = planOffers(now.draws, sel);
+    if (plan.recovered.length === 0) return null;
+    const extra = Object.fromEntries(plan.recovered.map((r) => [r.offer.id, { drawId: r.drawId, roundId: r.roundId }]));
+    if (!finish(plan.recovered.map((r) => r.offer), extra, false)) return false;
+    toast.success(recoveryMessage(plan, now.draws, formatDateBR));
+    setPicked(plan.fresh.map((o) => o.id));
+    setMode(null);
+    return false; // keep the fresh ones selected for the admin to decide again
+  };
+
   const create = () =>
     run(async () => {
+      const r = recover();
+      if (r !== null) return r;
       if (!date) {
         toast.error("Escolha a data.");
         return false;
       }
       const now = latest();
       if (!now) return false;
-      // Already saved by an earlier tap or a half-finished try? Then only finish the links.
-      const already = sel.find((o) => placementOf(now.draws, o));
-      if (!already) {
-        const d = draftFromOffers(sel, now.merchants, date, Date.now());
-        if (!d) return false;
-        if (!report(await repo.createDraw(d, { makeCurrent: false }))) return false;
-      }
+      const d = draftFromOffers(sel, now.merchants, date, Date.now());
+      if (!d) return false;
+      if (!report(await repo.createDraw(d, { makeCurrent: false }))) return false;
       if (!finish(sel, {})) return false;
       toast.success(`Rascunho criado com ${sel.length} ${sel.length === 1 ? "prêmio" : "prêmios"}.`);
       return true;
@@ -149,6 +167,8 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   const add = () =>
     run(async () => {
       if (!target) return false;
+      const r = recover();
+      if (r !== null) return r;
       const extra: Record<string, { drawId: string; roundId: string }> = {};
       for (const [id, roundId] of Object.entries(links)) if (picked.includes(id)) extra[id] = { drawId: target.id, roundId };
       const ok = await repo.editDraw(target.id, (d) => appendOffers(d, sel, latest()?.merchants ?? state.merchants, links));
