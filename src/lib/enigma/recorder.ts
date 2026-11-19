@@ -611,7 +611,7 @@ function paintWheel(
   }
   if (count > 0) {
     const size = wheelFontSize(count) * (r / 100);
-    ctx.font = `800 ${size}px ${DISPLAY}`;
+    ctx.font = `800 ${size}px ${SANS}`;
     ctx.textBaseline = "middle";
     names.forEach((name, i) => {
       if (!name) return;
