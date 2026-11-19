@@ -48,3 +48,30 @@ describe("P1 parceiros", () => {
     expect(addOfferCourtesy(spun, padaria, "Pão", "y")).toBe(spun);
   });
 });
+
+import { appendOffers, draftFromOffers, placementOf, type Offer } from "@/lib/enigma/partners";
+const off = (id: string, merchantId: string, prize: string): Offer => ({
+  id, accountId: "a", merchantId, name: "", whatsapp: "", prize, createdAt: 0,
+});
+const shops = [burger, padaria, { id: "c", name: "Café", createdAt: 0 }, { id: "d", name: "Doces", createdAt: 0 }];
+
+describe("P1 várias ofertas", () => {
+  it("um único rascunho com as ofertas na ordem escolhida", () => {
+    const os = [off("1", "b7", "1 hambúrguer com batata"), off("2", "p", "Pão"), off("3", "c", "Café"), off("4", "d", "Bolo")];
+    const d = draftFromOffers(os, shops, "2026-11-20", 0)!;
+    expect(d.draft).toBe(true);
+    expect(roundsOf(d, shops).map((r) => r.prize)).toEqual(["1 hambúrguer com batata", "Pão", "Café", "Bolo"]);
+    expect(os.map((o) => placementOf([d], o)?.drawId)).toEqual([d.id, d.id, d.id, d.id]);
+  });
+  it("uma oferta só cria rodada com esse único prêmio", () => {
+    const d = draftFromOffers([off("1", "b7", "1 hambúrguer com batata")], shops, "2026-11-20", 0)!;
+    expect(roundsOf(d, shops).map((r) => r.prize)).toEqual(["1 hambúrguer com batata"]);
+  });
+  it("adicionar duas vezes não duplica; associação explícita não acrescenta", () => {
+    const base = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
+    const os = [off("5", "b7", "X"), off("6", "c", "Y")];
+    const once = appendOffers(base, os, shops, { "6": base.id });
+    const twice = appendOffers(once, os, shops, { "6": base.id });
+    expect(roundsOf(twice, shops).map((r) => r.prize)).toEqual(["Pão", "X"]);
+  });
+});

@@ -111,3 +111,80 @@ export function fakePhone(seed: string): string {
   const n = String(10000000 + (h % 89999999)).slice(0, 8);
   return `43 9${n.slice(0, 4)}-${n.slice(4)}`;
 }
+
+// ---- Several offers at once (P1 fix). IDs come from the offer, so a double tap or a
+// retry after a partial failure finds what was already saved instead of duplicating it.
+
+export const offerDrawId = (o: Pick<Offer, "id">) => `rd-${o.id}`;
+export const offerRoundId = (o: Pick<Offer, "id">) => `of-${o.id}`;
+export const offerMerchantId = (o: Pick<Offer, "id">) => `mc-${o.id}`;
+
+/** Where an offer already sits in the saved draws (round id = draw id for the first prize). */
+export function placementOf(draws: Draw[], o: Pick<Offer, "id">): { drawId: string; roundId: string } | undefined {
+  for (const d of draws) {
+    if (d.id === offerDrawId(o)) return { drawId: d.id, roundId: d.id };
+    if (d.extraPrizes?.some((p) => p.id === offerRoundId(o))) return { drawId: d.id, roundId: offerRoundId(o) };
+  }
+  return undefined;
+}
+
+/** Pending = no link saved yet; only these are shown in "Ofertas recebidas". */
+export const pendingOffers = (sim: PartnerSim) => sim.offers.filter((o) => !o.confirmed);
+
+/** One draft with every selected offer, in the order given: first offer = prize 1. */
+export function draftFromOffers(
+  offers: Offer[],
+  merchants: Merchant[],
+  date: string,
+  now: number,
+): Draw | null {
+  const shops = offers.map((o) => merchants.find((m) => m.id === o.merchantId));
+  const [first, ...rest] = offers;
+  if (!first || shops.some((m) => !m)) return null;
+  const m0 = shops[0]!;
+  return {
+    id: offerDrawId(first),
+    date,
+    merchantId: m0.id,
+    merchant: m0.name,
+    prize: first.prize.trim(),
+    confirmed: true,
+    names: [],
+    entries: [],
+    draft: true,
+    ...(rest.length
+      ? {
+          extraPrizes: rest.map((o, i) => ({
+            id: offerRoundId(o),
+            merchantId: shops[i + 1]!.id,
+            merchant: shops[i + 1]!.name,
+            prize: o.prize.trim(),
+          })),
+          repeatWinners: false,
+        }
+      : {}),
+    createdAt: now,
+  };
+}
+
+/**
+ * Adds offers after the prizes already in the round. `links` maps an offer id to an existing
+ * prize the admin explicitly picked as "the same one"; those are not added again.
+ * Offers already in the draw are skipped, so running it twice changes nothing.
+ */
+export function appendOffers(
+  draw: Draw,
+  offers: Offer[],
+  merchants: Merchant[],
+  links: Record<string, string> = {},
+): Draw {
+  if (draw.result) return draw;
+  let next = draw;
+  for (const o of offers) {
+    if (links[o.id] || placementOf([next], o)) continue;
+    const m = merchants.find((x) => x.id === o.merchantId);
+    if (!m) continue;
+    next = addOfferCourtesy(next, m, o.prize, offerRoundId(o));
+  }
+  return next;
+}

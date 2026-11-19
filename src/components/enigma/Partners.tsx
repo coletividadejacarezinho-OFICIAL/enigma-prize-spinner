@@ -8,10 +8,13 @@ import { GoldButton, SecondaryButton } from "./GoldButton";
 import { MerchantLogo } from "./Logos";
 import { fieldClass } from "./fields";
 import { report } from "@/lib/enigma/feedback";
-import { formatDateBR, newId } from "@/lib/enigma/logic";
+import { formatDateBR, newId, todayISO } from "@/lib/enigma/logic";
 import {
-  addOfferCourtesy,
+  appendOffers,
+  draftFromOffers,
   fakePhone,
+  offerMerchantId,
+  placementOf,
   findExisting,
   formatWhatsapp,
   offerText,
@@ -66,30 +69,201 @@ export function PartnerTools({ state }: { state: AppState }) {
           Cadastrar o Burguer 7 de exemplo (ensaio)
         </button>
       )}
-      {pending.length > 0 && (
-        <section className="mt-4 space-y-3" aria-labelledby="ofertas">
-          <h2 id="ofertas" className="font-display text-xl font-extrabold">
-            Ofertas recebidas ({pending.length})
-          </h2>
-          {pending.map((o) => (
-            <OfferCard key={o.id} offer={o} state={state} />
-          ))}
-        </section>
-      )}
+      {pending.length > 0 && <OffersPanel state={state} pending={pending} />}
     </>
   );
 }
 
-function OfferCard({ offer, state }: { offer: Offer; state: AppState }) {
+const latest = (): AppState | null => {
+  const sn = repo.getSnapshot();
+  return sn && sn.kind === "ok" ? sn.state : null;
+};
+
+function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const [mode, setMode] = useState<"criar" | "adicionar" | null>(null);
+  const [date, setDate] = useState(todayISO());
+  const [drawId, setDrawId] = useState("");
+  const [links, setLinks] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const sel = picked.map((id) => pending.find((o) => o.id === id)).filter((o): o is Offer => !!o);
+  const shopOf = (o: Offer) => state.merchants.find((m) => m.id === o.merchantId);
+  const draws = openDraws(state.draws).sort((a, b) => b.date.localeCompare(a.date));
+  const target = draws.find((d) => d.id === drawId);
+
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  /** Records each offer's link, but only for offers whose prize is really saved in a round. */
+  const finish = (offers: Offer[], extra: Record<string, { drawId: string; roundId: string }>) => {
+    const now = latest();
+    if (!now) return false;
+    const found = offers.map((o) => [o, extra[o.id] ?? placementOf(now.draws, o)] as const);
+    const ok = updateSim((s) => ({
+      ...s,
+      offers: s.offers.map((x) => {
+        const f = found.find(([o]) => o.id === x.id)?.[1];
+        return f && !x.confirmed
+          ? { ...x, confirmed: { ...f, at: Date.now(), linked: !!extra[x.id] } }
+          : x;
+      }),
+    }));
+    if (!ok) toast.error("A rodada foi salva, mas as ofertas não. Toque de novo: nada será duplicado.");
+    return ok;
+  };
+
+  const run = async (fn: () => Promise<boolean>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (await fn()) {
+        setPicked([]);
+        setMode(null);
+        setLinks({});
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = () =>
+    run(async () => {
+      if (!date) {
+        toast.error("Escolha a data.");
+        return false;
+      }
+      const now = latest();
+      if (!now) return false;
+      // Already saved by an earlier tap or a half-finished try? Then only finish the links.
+      const already = sel.find((o) => placementOf(now.draws, o));
+      if (!already) {
+        const d = draftFromOffers(sel, now.merchants, date, Date.now());
+        if (!d) return false;
+        if (!report(await repo.createDraw(d, { makeCurrent: false }))) return false;
+      }
+      if (!finish(sel, {})) return false;
+      toast.success(`Rascunho criado com ${sel.length} ${sel.length === 1 ? "prêmio" : "prêmios"}.`);
+      return true;
+    });
+
+  const add = () =>
+    run(async () => {
+      if (!target) return false;
+      const extra: Record<string, { drawId: string; roundId: string }> = {};
+      for (const [id, roundId] of Object.entries(links)) if (picked.includes(id)) extra[id] = { drawId: target.id, roundId };
+      const ok = await repo.editDraw(target.id, (d) => appendOffers(d, sel, latest()?.merchants ?? state.merchants, links));
+      if (!report(ok)) return false;
+      if (!finish(sel, extra)) return false;
+      toast.success(`Ofertas adicionadas à rodada de ${formatDateBR(target.date)}.`);
+      return true;
+    });
+
+  return (
+    <section className="mt-4 space-y-3" aria-labelledby="ofertas">
+      <h2 id="ofertas" className="font-display text-xl font-extrabold">
+        Ofertas recebidas ({pending.length})
+      </h2>
+      {pending.map((o) => (
+        <OfferCard key={o.id} offer={o} state={state} picked={picked.indexOf(o.id)} onToggle={() => toggle(o.id)} />
+      ))}
+
+      {sel.length > 0 && (
+        <div className="rounded-2xl border-2 border-gold p-4" data-testid="selection">
+          <p className="font-extrabold">
+            {sel.length} {sel.length === 1 ? "oferta selecionada" : "ofertas selecionadas"}
+          </p>
+          <p className="text-sm text-muted-foreground">Ordem em que serão sorteadas:</p>
+          <ol className="mt-1 space-y-1" data-testid="order">
+            {sel.map((o, i) => (
+              <li key={o.id} className="text-sm">
+                <b>Prêmio {i + 1}</b> · {shopOf(o)?.name} — {o.prize}
+              </li>
+            ))}
+          </ol>
+          <GoldButton onClick={() => setMode("criar")} className="mt-3">
+            Criar rodada com as ofertas selecionadas
+          </GoldButton>
+          <SecondaryButton onClick={() => { setMode("adicionar"); setDrawId(draws[0]?.id ?? ""); }} className="mt-1">
+            Adicionar a uma rodada existente
+          </SecondaryButton>
+
+          {mode === "criar" && (
+            <div className="mt-3 space-y-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-bold">Data da rodada</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${fieldClass} [color-scheme:dark]`} />
+              </label>
+              <GoldButton onClick={create} disabled={busy}>
+                Confirmar e criar rascunho
+              </GoldButton>
+            </div>
+          )}
+
+          {mode === "adicionar" &&
+            (draws.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">Não há rodada aberta. Use “Criar rodada”.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-bold">Rodada (ainda sem resultado)</span>
+                  <select value={drawId} onChange={(e) => { setDrawId(e.target.value); setLinks({}); }} className={fieldClass} data-testid="draw-select">
+                    {draws.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {formatDateBR(d.date)}
+                        {d.draft ? " (rascunho)" : ""} · {roundsOf(d, state.merchants).map((r) => r.prize).join(", ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {target &&
+                  sel.map((o) => {
+                    const same = o.merchantId ? sameShopRounds(target, state.merchants, o.merchantId) : [];
+                    if (same.length === 0) return null;
+                    return (
+                      <fieldset key={o.id} className="space-y-1">
+                        <legend className="text-sm font-bold">“{o.prize}” já está cadastrado nesta rodada?</legend>
+                        {[{ roundId: "", prize: "Não: acrescentar como novo prêmio" }, ...same.map((r) => ({ ...r, prize: `Sim, é “${r.prize}”` }))].map((r) => (
+                          <label key={r.roundId || "nova"} className="flex min-h-11 items-center gap-2 rounded-xl bg-secondary/60 px-3">
+                            <input
+                              type="radio"
+                              name={`l-${o.id}`}
+                              checked={(links[o.id] ?? "") === r.roundId}
+                              onChange={() =>
+                                setLinks(({ [o.id]: _x, ...rest }) => (r.roundId ? { ...rest, [o.id]: r.roundId } : rest))
+                              }
+                            />
+                            <span className="text-sm">{r.prize}</span>
+                          </label>
+                        ))}
+                      </fieldset>
+                    );
+                  })}
+                <GoldButton onClick={add} disabled={busy || !target}>
+                  Confirmar e adicionar
+                </GoldButton>
+              </div>
+            ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OfferCard({
+  offer,
+  state,
+  picked,
+  onToggle,
+}: {
+  offer: Offer;
+  state: AppState;
+  picked: number;
+  onToggle: () => void;
+}) {
   const linked = offer.merchantId ? state.merchants.find((m) => m.id === offer.merchantId) : undefined;
   const match = linked ? undefined : findExisting(state.merchants, offer.name, offer.whatsapp);
-  const draws = openDraws(state.draws).sort((a, b) => b.date.localeCompare(a.date));
-  const [drawId, setDrawId] = useState(draws[0]?.id ?? "");
-  const [target, setTarget] = useState("nova");
-  const draw = draws.find((d) => d.id === drawId);
-  const existing = linked && draw ? sameShopRounds(draw, state.merchants, linked.id) : [];
 
-  const attachShop = async (merchantId: string) =>
+  const attachShop = (merchantId: string) =>
     updateSim((s) => ({
       ...s,
       offers: s.offers.map((x) => (x.id === offer.id ? { ...x, merchantId } : x)),
@@ -97,50 +271,42 @@ function OfferCard({ offer, state }: { offer: Offer; state: AppState }) {
     }));
 
   const createShop = async () => {
-    const id = newId();
-    const ok = await repo.saveMerchant({
-      id,
-      name: offer.name,
-      ...(offer.logo ? { logo: offer.logo } : {}),
-      ...(offer.whatsapp ? { whatsapp: offer.whatsapp } : {}),
-      createdAt: Date.now(),
-    });
-    if (!report(ok)) return;
-    if (!(await attachShop(id))) return void toast.error("Não foi possível salvar o ensaio.");
+    const id = offerMerchantId(offer);
+    if (!state.merchants.some((m) => m.id === id)) {
+      const ok = await repo.saveMerchant({
+        id,
+        name: offer.name,
+        ...(offer.logo ? { logo: offer.logo } : {}),
+        ...(offer.whatsapp ? { whatsapp: offer.whatsapp } : {}),
+        createdAt: Date.now(),
+      });
+      if (!report(ok)) return;
+    }
+    if (!attachShop(id)) return void toast.error("Não foi possível salvar o ensaio.");
     toast.success(`${offer.name} cadastrado.`);
   };
 
-  const confirm = async () => {
-    if (!linked || !draw) return;
-    const roundId = target === "nova" ? newId() : target;
-    if (target === "nova") {
-      const ok = await repo.editDraw(draw.id, (d) => addOfferCourtesy(d, linked, offer.prize, roundId));
-      if (!report(ok)) return;
-    }
-    const saved = updateSim((s) => ({
-      ...s,
-      offers: s.offers.map((x) =>
-        x.id === offer.id
-          ? { ...x, confirmed: { drawId: draw.id, roundId, at: Date.now(), linked: target !== "nova" } }
-          : x,
-      ),
-    }));
-    if (!saved) return void toast.error("Não foi possível salvar o ensaio.");
-    toast.success(
-      target === "nova" ? `Cortesia confirmada na rodada de ${formatDateBR(draw.date)}.` : "Oferta ligada à cortesia que já existia.",
-    );
-  };
-
   return (
-    <article className="rounded-2xl bg-card p-4" data-testid="offer">
-      <div className="flex items-center gap-3">
-        <MerchantLogo src={linked?.logo ?? offer.logo} className="h-12 w-12" />
-        <p className="min-w-0 flex-1 font-bold">{offerText(offer)}</p>
-      </div>
+    <article className={`rounded-2xl bg-card p-4 ${picked >= 0 ? "ring-2 ring-gold" : ""}`} data-testid="offer">
+      {linked ? (
+        <label className="flex cursor-pointer items-center gap-3">
+          <input type="checkbox" checked={picked >= 0} onChange={onToggle} className="h-6 w-6 shrink-0 accent-[var(--gold)]" aria-label={`Selecionar ${offerText(offer)}`} />
+          <MerchantLogo src={linked.logo ?? offer.logo} className="h-12 w-12" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">{linked.name}</span>
+            <span className="block text-sm">{offer.prize}</span>
+          </span>
+          {picked >= 0 && <span className="shrink-0 font-extrabold text-gold">{picked + 1}º</span>}
+        </label>
+      ) : (
+        <div className="flex items-center gap-3">
+          <MerchantLogo src={offer.logo} className="h-12 w-12" />
+          <p className="min-w-0 flex-1 font-bold">{offerText(offer)}</p>
+        </div>
+      )}
       <p className="mt-1 text-sm text-muted-foreground">WhatsApp {formatWhatsapp(offer.whatsapp)}</p>
-
-      {!linked ? (
-        match ? (
+      {!linked &&
+        (match ? (
           <div className="mt-3 rounded-xl border-2 border-gold/60 p-3">
             <p className="text-sm">
               Já existe <b>{match.name}</b> com o mesmo nome ou WhatsApp. Confira antes de criar outra ficha.
@@ -156,45 +322,7 @@ function OfferCard({ offer, state }: { offer: Offer; state: AppState }) {
           <GoldButton onClick={createShop} className="mt-3">
             Cadastrar {offer.name}
           </GoldButton>
-        )
-      ) : draws.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Crie uma rodada em “Nova rodada” para receber esta cortesia.
-        </p>
-      ) : (
-        <div className="mt-3 space-y-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-bold">Rodada</span>
-            <select
-              value={drawId}
-              onChange={(e) => {
-                setDrawId(e.target.value);
-                setTarget("nova");
-              }}
-              className={fieldClass}
-            >
-              {draws.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {formatDateBR(d.date)}
-                  {d.draft ? " (rascunho)" : ""} · {roundsOf(d, state.merchants).length} cortesia(s)
-                </option>
-              ))}
-            </select>
-          </label>
-          {existing.length > 0 && (
-            <fieldset className="space-y-1">
-              <legend className="mb-1 text-sm font-bold">Já cadastrou este prêmio?</legend>
-              {[{ roundId: "nova", prize: "Não: acrescentar como nova cortesia" }, ...existing.map((r) => ({ ...r, prize: `Sim, é “${r.prize}”` }))].map((r) => (
-                <label key={r.roundId} className="flex min-h-11 items-center gap-2 rounded-xl bg-secondary/60 px-3">
-                  <input type="radio" name={`t-${offer.id}`} checked={target === r.roundId} onChange={() => setTarget(r.roundId)} />
-                  <span className="text-sm">{r.prize}</span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-          <GoldButton onClick={confirm}>Confirmar cortesia</GoldButton>
-        </div>
-      )}
+        ))}
     </article>
   );
 }
