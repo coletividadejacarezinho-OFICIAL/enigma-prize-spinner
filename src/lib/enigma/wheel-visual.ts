@@ -9,10 +9,16 @@ export function wheelFontSize(count: number): number {
   return Math.min(4.3, (Math.PI * 2 * 70 * 0.78) / count);
 }
 
+/** Short labels affect presentation only; the registered names remain untouched. */
 export function wheelLabel(name: string, count: number): string {
-  const max = count <= 10 ? 14 : 18;
-  const chars = Array.from(name);
-  return chars.length > max ? `${chars.slice(0, max - 1).join("")}…` : name;
+  const max = count <= 10 ? 14 : count <= 30 ? 18 : count <= 80 ? 24 : count <= 120 ? 22 : 18;
+  const clean = name.trim().replace(/\\s+/g, " ");
+  const chars = Array.from(clean);
+  if (chars.length <= max) return clean;
+  const excerpt = chars.slice(0, max - 1).join("");
+  // A word boundary looks better than cutting someone's surname in half.
+  const boundary = excerpt.lastIndexOf(" ");
+  return (boundary >= Math.ceil(max * 0.58) ? excerpt.slice(0, boundary) : excerpt) + "…";
 }
 
 /** Enlarge the upper half as the spin slows down, keeping the top pointer anchored. */
