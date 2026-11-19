@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { WinnerToShopCard } from "@/components/enigma/Partners";
 import { DeliveryCard, RiddleArtButtons } from "@/components/enigma/RoundExtras";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -171,6 +172,7 @@ function VerSorteio() {
       )}
 
       <DeliveryCard draw={draw} merchants={state.merchants} />
+      <WinnerToShopCard draw={draw} state={state} />
 
       <div className="mt-4 space-y-1">
         {message ? (

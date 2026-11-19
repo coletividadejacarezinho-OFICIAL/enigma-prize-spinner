@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton } from "@/components/enigma/GoldButton";
+import { PartnerTools } from "@/components/enigma/Partners";
 import { ListaoShareDialog } from "@/components/enigma/ListaoShare";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import {
@@ -259,6 +260,7 @@ function Sorteios() {
             >
               <Plus aria-hidden="true" /> Cadastrar comércio
             </GoldButton>
+            <PartnerTools state={state} />
             {state.merchants.length === 0 ? (
               <p className="mt-4 rounded-2xl border-2 border-dashed border-border p-5 text-center text-muted-foreground">
                 Nenhum comércio cadastrado ainda.

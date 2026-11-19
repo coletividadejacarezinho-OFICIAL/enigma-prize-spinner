@@ -57,3 +57,4 @@ use the editor.
 - Rules for `src/lib/enigma` modules (backup, share-as-image) live in its own AGENTS.md.
 
 - "Nova rodada" has no riddle/answer text inputs: only the optional, closed-by-default "Anexar artes da rodada" with two ready images (arts are made outside the app); older saved riddle text stays untouched.
+- P1 partner shops (simulation only): pure rules in `src/lib/enigma/partners.ts` (tested in `enigma-partners.test.ts`); invites, simulated accounts, offers and winner notices live in their own localStorage key (`partners-store.ts`, `enigma-premiado:p1-ensaio`) so they never mix with draws. A confirmed offer becomes a normal courtesy via `addOfferCourtesy()` (or links to an existing one); "retirado" reuses `markDelivered`.

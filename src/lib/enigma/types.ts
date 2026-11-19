@@ -13,6 +13,8 @@ export type Merchant = {
   id: string;
   name: string;
   logo?: string;
+  /** P1: WhatsApp with DDD, digits only (optional). */
+  whatsapp?: string;
   createdAt: number;
 };
 
