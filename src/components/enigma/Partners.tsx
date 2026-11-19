@@ -1,7 +1,7 @@
 /** P1 (ensaio): admin side of partner shops — invites, received offers, winner sent to the shop. */
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CheckCircle2, Gift, Send, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { GoldButton, SecondaryButton } from "./GoldButton";
@@ -88,6 +88,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   const [drawId, setDrawId] = useState("");
   const [links, setLinks] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const created = state.draws.find((d) => d.id === createdId);
@@ -101,20 +102,20 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   /** Records each offer's link, but only for offers whose prize is really saved in a round. */
-  const finish = (
-    offers: Offer[],
-    extra: Record<string, { drawId: string; roundId: string }>,
-    explicit = true,
-  ) => {
+  const finish = (offers: Offer[]) => {
     const now = latest();
     if (!now) return false;
-    const found = offers.map((o) => [o, extra[o.id] ?? placementOf(now.draws, o)] as const);
+    const found = offers.map((o) => [o, placementOf(now.draws, o)] as const);
+    if (found.some(([, placement]) => !placement)) {
+      setError("A oferta ainda não foi salva na rodada. Confira o destino e tente novamente.");
+      return false;
+    }
     const ok = updateSim((s) => ({
       ...s,
       offers: s.offers.map((x) => {
         const f = found.find(([o]) => o.id === x.id)?.[1];
         return f && !x.confirmed
-          ? { ...x, confirmed: { ...f, at: Date.now(), linked: explicit && !!extra[x.id] } }
+          ? { ...x, confirmed: { ...f, at: Date.now(), linked: !!now.draws.find((d) => d.id === f.drawId)?.offerLinks?.[x.id] } }
           : x;
       }),
     }));
@@ -123,7 +124,8 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   };
 
   const run = async (fn: () => Promise<boolean>) => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError("");
     try {
@@ -135,6 +137,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     } catch {
       setError("Não foi possível concluir. Confira as ofertas e tente novamente.");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -145,8 +148,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     if (!now) return false;
     const plan = planOffers(now.draws, sel);
     if (plan.recovered.length === 0) return null;
-    const extra = Object.fromEntries(plan.recovered.map((r) => [r.offer.id, { drawId: r.drawId, roundId: r.roundId }]));
-    if (!finish(plan.recovered.map((r) => r.offer), extra, false)) return false;
+    if (!finish(plan.recovered.map((r) => r.offer))) return false;
     toast.success(recoveryMessage(plan, now.draws, formatDateBR));
     setPicked(plan.fresh.map((o) => o.id));
     setMode(null);
@@ -174,7 +176,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
         return false;
       }
       setCreatedId(d.id);
-      if (!finish(sel, {})) return false;
+      if (!finish(sel)) return false;
       toast.success(`Rascunho criado com ${sel.length} ${sel.length === 1 ? "prêmio" : "prêmios"}.`);
       return true;
     });
@@ -184,11 +186,9 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
       if (!target) return false;
       const r = recover();
       if (r !== null) return r;
-      const extra: Record<string, { drawId: string; roundId: string }> = {};
-      for (const [id, roundId] of Object.entries(links)) if (picked.includes(id)) extra[id] = { drawId: target.id, roundId };
       const ok = await repo.editDraw(target.id, (d) => appendOffers(d, sel, latest()?.merchants ?? state.merchants, links));
       if (!report(ok)) return false;
-      if (!finish(sel, extra)) return false;
+      if (!finish(sel)) return false;
       toast.success(`Ofertas adicionadas à rodada de ${formatDateBR(target.date)}.`);
       return true;
     });
