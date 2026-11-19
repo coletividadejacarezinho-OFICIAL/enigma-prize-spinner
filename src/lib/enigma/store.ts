@@ -4,6 +4,7 @@ import { finishRecording, migrateState } from "./logic";
 import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 
 const KEY = "enigma-premiado:v1";
+export const STORAGE_KEY = KEY;
 const EVENT = "enigma-premiado:change";
 
 function isState(value: unknown): value is AppState {

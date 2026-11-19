@@ -1,0 +1,2 @@
+- Backup (E04): pure `buildManifest()` in `backup.ts` (tested); `backup-export.ts` only reads localStorage/IndexedDB and zips `copia.json` (exact saved text + parsed state + summary) with `videos/<recordingId>.*`; missing videos are listed, never fatal. Restore is E05.
+- Share-as-image: picture content and splitting live in pure `cards.ts` (tested); `cards-render.ts` only paints 1080×1920 PNGs; the preview shows the same files that are shared and saved.

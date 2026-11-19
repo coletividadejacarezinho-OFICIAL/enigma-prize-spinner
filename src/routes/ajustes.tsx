@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
+import { BackupCard } from "@/components/enigma/BackupCard";
 import { BotTestCard } from "@/components/enigma/BotTestCard";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { InstallCard } from "@/components/enigma/InstallCard";
@@ -113,6 +114,8 @@ function Ajustes() {
         </section>
 
         <BotTestCard state={state} />
+
+        <BackupCard />
 
         <InstallCard />
 
