@@ -135,6 +135,8 @@ export type Draw = {
   result?: DrawResult;
   /** Courtesies 2, 3…: same list of names, one winner each, spun in order. */
   extraPrizes?: Prize[];
+  /** P1: explicit offer associations, saved with the draw before confirming the offer. */
+  offerLinks?: Record<string, string>;
   /** "Quem ganhar pode ganhar de novo neste sorteio?" — only asked with 2 or more courtesies. */
   repeatWinners?: boolean;
   /** Round the Roleta shows (0-based); moves on only through "Sortear próxima cortesia". */
