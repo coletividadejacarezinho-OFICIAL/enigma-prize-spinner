@@ -182,3 +182,32 @@
     box-shadow: var(--shadow-wheel);
   }
 }
+
+/* Alternating marquee bulbs around the wheel's gold rim. */
+.wheel-bulb {
+  width: 2.9%;
+  height: 2.9%;
+  transform: translate(-50%, -50%);
+  background: #d99517;
+  box-shadow: 0 0 0 transparent;
+  animation: wheel-bulb-pulse 1.3s steps(1, end) infinite;
+}
+
+@keyframes wheel-bulb-pulse {
+  0%, 49.99% {
+    background: #fffaf0;
+    box-shadow: 0 0 7px 2px rgba(255, 250, 225, 0.8);
+  }
+  50%, 100% {
+    background: #d99517;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-bulb {
+    animation: none;
+    background: #fff3cd;
+    box-shadow: none;
+  }
+}
