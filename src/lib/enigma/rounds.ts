@@ -3,6 +3,7 @@
  * winner from the same confirmed list, in order. Pure functions only.
  */
 import { formatDateBR, merchantOf, resultMessage } from "./logic";
+import { MIN_NAMES_TO_SPIN } from "./types";
 import type { Draw, DrawResult, Merchant, Prize } from "./types";
 
 export type Round = {
@@ -213,4 +214,10 @@ export function roundIndexOf(draw: Draw, roundId: string): number {
   if (roundId === draw.id) return 0;
   const i = (draw.extraPrizes ?? []).findIndex((p) => p.id === roundId);
   return i < 0 ? -1 : i + 1;
+}
+
+
+/** Later courtesies may have one eligible name after earlier winners leave. */
+export function minimumNamesForRound(index: number): number {
+  return index === 0 ? MIN_NAMES_TO_SPIN : 1;
 }

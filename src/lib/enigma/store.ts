@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { receiveBotMessage, type BotInput } from "./entries";
 import { finishRecording, migrateState } from "./logic";
+import { SIM_KEY } from "./partners-store";
 import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 
 const KEY = "enigma-premiado:v1";
@@ -146,7 +147,7 @@ export function update(fn: (state: AppState) => AppState): boolean {
 
 /** The draw on the Roleta. Screens that call this only render once a draw exists (see FirstRun). */
 export function currentDraw(state: AppState): Draw {
-  return state.draws.find((d) => d.id === state.currentId) ?? state.draws[0]!;
+  return state.draws.find((d) => d.id === state.currentId && !d.draft) ?? state.draws.find((d) => !d.draft)!;
 }
 
 export function updateDraw(id: string, fn: (draw: Draw) => Draw): boolean {
@@ -250,6 +251,8 @@ export type RestoreJournal = {
   newRaw: string;
   /** Videos this restore adds; deleted again if the restore is rolled back. */
   newVideoIds: string[];
+  prevPartnerRaw?: string | null;
+  newPartnerRaw?: string;
 };
 
 function readJournal(): RestoreJournal | null {
@@ -307,16 +310,25 @@ export function writeRawBack(prevRaw: string | null) {
  * the data write is finished; phase "videos" means data was never touched, so it is rolled back
  * and the returned video ids must be deleted.
  */
-export function settleRestore(): { outcome: "none" | "finished" | "rolledBack"; deleteVideos: string[] } {
+export function settleRestore(): { outcome: "none" | "finished" | "rolledBack" | "pending"; deleteVideos: string[] } {
   const j = readJournal();
   if (!j) return { outcome: "none", deleteVideos: [] };
   if (j.phase === "data") {
-    if (getRaw().raw !== j.newRaw && !writeRestoredRaw(j.newRaw)) {
-      writeRawBack(j.prevRaw);
-      return { outcome: "rolledBack", deleteVideos: j.newVideoIds };
+    try {
+      if (j.newPartnerRaw !== undefined) window.localStorage.setItem(SIM_KEY, j.newPartnerRaw);
+      if (getRaw().raw !== j.newRaw && !writeRestoredRaw(j.newRaw))
+        return { outcome: "pending", deleteVideos: [] };
+      return { outcome: "finished", deleteVideos: [] };
+    } catch {
+      return { outcome: "pending", deleteVideos: [] };
     }
-    return { outcome: "finished", deleteVideos: [] };
   }
-  writeRawBack(j.prevRaw);
+  if (!writeRawBack(j.prevRaw)) return { outcome: "pending", deleteVideos: [] };
+  try {
+    if (j.prevPartnerRaw === null) window.localStorage.removeItem(SIM_KEY);
+    else if (j.prevPartnerRaw !== undefined) window.localStorage.setItem(SIM_KEY, j.prevPartnerRaw);
+  } catch {
+    return { outcome: "pending", deleteVideos: [] };
+  }
   return { outcome: "rolledBack", deleteVideos: j.newVideoIds };
 }

@@ -180,7 +180,7 @@ export function buildListao(
   const latestPast = new Map<string, string>();
   const earliestFuture = new Map<string, string>();
   for (const d of state.draws) {
-    if (d.isSample || d.confirmed !== true) continue;
+    if (d.isSample || d.draft || d.confirmed !== true) continue;
     // Every courtesy of the draw puts its shop on the Listão.
     const ids = [d.merchantId, ...(d.extraPrizes ?? []).map((p) => p.merchantId)];
     for (const id of new Set(ids)) {

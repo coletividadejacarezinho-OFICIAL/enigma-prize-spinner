@@ -161,10 +161,11 @@ function RootComponent() {
   // First open with no draws: Roleta, Nomes and the invite need a draw, so they show FirstRun.
   const path = useRouterState({ select: (s) => s.location.pathname });
   const needsDraw = path === "/" || path === "/nomes" || path.startsWith("/convite");
-  const empty = store?.kind === "ok" && store.state.draws.length === 0 && needsDraw;
+  const empty = store?.kind === "ok" && !store.state.draws.some((d) => !d.draft) && needsDraw;
   useEffect(() => {
     // A restore interrupted by closing the page is finished or undone before anything else.
     void settleOnOpen().then((r) => {
+      if (r === "pending") toast.error("A restauração precisa de espaço para terminar. Libere espaço e reabra o aplicativo.");
       if (r === "finished") toast.success("A restauração da cópia foi concluída.");
       if (r === "rolledBack") toast.info("A restauração anterior não terminou e foi desfeita. Seus dados estão como antes.");
     });

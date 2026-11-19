@@ -1,4 +1,6 @@
 /** Browser-only: reads (never writes) localStorage and IndexedDB and builds the backup zip. */
+import { SIM_KEY } from "./partners-store";
+import { mergePartners } from "./partners-backup";
 import JSZip from "jszip";
 import { buildManifest, backupFileName, videoPath, videoRefs, type BackupManifest } from "./backup";
 import { loadState, rawSavedData, STORAGE_KEY } from "./store";
@@ -27,6 +29,8 @@ export async function prepareBackup(now = new Date()): Promise<PreparedBackup> {
       }
     }
     const manifest = buildManifest(loaded.state, raw, STORAGE_KEY, available, now);
+    const partnerRaw = localStorage.getItem(SIM_KEY);
+    if (partnerRaw) manifest.partners = mergePartners(null, JSON.parse(partnerRaw));
     zip.file("copia.json", JSON.stringify(manifest, null, 2));
     const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
     return { ok: true, blob, filename: backupFileName(now), manifest };
