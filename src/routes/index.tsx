@@ -22,7 +22,10 @@ import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
+import { ImageButton } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
+import { WinnerArtDialog } from "@/components/enigma/WinnerArt";
+import type { WinnerChoice } from "@/lib/enigma/cards";
 import { VideoDoneDialog } from "@/components/enigma/VideoActions";
 import { Wheel } from "@/components/enigma/Wheel";
 import {
@@ -107,6 +110,8 @@ function Roleta() {
   const [stopping, setStopping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  // "Compartilhar arte do ganhador": which picture opens first (null = closed).
+  const [art, setArt] = useState<WinnerChoice | null>(null);
   const [repeatAsk, setRepeatAsk] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const rec = useRecorder();
@@ -460,7 +465,13 @@ function Roleta() {
             <Plus aria-hidden="true" /> Novo sorteio
           </SecondaryButton>
         ) : result ? (
-          hint(spinning ? "" : `Ganhador(a) guardado. Falta ${total - ri - 1 === 1 ? "1 cortesia" : `${total - ri - 1} cortesias`}.`)
+          spinning ? (
+            hint("")
+          ) : (
+            <SecondaryButton onClick={() => setArt(ri)}>
+              <Trophy className="text-gold" aria-hidden="true" /> Compartilhar arte do ganhador
+            </SecondaryButton>
+          )
         ) : dirty && count > 0 ? (
           hint("A lista mudou em Nomes. Confirme antes de girar.")
         ) : canSpin && ri > 0 ? (
@@ -546,6 +557,13 @@ function Roleta() {
           >
             <MessageCircle aria-hidden="true" /> Compartilhar no WhatsApp
           </GoldButton>
+          <ImageButton
+            label="Compartilhar arte do ganhador"
+            onClick={() => {
+              setSummaryOpen(false);
+              setArt("resumo");
+            }}
+          />
         </DialogContent>
       </Dialog>
 
@@ -553,6 +571,23 @@ function Roleta() {
         text={shareOpen ? message : null}
         onClose={() => setShareOpen(false)}
         {...(multi ? { title: "Compartilhar no WhatsApp" } : {})}
+        extra={
+          <ImageButton
+            label="Compartilhar arte do ganhador"
+            onClick={() => {
+              setShareOpen(false);
+              setArt(multi ? "resumo" : 0);
+            }}
+          />
+        }
+      />
+      <WinnerArtDialog
+        open={art !== null}
+        onClose={() => setArt(null)}
+        draw={draw}
+        merchants={state.merchants}
+        groupLogo={state.groupLogo}
+        initial={art ?? 0}
       />
       <CameraDialog open={cameraOpen} onClose={() => setCameraOpen(false)} onStart={handleStartRecording} />
       <VideoDoneDialog video={videoDone} onClose={() => setVideoDone(null)} />

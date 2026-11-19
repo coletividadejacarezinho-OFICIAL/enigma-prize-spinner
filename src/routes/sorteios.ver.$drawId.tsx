@@ -4,7 +4,10 @@ import { useState } from "react";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { MerchantLogo } from "@/components/enigma/Logos";
+import { ImageButton } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
+import { WinnerArtDialog } from "@/components/enigma/WinnerArt";
+import { winnerChoices } from "@/lib/enigma/cards";
 import { formatDateBR, merchantOf } from "@/lib/enigma/logic";
 import { drawResultMessage, roundsOf } from "@/lib/enigma/rounds";
 import { setCurrent, useAppState } from "@/lib/enigma/store";
@@ -31,6 +34,7 @@ function VerSorteio() {
   const state = useAppState();
   const navigate = useNavigate();
   const [shareOpen, setShareOpen] = useState(false);
+  const [artOpen, setArtOpen] = useState(false);
   if (!state) return <div className="h-dvh" aria-busy="true" />;
 
   const back = (
@@ -53,6 +57,7 @@ function VerSorteio() {
   // This draw's own saved result, whatever round is on the wheel right now.
   const message = drawResultMessage(draw, state.merchants, GROUP_NAME);
   const rounds = roundsOf(draw, state.merchants);
+  const artChoices = winnerChoices(draw, state.merchants);
 
   return (
     <div className="px-4 pb-24 pt-3">
@@ -148,6 +153,11 @@ function VerSorteio() {
             <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" /> Resultado ainda não disponível
           </p>
         )}
+        {artChoices.length > 0 && (
+          <SecondaryButton onClick={() => setArtOpen(true)}>
+            <Trophy className="text-gold" aria-hidden="true" /> Compartilhar arte do ganhador
+          </SecondaryButton>
+        )}
         <SecondaryButton
           onClick={() => {
             setCurrent(draw.id);
@@ -181,7 +191,27 @@ function VerSorteio() {
 
       <WhoWatched />
 
-      <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />
+      <ResultShareDialog
+        text={shareOpen ? message : null}
+        onClose={() => setShareOpen(false)}
+        extra={
+          <ImageButton
+            label="Compartilhar arte do ganhador"
+            onClick={() => {
+              setShareOpen(false);
+              setArtOpen(true);
+            }}
+          />
+        }
+      />
+      <WinnerArtDialog
+        open={artOpen}
+        onClose={() => setArtOpen(false)}
+        draw={draw}
+        merchants={state.merchants}
+        groupLogo={state.groupLogo}
+        initial={artChoices[0]?.id ?? 0}
+      />
     </div>
   );
 }

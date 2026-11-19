@@ -1,5 +1,5 @@
 import { Check, Copy, MessageCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   Dialog,
@@ -45,11 +45,14 @@ export function ResultShareDialog({
   onClose,
   title = "Mandar no WhatsApp",
   description = "Veja a mensagem. No WhatsApp, escolha o grupo e toque em Enviar.",
+  extra,
 }: {
   text: string | null;
   onClose: () => void;
   title?: string;
   description?: string;
+  /** Another way to share, such as "Enviar como imagem", shown under "Abrir WhatsApp". */
+  extra?: ReactNode;
 }) {
   const [copy, setCopy] = useState<"idle" | "ok" | "fail">("idle");
   useEffect(() => setCopy("idle"), [text]);
@@ -81,6 +84,7 @@ export function ResultShareDialog({
           >
             <MessageCircle aria-hidden="true" /> Abrir WhatsApp
           </a>
+          {extra}
           <button
             onClick={handleCopy}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary font-bold active:bg-accent"

@@ -1,7 +1,9 @@
 import { Copy, Share2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { GoldButton } from "./GoldButton";
+import { ImageButton, ImageShareDialog } from "./ImageShare";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatDateBR, listaoText, type ListaoEntry } from "@/lib/enigma/logic";
+import { listaoCardItems } from "@/lib/enigma/cards";
+import { renderListaoCards } from "@/lib/enigma/cards-render";
+import { formatDateBR, listaoText, type ListaoEntry, type ScheduledEntry } from "@/lib/enigma/logic";
 import { GROUP_NAME } from "@/lib/enigma/types";
 
 export function ListaoShareDialog({
@@ -17,12 +21,18 @@ export function ListaoShareDialog({
   onOpenChange,
   today,
   entries,
+  scheduled,
+  groupLogo,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   today: string;
   entries: ListaoEntry[];
+  scheduled: ScheduledEntry[];
+  groupLogo: string | undefined;
 }) {
+  const [imageOpen, setImageOpen] = useState(false);
+  const items = listaoCardItems(entries, scheduled);
   const text = listaoText(GROUP_NAME, today, entries);
 
   const copy = async () => {
@@ -47,6 +57,7 @@ export function ListaoShareDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border-border bg-background sm:max-w-md">
         <DialogHeader>
@@ -84,8 +95,23 @@ export function ListaoShareDialog({
           >
             <Copy className="h-5 w-5" aria-hidden="true" /> Copiar texto
           </button>
+          <ImageButton
+            onClick={() => {
+              onOpenChange(false);
+              setImageOpen(true);
+            }}
+          />
         </div>
       </DialogContent>
     </Dialog>
+    <ImageShareDialog
+      open={imageOpen}
+      onClose={() => setImageOpen(false)}
+      title="Listão como imagem"
+      description="Os comércios na mesma ordem do Listão, com as logos cadastradas."
+      renderKey={JSON.stringify([today, items.map((i) => (i.kind === "shop" ? [i.id, i.name, i.note, i.logo?.length ?? 0] : i.title)), groupLogo?.length ?? 0])}
+      make={() => renderListaoCards(today, items, groupLogo)}
+    />
+    </>
   );
 }

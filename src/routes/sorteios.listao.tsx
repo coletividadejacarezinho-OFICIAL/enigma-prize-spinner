@@ -97,7 +97,14 @@ function Listao() {
         </>
       )}
 
-      <ListaoShareDialog open={shareOpen} onOpenChange={setShareOpen} today={today} entries={active} />
+      <ListaoShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        today={today}
+        entries={active}
+        scheduled={scheduled}
+        groupLogo={state.groupLogo}
+      />
     </div>
   );
 }

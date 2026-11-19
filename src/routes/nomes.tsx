@@ -5,7 +5,10 @@ import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
+import { ImageButton, ImageShareDialog } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
+import { listCardData } from "@/lib/enigma/cards";
+import { renderListCards } from "@/lib/enigma/cards-render";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,6 +91,7 @@ function Nomes() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmShare, setConfirmShare] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [listImageOpen, setListImageOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (!state) return <div className="h-dvh" aria-busy="true" />;
@@ -616,6 +620,23 @@ function Nomes() {
         onClose={() => setShareOpen(false)}
         title="Mandar lista no grupo"
         description="Só os nomes confirmados, iguais aos da roleta. No WhatsApp, escolha o grupo e toque em Enviar."
+        extra={
+          <ImageButton
+            onClick={() => {
+              setShareOpen(false);
+              setListImageOpen(true);
+            }}
+          />
+        }
+      />
+
+      <ImageShareDialog
+        open={listImageOpen}
+        onClose={() => setListImageOpen(false)}
+        title="Lista como imagem"
+        description="Só os nomes confirmados, na mesma ordem da roleta."
+        renderKey={JSON.stringify([listCardData(draw, state.merchants), state.groupLogo?.length ?? 0])}
+        make={() => renderListCards(listCardData(draw, state.merchants), state.groupLogo)}
       />
 
       <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>

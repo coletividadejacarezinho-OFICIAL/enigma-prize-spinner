@@ -271,6 +271,8 @@ function Sorteios() {
         onOpenChange={setShareOpen}
         today={today}
         entries={listao.active}
+        scheduled={listao.scheduled}
+        groupLogo={state.groupLogo}
       />
     </div>
   );
