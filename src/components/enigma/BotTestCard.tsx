@@ -12,8 +12,14 @@ import {
   type BotInput,
 } from "@/lib/enigma/entries";
 import { cleanName, formatDateBR, merchantOf } from "@/lib/enigma/logic";
-import { setCurrent, simulateBotMessage } from "@/lib/enigma/store";
-import { BOT_CLOSE_TIME, type AppState, type BotOutcome, type BotSituation } from "@/lib/enigma/types";
+import { report } from "@/lib/enigma/feedback";
+import { repo } from "@/lib/enigma/repo";
+import {
+  BOT_CLOSE_TIME,
+  type AppState,
+  type BotOutcome,
+  type BotSituation,
+} from "@/lib/enigma/types";
 
 const field =
   "h-12 w-full min-w-0 rounded-xl border-2 border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-hidden";
@@ -32,7 +38,11 @@ export function BotTestCard({ state }: { state: AppState }) {
   const [time, setTime] = useState("19:29");
   const [situation, setSituation] = useState<BotSituation>("acertou");
   const [last, setLast] = useState<BotInput | null>(null);
-  const [feedback, setFeedback] = useState<{ outcome: BotOutcome; matchName?: string; name: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    outcome: BotOutcome;
+    matchName?: string;
+    name: string;
+  } | null>(null);
 
   const draw = open.find((d) => d.id === drawId) ?? open[0];
   useEffect(() => {
@@ -55,16 +65,17 @@ export function BotTestCard({ state }: { state: AppState }) {
   const validTime = cleanTime(time);
   const canSend = !!cleanName(name) && !!cleanName(senderId) && !!validTime;
 
-  const send = (input: BotInput) => {
-    const r = simulateBotMessage(draw.id, input, Date.now());
-    if (!r) return;
+  const send = async (input: BotInput) => {
+    const r = await repo.simulateBot(draw.id, input, Date.now());
+    if (!report(r)) return false;
     setLast(input);
-    setFeedback({ ...r, name: cleanName(input.name) });
+    setFeedback({ ...r.value, name: cleanName(input.name) });
+    return true;
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!canSend || !validTime) return;
-    send({ name, senderId, time: validTime, situation });
+    if (!(await send({ name, senderId, time: validTime, situation }))) return;
     // Next fictitious sender, so a new message is a new person unless "Repetir" is used.
     const m = /^(.*?)(\d+)$/.exec(cleanName(senderId));
     if (m) setSenderId(`${m[1] ?? ""}${String(Number(m[2]) + 1).padStart(m[2]?.length ?? 3, "0")}`);
@@ -117,7 +128,12 @@ export function BotTestCard({ state }: { state: AppState }) {
 
       <label className="mt-3 block text-sm font-bold">
         Identificação fictícia
-        <input value={senderId} onChange={(e) => setSenderId(e.target.value)} className={`${field} mt-1`} autoComplete="off" />
+        <input
+          value={senderId}
+          onChange={(e) => setSenderId(e.target.value)}
+          className={`${field} mt-1`}
+          autoComplete="off"
+        />
       </label>
 
       <div className="mt-3">
@@ -125,7 +141,13 @@ export function BotTestCard({ state }: { state: AppState }) {
           Horário (Jacarezinho)
         </label>
         <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-1">
-          <input id="bot-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className={field} />
+          <input
+            id="bot-time"
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className={field}
+          />
           {["19:29", "19:30"].map((t) => (
             <button
               key={t}
@@ -135,7 +157,10 @@ export function BotTestCard({ state }: { state: AppState }) {
               {t}
             </button>
           ))}
-          <button onClick={() => setTime(jacarezinhoTime())} className="h-12 rounded-xl bg-secondary px-2 text-sm font-bold">
+          <button
+            onClick={() => setTime(jacarezinhoTime())}
+            className="h-12 rounded-xl bg-secondary px-2 text-sm font-bold"
+          >
             Agora
           </button>
         </div>
@@ -181,13 +206,15 @@ export function BotTestCard({ state }: { state: AppState }) {
       <p className="mt-2 min-h-5 text-sm font-bold" role="status" data-testid="bot-feedback">
         {feedback &&
           `${feedback.name}: ${BOT_OUTCOME_LABEL[feedback.outcome]}${
-            feedback.outcome === "revisao" && feedback.matchName ? ` (parecido com “${feedback.matchName}”)` : ""
+            feedback.outcome === "revisao" && feedback.matchName
+              ? ` (parecido com “${feedback.matchName}”)`
+              : ""
           }.`}
       </p>
 
       <p className="mt-1 text-xs text-muted-foreground">
-        A entrada pelo bot fecha às {BOT_CLOSE_TIME}. O que chegou antes pode ser conferido depois, e
-        você continua podendo digitar quem acertou no prazo, na aba Nomes.
+        A entrada pelo bot fecha às {BOT_CLOSE_TIME}. O que chegou antes pode ser conferido depois,
+        e você continua podendo digitar quem acertou no prazo, na aba Nomes.
       </p>
 
       {log.length > 0 && (
@@ -212,7 +239,7 @@ export function BotTestCard({ state }: { state: AppState }) {
       <Link
         to="/nomes"
         onClick={() => {
-          if (!isCurrent) setCurrent(draw.id);
+          if (!isCurrent) void repo.selectDraw(draw.id).then((r) => report(r));
         }}
         className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-secondary text-sm font-bold active:bg-accent"
       >

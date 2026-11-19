@@ -5,6 +5,8 @@ export type DrawResult = {
   /** Final wheel rotation in degrees, so the wheel reopens where it stopped. */
   rotation: number;
   at: number;
+  /** Entry that won (E02). Older results have only the name; names on a confirmed list are unique. */
+  entryId?: string;
 };
 
 export type Merchant = {

@@ -200,3 +200,15 @@ export function commitSpin(
   }
   return { draw: withRoundResult(base, plan.round, result), status: "saved" };
 }
+
+/** Stable id of each courtesy: the draw id for the first, the prize id for the rest. */
+export function roundIdOf(draw: Draw, index: number): string | undefined {
+  if (index === 0) return draw.id;
+  return draw.extraPrizes?.[index - 1]?.id;
+}
+
+export function roundIndexOf(draw: Draw, roundId: string): number {
+  if (roundId === draw.id) return 0;
+  const i = (draw.extraPrizes ?? []).findIndex((p) => p.id === roundId);
+  return i < 0 ? -1 : i + 1;
+}

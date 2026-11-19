@@ -10,7 +10,8 @@ import { InstallCard } from "@/components/enigma/InstallCard";
 import { GroupLogo } from "@/components/enigma/Logos";
 import { Switch } from "@/components/ui/switch";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
-import { update, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo, useAppState } from "@/lib/enigma/repo";
 
 export const Route = createFileRoute("/ajustes")({
   head: () => ({
@@ -41,19 +42,14 @@ function Ajustes() {
     if (!file) return;
     try {
       const url = await fileToSmallDataUrl(file, 400);
-      if (update((s) => ({ ...s, groupLogo: url }))) toast.success("Logo trocada!");
-      else toast.error("O celular está sem espaço para guardar essa logo.");
+      if (report(await repo.setPreferences({ groupLogo: url }))) toast.success("Logo trocada!");
     } catch {
       toast.error("Não deu para abrir essa imagem. Tente outra.");
     }
   };
 
-  const removeLogo = () => {
-    const ok = update((s) => {
-      const { groupLogo: _removed, ...rest } = s;
-      return rest;
-    });
-    if (!ok) toast.error(SAVE_FAIL);
+  const removeLogo = async () => {
+    report(await repo.setPreferences({ groupLogo: null }));
   };
 
   return (
@@ -107,8 +103,8 @@ function Ajustes() {
             </span>
             <Switch
               checked={state.sound}
-              onCheckedChange={(on) => {
-                if (!update((s) => ({ ...s, sound: on }))) toast.error(SAVE_FAIL);
+              onCheckedChange={async (on) => {
+                report(await repo.setPreferences({ sound: on }));
               }}
               className="scale-125"
               aria-label="Som da roleta"

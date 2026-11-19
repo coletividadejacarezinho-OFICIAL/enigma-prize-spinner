@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createMerchant, newId, normalizeForCompare, todayISO } from "@/lib/enigma/logic";
-import { saveMerchant } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo } from "@/lib/enigma/repo";
 import type { Merchant } from "@/lib/enigma/types";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +68,9 @@ function Choice<T>({
             onClick={() => onChange(opt.value)}
             className={cn(
               "flex h-14 items-center justify-center gap-2 rounded-2xl border-2 text-lg font-bold",
-              selected ? "border-gold bg-secondary text-gold" : "border-input bg-card text-foreground",
+              selected
+                ? "border-gold bg-secondary text-gold"
+                : "border-input bg-card text-foreground",
             )}
           >
             {selected && <Check className="h-5 w-5" aria-hidden="true" />}
@@ -88,7 +91,10 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
   const [picking, setPicking] = useState<{ key: string; adding: boolean } | null>(null);
   const set = (patch: Partial<DrawFormValues>) => setValues((v) => ({ ...v, ...patch }));
   const setRow = (key: string, patch: Partial<PrizeRow>) =>
-    setValues((v) => ({ ...v, prizes: v.prizes.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
+    setValues((v) => ({
+      ...v,
+      prizes: v.prizes.map((p) => (p.key === key ? { ...p, ...patch } : p)),
+    }));
 
   // Today's date comes from the phone, so it is filled in after the page loads.
   useEffect(() => {
@@ -124,18 +130,17 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
     setPicking(null);
   };
 
-  const addMerchant = ({ name, logo }: { name: string; logo: string | undefined }) => {
-    const existing = merchants.find((m) => normalizeForCompare(m.name) === normalizeForCompare(name));
+  const addMerchant = async ({ name, logo }: { name: string; logo: string | undefined }) => {
+    const existing = merchants.find(
+      (m) => normalizeForCompare(m.name) === normalizeForCompare(name),
+    );
     if (existing) {
       choose(existing.id);
       toast.info(`“${existing.name}” já estava cadastrada e foi escolhida.`);
       return;
     }
     const m = createMerchant({ name, logo });
-    if (!saveMerchant(m)) {
-      toast.error("O celular está sem espaço para guardar. Tente sem a logo.");
-      return;
-    }
+    if (!report(await repo.saveMerchant(m))) return;
     choose(m.id);
     toast.success(`${m.name} cadastrada e escolhida.`);
   };
@@ -165,7 +170,11 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
           {values.prizes.map((row, i) => {
             const merchant = merchants.find((m) => m.id === row.merchantId);
             return (
-              <fieldset key={row.key} className="rounded-2xl border-2 border-border p-3" data-testid="prize-row">
+              <fieldset
+                key={row.key}
+                className="rounded-2xl border-2 border-border p-3"
+                data-testid="prize-row"
+              >
                 <legend className="px-1 text-sm font-bold text-gold">
                   {multi ? `Cortesia ${i + 1}` : "Cortesia"}
                 </legend>
@@ -179,12 +188,18 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
                   {merchant ? (
                     <>
                       <MerchantLogo src={merchant.logo} className="h-9 w-9" />
-                      <span className="min-w-0 flex-1 truncate text-lg font-bold">{merchant.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-lg font-bold">
+                        {merchant.name}
+                      </span>
                     </>
                   ) : (
-                    <span className="min-w-0 flex-1 text-lg text-muted-foreground">Escolher empresa</span>
+                    <span className="min-w-0 flex-1 text-lg text-muted-foreground">
+                      Escolher empresa
+                    </span>
                   )}
-                  {!row.locked && <ChevronDown className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />}
+                  {!row.locked && (
+                    <ChevronDown className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+                  )}
                 </button>
                 {tried && !merchant && (
                   <span className="mt-1 block text-sm font-semibold text-destructive">
@@ -209,12 +224,16 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
                   )}
                 </label>
                 {row.locked ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Já sorteada: não dá para mudar.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Já sorteada: não dá para mudar.
+                  </p>
                 ) : (
                   multi && (
                     <button
                       type="button"
-                      onClick={() => set({ prizes: values.prizes.filter((p) => p.key !== row.key) })}
+                      onClick={() =>
+                        set({ prizes: values.prizes.filter((p) => p.key !== row.key) })
+                      }
                       className="mt-2 flex h-11 items-center gap-2 rounded-xl px-1 text-sm font-bold text-destructive"
                     >
                       <Trash2 className="h-4 w-4" aria-hidden="true" /> Tirar esta cortesia
@@ -240,7 +259,9 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
 
         {multi && (
           <fieldset>
-            <legend className="mb-1.5 text-base font-bold">Quem ganhar pode ganhar de novo neste sorteio?</legend>
+            <legend className="mb-1.5 text-base font-bold">
+              Quem ganhar pode ganhar de novo neste sorteio?
+            </legend>
             <Choice
               options={[
                 { label: "Sim", value: true },

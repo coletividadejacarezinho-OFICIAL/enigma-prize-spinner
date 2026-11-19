@@ -8,7 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { report } from "@/lib/enigma/feedback";
 import { whatsappLink } from "@/lib/enigma/logic";
+import { needsConnection } from "@/lib/enigma/repo";
 
 /** Copies text; falls back to a hidden textarea for phones without the clipboard API. */
 async function copyText(text: string): Promise<boolean> {
@@ -80,6 +82,10 @@ export function ResultShareDialog({
             href={text ? whatsappLink(text) : undefined}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => {
+              // Copying still works offline; opening WhatsApp needs a connection.
+              if (!report(needsConnection())) e.preventDefault();
+            }}
             className="btn-gold flex h-14 w-full items-center justify-center gap-2 rounded-2xl px-5 font-display text-xl font-extrabold transition-transform active:scale-[0.98] [&_svg]:h-6 [&_svg]:w-6"
           >
             <MessageCircle aria-hidden="true" /> Abrir WhatsApp

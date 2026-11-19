@@ -14,7 +14,9 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { BottomNav } from "../components/enigma/BottomNav";
 import { DataRecovery } from "../components/enigma/DataRecovery";
-import { useStoreSnapshot } from "../lib/enigma/store";
+import { FirstRun, Opening } from "../components/enigma/FirstRun";
+import { OfflineNotice } from "../components/enigma/OfflineNotice";
+import { useSnapshot } from "../lib/enigma/repo";
 import { initInstallPrompt } from "../lib/enigma/install";
 import { usePresentation } from "../lib/enigma/presentation";
 import { Toaster } from "../components/ui/sonner";
@@ -152,8 +154,12 @@ function RootComponent() {
   });
   // Roleta full screen hides the tabs too.
   const presenting = usePresentation();
-  const store = useStoreSnapshot();
+  const store = useSnapshot();
   const broken = store?.kind === "broken";
+  // First open with no draws: Roleta, Nomes and the invite need a draw, so they show FirstRun.
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const needsDraw = path === "/" || path === "/nomes" || path.startsWith("/convite");
+  const empty = store?.kind === "ok" && store.state.draws.length === 0 && needsDraw;
   useEffect(() => initInstallPrompt(), []);
 
   return (
@@ -168,9 +174,18 @@ function RootComponent() {
             : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
         }
       >
-        {broken ? <DataRecovery raw={store.raw} /> : <Outlet />}
+        {store === null ? (
+          <Opening />
+        ) : broken ? (
+          <DataRecovery raw={store.raw} />
+        ) : empty ? (
+          <FirstRun />
+        ) : (
+          <Outlet />
+        )}
+        <OfflineNotice />
       </div>
-      {!isViewerPage && !presenting && !broken && <BottomNav />}
+      {!isViewerPage && !presenting && store !== null && !broken && <BottomNav />}
       <Toaster
         position="top-center"
         richColors

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { WatchView } from "@/components/enigma/WatchView";
 import { merchantOf } from "@/lib/enigma/logic";
-import { currentDraw, useAppState } from "@/lib/enigma/store";
+import { currentDraw, useAppState } from "@/lib/enigma/repo";
 import { DEMO_WATCH, WATCH_STATES, parseWatchState, type WatchInfo } from "@/lib/enigma/watch";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +61,9 @@ function PreviaPublico() {
             key={s.id}
             role="tab"
             aria-selected={watchState === s.id}
-            onClick={() => navigate({ to: "/convite/previa", search: { estado: s.id }, replace: true })}
+            onClick={() =>
+              navigate({ to: "/convite/previa", search: { estado: s.id }, replace: true })
+            }
             className={cn(
               "min-h-12 rounded-xl px-1 text-xs font-bold leading-tight",
               watchState === s.id ? "bg-secondary text-gold" : "text-muted-foreground",
@@ -72,7 +74,10 @@ function PreviaPublico() {
         ))}
       </div>
 
-      <div className="mt-3 rounded-3xl border-2 border-dashed border-border p-3" aria-label="Tela de quem assiste">
+      <div
+        className="mt-3 rounded-3xl border-2 border-dashed border-border p-3"
+        aria-label="Tela de quem assiste"
+      >
         <WatchView info={info} state={watchState} />
       </div>
     </div>

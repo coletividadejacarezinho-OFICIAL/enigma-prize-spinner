@@ -22,7 +22,8 @@ import { WinnerArtDialog } from "@/components/enigma/WinnerArt";
 import { winnerChoices } from "@/lib/enigma/cards";
 import { formatDateBR, merchantOf } from "@/lib/enigma/logic";
 import { drawResultMessage, roundsOf } from "@/lib/enigma/rounds";
-import { setCurrent, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo, useAppState } from "@/lib/enigma/repo";
 import { GROUP_NAME } from "@/lib/enigma/types";
 import { DEMO_AUDIENCE, audienceTotals } from "@/lib/enigma/watch";
 
@@ -181,8 +182,8 @@ function VerSorteio() {
           </SecondaryButton>
         )}
         <SecondaryButton
-          onClick={() => {
-            if (!setCurrent(draw.id)) return void toast.error(SAVE_FAIL);
+          onClick={async () => {
+            if (!report(await repo.selectDraw(draw.id))) return;
             navigate({ to: "/" });
           }}
         >

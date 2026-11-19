@@ -1,12 +1,12 @@
 import { Download, RotateCcw, TriangleAlert } from "lucide-react";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
-import { rawSavedData, retryLoad } from "@/lib/enigma/store";
+import { repo } from "@/lib/enigma/repo";
 
 /** Shown instead of the app when saved data exists but cannot be read. The data is never touched here. */
 export function DataRecovery({ raw }: { raw: string | null }) {
   const download = () => {
-    const text = rawSavedData() ?? raw;
+    const text = repo.rawCopy() ?? raw;
     if (!text) return;
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     const a = document.createElement("a");
@@ -27,7 +27,7 @@ export function DataRecovery({ raw }: { raw: string | null }) {
         guardados do jeito que estavam.
       </p>
       <div className="mt-6 space-y-3">
-        <GoldButton onClick={retryLoad}>
+        <GoldButton onClick={() => repo.reload()}>
           <RotateCcw aria-hidden="true" /> Tentar novamente
         </GoldButton>
         {raw ? (

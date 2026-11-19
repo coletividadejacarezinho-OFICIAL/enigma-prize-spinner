@@ -6,7 +6,7 @@ import { GoldButton } from "@/components/enigma/GoldButton";
 import { ListaoShareDialog } from "@/components/enigma/ListaoShare";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { buildListao, formatDateBR, todayISO } from "@/lib/enigma/logic";
-import { useAppState } from "@/lib/enigma/store";
+import { useAppState } from "@/lib/enigma/repo";
 import { LISTAO_DAYS } from "@/lib/enigma/types";
 
 export const Route = createFileRoute("/sorteios/listao")({
@@ -35,7 +35,10 @@ function Listao() {
 
   return (
     <div className="px-4 pb-24 pt-3">
-      <Link to="/sorteios" className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground">
+      <Link
+        to="/sorteios"
+        className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground"
+      >
         <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Voltar
       </Link>
       <h1 className="text-3xl font-extrabold">🎉 Listão da Alegria</h1>
@@ -50,8 +53,8 @@ function Listao() {
 
       {active.length === 0 ? (
         <p className="mt-5 rounded-2xl border-2 border-dashed border-border p-5 text-center text-muted-foreground">
-          Nenhum comércio em divulgação hoje. Quando um comércio confirmar a cortesia de um
-          sorteio, ele aparece aqui por {LISTAO_DAYS} dias.
+          Nenhum comércio em divulgação hoje. Quando um comércio confirmar a cortesia de um sorteio,
+          ele aparece aqui por {LISTAO_DAYS} dias.
         </p>
       ) : (
         <ul className="mt-5 space-y-2">
@@ -85,11 +88,16 @@ function Listao() {
           </p>
           <ul className="mt-2 space-y-2">
             {scheduled.map((e) => (
-              <li key={e.merchant.id} className="flex items-center gap-3 rounded-2xl bg-card/60 p-3">
+              <li
+                key={e.merchant.id}
+                className="flex items-center gap-3 rounded-2xl bg-card/60 p-3"
+              >
                 <MerchantLogo src={e.merchant.logo} className="h-10 w-10" />
                 <div className="min-w-0">
                   <p className="truncate font-bold">{e.merchant.name}</p>
-                  <p className="text-sm text-muted-foreground">Começa em {formatDateBR(e.starts)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Começa em {formatDateBR(e.starts)}
+                  </p>
                 </div>
               </li>
             ))}

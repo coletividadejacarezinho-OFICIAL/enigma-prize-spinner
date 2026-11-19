@@ -4,7 +4,8 @@ import { toast } from "sonner";
 
 import { MerchantForm } from "@/components/enigma/MerchantForm";
 import { buildListao, formatDateBR, normalizeForCompare, todayISO } from "@/lib/enigma/logic";
-import { saveMerchant, useAppState } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo, useAppState } from "@/lib/enigma/repo";
 
 export const Route = createFileRoute("/sorteios/comercios/$merchantId")({
   head: () => ({
@@ -59,15 +60,15 @@ function Comercio() {
           <MerchantForm
             key={merchant.id}
             initial={{ name: merchant.name, logo: merchant.logo }}
-            onSave={({ name, logo }) => {
+            onSave={async ({ name, logo }) => {
               const dup = state.merchants.find(
-                (m) => m.id !== merchant.id && normalizeForCompare(m.name) === normalizeForCompare(name),
+                (m) =>
+                  m.id !== merchant.id && normalizeForCompare(m.name) === normalizeForCompare(name),
               );
               if (dup) return void toast.error(`“${dup.name}” já está cadastrado.`);
               const { logo: _old, ...rest } = merchant;
               const next = logo ? { ...rest, name, logo } : { ...rest, name };
-              if (!saveMerchant(next))
-                return void toast.error("O celular está sem espaço para guardar. Tente sem a logo.");
+              if (!report(await repo.saveMerchant(next))) return;
               toast.success("Comércio atualizado.");
               navigate({ to: "/sorteios", search: { aba: "comercios" } });
             }}

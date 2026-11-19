@@ -10,7 +10,8 @@ import { RecordingSummary } from "@/components/enigma/RecordingDone";
 import { VideoActions } from "@/components/enigma/VideoActions";
 import { Wheel } from "@/components/enigma/Wheel";
 import { formatDateBR, formatDuration, merchantOf } from "@/lib/enigma/logic";
-import { setCurrent, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo, useAppState } from "@/lib/enigma/repo";
 import { RECORDING_MODES, type Recording } from "@/lib/enigma/types";
 import { loadVideo, videoFileName } from "@/lib/enigma/videos";
 
@@ -142,8 +143,8 @@ function Previa() {
 
       <GoldButton
         className="mt-4"
-        onClick={() => {
-          if (!setCurrent(draw.id)) return void toast.error(SAVE_FAIL);
+        onClick={async () => {
+          if (!report(await repo.selectDraw(draw.id))) return;
           navigate({ to: "/" });
         }}
       >
@@ -216,8 +217,8 @@ function RealRecording({
       </div>
       <SecondaryButton
         className="mt-2"
-        onClick={() => {
-          if (!setCurrent(drawId)) return void toast.error(SAVE_FAIL);
+        onClick={async () => {
+          if (!report(await repo.selectDraw(drawId))) return;
           navigate({ to: "/" });
         }}
       >

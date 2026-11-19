@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { receiveBotMessage, type BotInput } from "./entries";
-import { createSampleState, finishRecording, migrateState } from "./logic";
+import { finishRecording, migrateState } from "./logic";
 import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 
 const KEY = "enigma-premiado:v1";
@@ -25,7 +25,7 @@ export function loadState(raw: string | null): Loaded {
   if (raw === null || raw === "") return { kind: "empty" };
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!isState(parsed) || parsed.draws.length === 0) return { kind: "broken" };
+    if (!isState(parsed)) return { kind: "broken" };
     const state = migrateState(parsed);
     return { kind: "ok", state, migrated: state !== parsed };
   } catch {
@@ -49,7 +49,7 @@ function getRaw(): { raw: string | null; readable: boolean } {
   }
 }
 
-function snap(): StoreSnapshot {
+export function snap(): StoreSnapshot {
   const { raw, readable } = getRaw();
   if (cachedSnap && raw === cachedRaw) return cachedSnap;
   if (raw === null && memoryOnly) {
@@ -64,7 +64,8 @@ function snap(): StoreSnapshot {
   cachedRaw = raw;
   if (loaded.kind === "broken") return (cachedSnap = { kind: "broken", raw });
   if (loaded.kind === "empty") {
-    const fresh = createSampleState();
+    // First open: no draws yet. Rehearsal draws are only created on request.
+    const fresh = emptyState();
     if (!write(fresh)) memoryOnly = fresh;
     return snap();
   }
@@ -93,7 +94,7 @@ function read(): AppState | null {
   return s.kind === "ok" ? s.state : null;
 }
 
-function subscribe(cb: () => void) {
+export function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);
   window.addEventListener("storage", cb);
   return () => {
@@ -124,6 +125,17 @@ export function rawSavedData(): string | null {
   return getRaw().raw;
 }
 
+export function emptyState(): AppState {
+  return { version: 1, draws: [], merchants: [], currentId: "", sound: true };
+}
+
+/** Like `update`, but says whether reading or saving failed. Errors thrown by `fn` propagate. */
+export function tryUpdate(fn: (state: AppState) => AppState): "ok" | "read" | "write" {
+  const s = snap();
+  if (s.kind !== "ok") return "read";
+  return write(fn(s.state)) ? "ok" : "write";
+}
+
 /** Applies a change and saves it. Returns false when the phone's storage is full. */
 export function update(fn: (state: AppState) => AppState): boolean {
   const s = snap();
@@ -131,6 +143,7 @@ export function update(fn: (state: AppState) => AppState): boolean {
   return write(fn(s.state));
 }
 
+/** The draw on the Roleta. Screens that call this only render once a draw exists (see FirstRun). */
 export function currentDraw(state: AppState): Draw {
   return state.draws.find((d) => d.id === state.currentId) ?? state.draws[0]!;
 }
@@ -165,7 +178,10 @@ export function saveDraw(draw: Draw): boolean {
 }
 
 /** Removes the running test from the state and files it under its draw's "Gravações". */
-function closeSession(s: AppState, now: number): { state: AppState; saved: Recording | null } {
+export function closeSession(
+  s: AppState,
+  now: number,
+): { state: AppState; saved: Recording | null } {
   const session = s.recording;
   const { recording: _ended, ...rest } = s;
   if (!session) return { state: s, saved: null };
@@ -194,7 +210,7 @@ export function endRecording(now: number): Recording | null {
 }
 
 /** Putting another round on the wheel ends a test recording of the previous one. */
-function switchCurrent(s: AppState, id: string): AppState {
+export function switchCurrent(s: AppState, id: string): AppState {
   const base = s.recording && s.recording.drawId !== id ? closeSession(s, Date.now()).state : s;
   return { ...base, currentId: id };
 }

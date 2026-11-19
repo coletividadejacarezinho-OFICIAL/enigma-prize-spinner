@@ -66,25 +66,18 @@ import {
 } from "@/lib/enigma/recorder";
 import {
   allRoundsDone,
-  commitSpin,
   drawResultMessage,
   needsRepeatAnswer,
-  nextRound,
   poolFor,
+  roundIdOf,
   roundLabel,
   roundsOf,
   shownRound,
   withRoundResult,
 } from "@/lib/enigma/rounds";
 import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
-import {
-  SAVE_FAIL,
-  addRecording,
-  currentDraw,
-  endRecording,
-  updateDraw,
-  useAppState,
-} from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
 import { saveVideo, videoFileName } from "@/lib/enigma/videos";
 
@@ -154,7 +147,7 @@ function Roleta() {
   // A simulated test left running by an older version is filed under its draw.
   const staleTest = !!state?.recording;
   useEffect(() => {
-    if (staleTest) endRecording(Date.now());
+    if (staleTest) void repo.closeLegacyTest(Date.now());
   }, [staleTest]);
 
   // While recording, the video always shows what is on screen now.
@@ -226,36 +219,30 @@ function Roleta() {
     const index = pickWinnerIndex(wheelNames.length);
     const rotation = targetRotation(0, index, wheelNames.length, secureRandom());
     const winner = wheelNames[index] ?? "";
-    // Save the result first; the wheel only turns after the browser confirms the save.
-    let status = "changed" as "saved" | "already" | "changed";
-    const ok = updateDraw(draw.id, (d) => {
-      const r = commitSpin(
-        d,
-        { drawId: draw.id, round: ri, pool: wheelNames, repeatWinners: repeat },
-        {
-          winner,
-          index,
-          rotation,
-          at: Date.now(),
-        },
-      );
-      status = r.status;
-      return r.draw;
-    });
-    if (!ok || status !== "saved") {
-      spinningRef.current = false;
-      if (!ok) toast.error(SAVE_FAIL);
-      else if (status === "changed")
-        toast.error("O sorteio mudou nesta tela. Confira e tente de novo.");
-      return;
-    }
-    spinFrameRef.current = {
-      from: 0,
-      to: rotation,
-      startedAt: performance.now(),
-      durationMs: SPIN_MS,
-    };
-    setSpin({ from: 0, durationMs: SPIN_MS, key: Date.now() });
+    // Save the result first; the wheel only turns after the save is confirmed.
+    const roundId = roundIdOf(draw, ri) ?? "";
+    void repo
+      .spin({
+        drawId: draw.id,
+        roundId,
+        pool: wheelNames,
+        repeatWinners: repeat,
+        result: { winner, index, rotation, at: Date.now() },
+      })
+      .then((r) => {
+        if (!report(r, () => doSpin(repeat)) || r.value.status !== "saved") {
+          // A result already saved for this courtesy is shown as it is; nothing turns.
+          spinningRef.current = false;
+          return;
+        }
+        spinFrameRef.current = {
+          from: 0,
+          to: r.value.result.rotation,
+          startedAt: performance.now(),
+          durationMs: SPIN_MS,
+        };
+        setSpin({ from: 0, durationMs: SPIN_MS, key: Date.now() });
+      });
   };
 
   const handleSpin = () => {
@@ -309,7 +296,9 @@ function Roleta() {
       rounds: decided,
       ...(decided[0] ? { winner: decided[0].winner } : {}),
     };
-    const saved = (await saveVideo(recording.id, out.blob)) && addRecording(draw.id, recording);
+    const saved =
+      (await saveVideo(recording.id, out.blob)) &&
+      report(await repo.addRecording(draw.id, recording));
     setVideoDone({
       blob: out.blob,
       filename: videoFileName(draw.date, out.mimeType, draw.recordings?.length ?? 0),
@@ -357,7 +346,8 @@ function Roleta() {
       return (
         <GoldButton
           onClick={() => {
-            if (!updateDraw(draw.id, nextRound)) toast.error(SAVE_FAIL);
+            const id = roundIdOf(draw, ri) ?? "";
+            void repo.nextRound(draw.id, id).then((r) => report(r));
           }}
           className={showRecordButton ? "px-2 text-lg leading-tight" : ""}
         >

@@ -6,7 +6,8 @@ import { DrawForm } from "@/components/enigma/DrawForm";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { newId } from "@/lib/enigma/logic";
 import { applyPrizes, roundsOf } from "@/lib/enigma/rounds";
-import { updateDraw, useAppState } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { repo, useAppState } from "@/lib/enigma/repo";
 
 export const Route = createFileRoute("/sorteios/editar/$drawId")({
   head: () => ({
@@ -35,7 +36,10 @@ function EditarSorteio() {
 
   return (
     <div className="px-4 pb-24 pt-3">
-      <Link to="/sorteios" className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground">
+      <Link
+        to="/sorteios"
+        className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground"
+      >
         <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Voltar
       </Link>
       <h1 className="mb-4 text-3xl font-extrabold">Editar sorteio</h1>
@@ -56,14 +60,14 @@ function EditarSorteio() {
             confirmed: draw.confirmed ?? null,
             repeatWinners: draw.repeatWinners ?? null,
           }}
-          onSubmit={(v) => {
+          onSubmit={async (v) => {
             const prizes = v.prizes.map((p) => ({
               ...(p.id ? { id: p.id } : {}),
               merchant: state.merchants.find((m) => m.id === p.merchantId),
               prize: p.prize,
             }));
             if (prizes.some((p) => !p.merchant)) return;
-            const ok = updateDraw(draw.id, (d) => {
+            const ok = await repo.editDraw(draw.id, (d) => {
               const next = applyPrizes(
                 d,
                 prizes.flatMap((p) => (p.merchant ? [{ ...p, merchant: p.merchant }] : [])),
@@ -84,7 +88,7 @@ function EditarSorteio() {
                     : {}),
               };
             });
-            if (!ok) return void toast.error("O celular está sem espaço para guardar.");
+            if (!report(ok)) return;
             toast.success("Sorteio atualizado.");
             navigate({ to: "/sorteios" });
           }}

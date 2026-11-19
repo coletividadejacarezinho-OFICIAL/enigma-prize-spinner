@@ -51,7 +51,8 @@ import {
   normalizeForCompare,
   parsePastedList,
 } from "@/lib/enigma/logic";
-import { SAVE_FAIL, currentDraw, updateDraw, useAppState } from "@/lib/enigma/store";
+import { report } from "@/lib/enigma/feedback";
+import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Entry } from "@/lib/enigma/types";
 
 export const Route = createFileRoute("/nomes")({
@@ -115,24 +116,19 @@ function Nomes() {
   const canConfirm = ready.length >= MIN_NAMES_TO_SPIN;
 
   // Always work on the saved list, so quick taps never overwrite each other.
-  const change = (fn: (list: Entry[]) => Entry[]) =>
-    updateDraw(draw.id, (d) => (d.result ? d : { ...d, entries: fn(entriesOf(d)) }));
-
-  /** Runs a change; when the browser refuses to save, says so and returns false. */
-  const save = (fn: (list: Entry[]) => Entry[]) => {
-    const ok = change(fn);
-    if (!ok) toast.error(SAVE_FAIL);
-    return ok;
-  };
+  // Saved through the repo with this draw's id; a spun draw answers with a conflict.
+  /** Runs a change; when it is refused, says so and returns false (the screen keeps what was typed). */
+  const save = async (fn: (list: Entry[]) => Entry[]) =>
+    report(await repo.changeEntries(draw.id, fn));
 
   /**
    * Adds names in order and stops at the first one that is already in the list.
    * `before` is saved in the same step, so a refused save leaves everything to retry.
    * Returns null when nothing was saved.
    */
-  const addNames = (queue: string[], before?: (list: Entry[]) => Entry[]) => {
+  const addNames = async (queue: string[], before?: (list: Entry[]) => Entry[]) => {
     const out: { ask: Ask | null; added: number } = { ask: null, added: 0 };
-    const ok = save((list) => {
+    const ok = await save((list) => {
       out.ask = null;
       out.added = 0;
       let next = before ? before(list) : list;
@@ -153,21 +149,21 @@ function Nomes() {
     return out.added;
   };
 
-  const add = () => {
+  const add = async () => {
     const name = cleanName(text);
     if (!name) {
       inputRef.current?.focus();
       return;
     }
-    if (addNames([name]) === null) return; // keep the typed name to try again
+    if ((await addNames([name])) === null) return; // keep the typed name to try again
     setText("");
     inputRef.current?.focus();
   };
 
-  const addPasted = () => {
+  const addPasted = async () => {
     const list = parsePastedList(pasteText);
     if (list.length === 0) return;
-    const added = addNames(list);
+    const added = await addNames(list);
     if (added === null) return; // the pasted list stays in the box
     setPasteText("");
     setPasteOpen(false);
@@ -176,11 +172,11 @@ function Nomes() {
 
   const askMatch = ask ? entries.find((e) => e.id === ask.matchId) : undefined;
 
-  const askSame = () => {
+  const askSame = async () => {
     if (!ask) return;
     const kept = askMatch?.name ?? ask.name;
     // On a refused save the question stays open with the names still to add.
-    if (addNames(ask.rest) === null) return;
+    if ((await addNames(ask.rest)) === null) return;
     toast.success(`Mantida uma vaga para ${kept}.`);
   };
 
@@ -196,10 +192,10 @@ function Nomes() {
     setAsk(null);
   };
 
-  const askLater = () => {
+  const askLater = async () => {
     if (!ask) return;
     const { name, matchId, rest } = ask;
-    addNames(rest, (list) => [
+    await addNames(rest, (list) => [
       ...list,
       manualEntry(name, Date.now(), { kind: "repetido", withId: matchId }),
     ]);
@@ -218,7 +214,7 @@ function Nomes() {
     return null;
   })();
 
-  const saveDiff = () => {
+  const saveDiff = async () => {
     if (!diff || diffError) return;
     const first = cleanName(diff.first);
     const second = cleanName(diff.second);
@@ -227,13 +223,13 @@ function Nomes() {
         ...renameEntry(list, diff.matchId, first),
         manualEntry(second, Date.now()),
       ];
-      if (addNames(diff.rest, before) === null) return; // the two names stay in the dialog
+      if ((await addNames(diff.rest, before)) === null) return; // the two names stay in the dialog
       setDiff(null);
     } else {
       if (
-        !save((list) =>
+        !(await save((list) =>
           confirmEntry(renameEntry(list, diff.matchId, first), diff.pendingId, second),
-        )
+        ))
       )
         return;
       setDiff(null);
@@ -241,7 +237,7 @@ function Nomes() {
     }
   };
 
-  const confirmPending = (e: Entry) => {
+  const confirmPending = async (e: Entry) => {
     const match = reasonMatch(e, entries);
     const twin =
       match && normalizeForCompare(match.name) === normalizeForCompare(e.name)
@@ -258,23 +254,23 @@ function Nomes() {
       });
       return;
     }
-    if (!save((list) => confirmEntry(list, e.id))) return;
+    if (!(await save((list) => confirmEntry(list, e.id)))) return;
     toast.success(`${e.name} entrou na lista.`);
     if (pending.length <= 1) setReviewOpen(false);
   };
 
-  const samePerson = (e: Entry, match: Entry) => {
-    if (!save((list) => mergeEntry(list, e.id, match.id))) return;
+  const samePerson = async (e: Entry, match: Entry) => {
+    if (!(await save((list) => mergeEntry(list, e.id, match.id)))) return;
     toast.success(`Mantida uma vaga para ${match.name}.`);
     if (pending.length <= 1) setReviewOpen(false);
   };
 
-  const dropPending = (e: Entry) => {
-    if (!save((list) => removeEntry(list, e.id))) return;
+  const dropPending = async (e: Entry) => {
+    if (!(await save((list) => removeEntry(list, e.id)))) return;
     if (pending.length <= 1) setReviewOpen(false);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editing) return;
     const value = cleanName(editing.value);
     if (!value) return;
@@ -283,23 +279,23 @@ function Nomes() {
       toast.error(`Já tem “${taken.name}” na lista. Acrescente um detalhe, como o bairro.`);
       return;
     }
-    if (!save((list) => renameEntry(list, editing.id, value))) return;
+    if (!(await save((list) => renameEntry(list, editing.id, value)))) return;
     setEditing(null);
   };
 
-  const confirmRemove = () => {
+  const confirmRemove = async () => {
     if (!removing) return;
-    if (!save((list) => removeEntry(list, removing.id))) return;
+    if (!(await save((list) => removeEntry(list, removing.id)))) return;
     setRemoveOpen(false);
   };
 
-  const confirmAndOpen = () => {
+  const confirmAndOpen = async () => {
     if (locked) {
       navigate({ to: "/" });
       return;
     }
     if (!canConfirm) return;
-    if (!updateDraw(draw.id, confirmList)) return void toast.error(SAVE_FAIL);
+    if (!report(await repo.confirmList(draw.id))) return;
     toast.success(`Lista confirmada: ${plural(ready.length, "nome", "nomes")} na roleta.`);
     navigate({ to: "/" });
   };
@@ -671,8 +667,8 @@ function Nomes() {
             </AlertDialogCancel>
             {canConfirm && (
               <AlertDialogAction
-                onClick={() => {
-                  if (!updateDraw(draw.id, confirmList)) return void toast.error(SAVE_FAIL);
+                onClick={async () => {
+                  if (!report(await repo.confirmList(draw.id))) return;
                   setShareOpen(true);
                 }}
                 className="btn-gold h-12 rounded-xl text-base font-bold"
