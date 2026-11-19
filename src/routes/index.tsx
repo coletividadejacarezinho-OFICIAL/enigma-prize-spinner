@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Camera, Pencil, Plus, Share2, Square, Trophy, UserPlus } from "lucide-react";
+import { Camera, MessageCircle, Pencil, Plus, Square, Trophy, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
@@ -9,6 +8,7 @@ import { MerchantLogo } from "@/components/enigma/Logos";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
 import { RecordSheet } from "@/components/enigma/RecordSheet";
 import { RecordingDoneDialog } from "@/components/enigma/RecordingDone";
+import { ResultShareDialog } from "@/components/enigma/ResultShare";
 import { Wheel } from "@/components/enigma/Wheel";
 import {
   formatDateBR,
@@ -16,7 +16,7 @@ import {
   micFor,
   pickWinnerIndex,
   secureRandom,
-  shareText,
+  resultMessage,
   targetRotation,
 } from "@/lib/enigma/logic";
 import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
@@ -60,6 +60,7 @@ function Roleta() {
   const spinningRef = useRef(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [done, setDone] = useState<{ recording: Recording; drawId: string } | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!state) return <RoletaSkeleton />;
 
@@ -102,23 +103,8 @@ function Roleta() {
     if (state.sound) playWin();
   };
 
-  const handleShare = async () => {
-    const text = shareText(draw, shop.name, GROUP_NAME);
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: APP_NAME, text });
-        return;
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Resultado copiado! Agora é só colar no WhatsApp.");
-    } catch {
-      toast.error("Não deu para compartilhar neste aparelho.");
-    }
-  };
+  // Built from the saved result of the round on the wheel, never from a new spin.
+  const message = showResult ? resultMessage(draw, shop.name, GROUP_NAME) : null;
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col">
@@ -214,8 +200,11 @@ function Roleta() {
               <UserPlus aria-hidden="true" /> Adicionar nomes
             </GoldButton>
           ) : showResult ? (
-            <GoldButton onClick={handleShare} className={recording ? "text-lg" : ""}>
-              <Share2 aria-hidden="true" /> {recording ? "Compartilhar" : "Compartilhar resultado"}
+            <GoldButton
+              onClick={() => setShareOpen(true)}
+              className={recording ? "px-2 text-lg leading-tight" : ""}
+            >
+              <MessageCircle className="shrink-0" aria-hidden="true" /> Mandar no WhatsApp
             </GoldButton>
           ) : (
             <GoldButton onClick={handleSpin} disabled={spinning}>
@@ -246,6 +235,7 @@ function Roleta() {
         )}
       </div>
 
+      <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />
       <RecordSheet open={recordOpen} onOpenChange={setRecordOpen} onStart={handleStartRecording} />
       <RecordingDoneDialog
         recording={done?.recording ?? null}

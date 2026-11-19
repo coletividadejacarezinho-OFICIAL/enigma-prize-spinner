@@ -15,7 +15,7 @@ import {
   merchantOf,
   todayISO,
 } from "@/lib/enigma/logic";
-import { setCurrent, useAppState } from "@/lib/enigma/store";
+import { useAppState } from "@/lib/enigma/store";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -117,11 +117,9 @@ function Sorteios() {
                       className={cn("rounded-2xl bg-card", isCurrent && "ring-2 ring-gold")}
                     >
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            setCurrent(d.id);
-                            navigate({ to: "/" });
-                          }}
+                        <Link
+                          to="/sorteios/ver/$drawId"
+                          params={{ drawId: d.id }}
                           className="flex min-w-0 flex-1 gap-3 rounded-2xl p-3 text-left active:bg-secondary"
                         >
                           <MerchantLogo src={m.logo} className="h-12 w-12" />
@@ -159,7 +157,7 @@ function Sorteios() {
                               </p>
                             )}
                           </div>
-                        </button>
+                        </Link>
                         {!d.isSample && (
                           <Link
                             to="/sorteios/editar/$drawId"

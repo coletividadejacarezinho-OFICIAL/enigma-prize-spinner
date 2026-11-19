@@ -14,6 +14,8 @@ import {
   formatDateBR,
   parsePastedList,
   pickWinnerIndex,
+  resultMessage,
+  whatsappLink,
   segmentAtPointer,
   targetRotation,
 } from "@/lib/enigma/logic";
@@ -184,5 +186,34 @@ describe("Test recording", () => {
   it("shows durations as mm:ss", () => {
     expect(formatDuration(64000)).toBe("01:04");
     expect(formatDuration(3725000)).toBe("1:02:05");
+  });
+
+  it("builds the WhatsApp message from that draw's saved result only", () => {
+    const base: Draw = {
+      id: "d1",
+      date: "2026-11-05",
+      merchant: "Mercado Bom Preço",
+      prize: "Vale-compras de R$ 50",
+      names: ["Ana", "Bia"],
+      createdAt: 1,
+    };
+    expect(resultMessage(base, "Mercado Bom Preço", "COLETIVIDADE JACAREZINHO PR")).toBeNull();
+    const done: Draw = { ...base, result: { winner: "Bia", index: 1, rotation: 0, at: 2 } };
+    expect(resultMessage(done, "Mercado Bom Preço", "COLETIVIDADE JACAREZINHO PR")).toBe(
+      [
+        "🏆 Resultado do Enigma Premiado",
+        "COLETIVIDADE JACAREZINHO PR",
+        "📅 05/11/2026",
+        "🎉 Ganhador(a): Bia",
+        "🎁 Cortesia: Vale-compras de R$ 50",
+        "🤝 Oferecimento: Mercado Bom Preço",
+        "",
+        "Parabéns! Chame a administração no privado para combinar a retirada.",
+        "Reaja com 👍 aqui no grupo!",
+      ].join("\n"),
+    );
+    const link = whatsappLink("Oi & 👍\nlinha");
+    expect(link.startsWith("https://wa.me/?text=")).toBe(true);
+    expect(decodeURIComponent(link.slice("https://wa.me/?text=".length))).toBe("Oi & 👍\nlinha");
   });
 });

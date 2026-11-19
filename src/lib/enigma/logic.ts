@@ -254,16 +254,28 @@ export function segmentAtPointer(rotation: number, count: number): number {
   return Math.min(count - 1, Math.floor(angle / seg));
 }
 
-export function shareText(draw: Draw, merchantName: string, groupName: string): string {
-  const lines = [
-    `🎉 Enigma Premiado — ${groupName}`,
-    `Sorteio de ${formatDateBR(draw.date)}`,
+/**
+ * WhatsApp result message, built only from the saved result of that draw.
+ * Returns null while the draw has no result, so nothing can be shared before a spin.
+ */
+export function resultMessage(draw: Draw, merchantName: string, groupName: string): string | null {
+  if (!draw.result) return null;
+  return [
+    "🏆 Resultado do Enigma Premiado",
+    groupName,
+    `📅 ${formatDateBR(draw.date)}`,
+    `🎉 Ganhador(a): ${draw.result.winner}`,
+    `🎁 Cortesia: ${draw.prize}`,
+    `🤝 Oferecimento: ${merchantName}`,
     "",
-    `Ganhador(a): ${draw.result?.winner ?? ""}`,
-    `Cortesia: ${draw.prize}`,
-    `Oferecimento: ${merchantName}`,
-  ];
-  return lines.join("\n");
+    "Parabéns! Chame a administração no privado para combinar a retirada.",
+    "Reaja com 👍 aqui no grupo!",
+  ].join("\n");
+}
+
+/** Opens WhatsApp with the text filled in; the person picks the group and taps Enviar. */
+export function whatsappLink(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 /** mm:ss, or h:mm:ss past an hour. */
