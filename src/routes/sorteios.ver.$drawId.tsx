@@ -5,7 +5,8 @@ import { useState } from "react";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
-import { formatDateBR, merchantOf, resultMessage } from "@/lib/enigma/logic";
+import { formatDateBR, merchantOf } from "@/lib/enigma/logic";
+import { drawResultMessage, roundsOf } from "@/lib/enigma/rounds";
 import { setCurrent, useAppState } from "@/lib/enigma/store";
 import { GROUP_NAME } from "@/lib/enigma/types";
 import { DEMO_AUDIENCE, audienceTotals } from "@/lib/enigma/watch";
@@ -50,7 +51,8 @@ function VerSorteio() {
   const shop = merchantOf(state.merchants, draw);
   const isCurrent = draw.id === state.currentId;
   // This draw's own saved result, whatever round is on the wheel right now.
-  const message = resultMessage(draw, shop.name, GROUP_NAME);
+  const message = drawResultMessage(draw, state.merchants, GROUP_NAME);
+  const rounds = roundsOf(draw, state.merchants);
 
   return (
     <div className="px-4 pb-24 pt-3">
@@ -69,6 +71,38 @@ function VerSorteio() {
         )}
       </div>
 
+      {rounds.length > 1 ? (
+        <ol className="mt-3 space-y-2" data-testid="rounds">
+          {rounds.map((r) => (
+            <li key={r.index} className="rounded-2xl bg-card p-3">
+              <div className="flex items-center gap-3">
+                <MerchantLogo src={r.merchantLogo} className="h-11 w-11" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Prêmio {r.index + 1} de {rounds.length} · <span className="font-bold text-foreground">{r.merchantName}</span>
+                  </p>
+                  <p className="break-words font-display text-lg font-bold leading-snug text-gold">{r.prize}</p>
+                </div>
+              </div>
+              <p className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 font-bold">
+                {r.result ? (
+                  <>
+                    <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />
+                    <span className="min-w-0 break-words font-display text-xl font-extrabold">{r.result.winner}</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Ainda não sorteado</span>
+                )}
+              </p>
+            </li>
+          ))}
+          <li className="px-1 text-sm text-muted-foreground">
+            {draw.names.length} {draw.names.length === 1 ? "participante" : "participantes"} ·{" "}
+            {draw.repeatWinners === false ? "quem ganhou não concorre de novo" : "quem ganhou pode ganhar de novo"}
+          </li>
+        </ol>
+      ) : (
+      <>
       <section className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3">
         <MerchantLogo src={shop.logo} className="h-12 w-12" />
         <div className="min-w-0">
@@ -99,6 +133,9 @@ function VerSorteio() {
             Ainda não girou · {draw.names.length} {draw.names.length === 1 ? "nome" : "nomes"}
           </p>
         </section>
+      )}
+
+      </>
       )}
 
       <div className="mt-4 space-y-1">

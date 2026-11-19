@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { receiveBotMessage, type BotInput } from "./entries";
 import { createSampleState, finishRecording, migrateState } from "./logic";
-import type { AppState, BotOutcome, Draw, Merchant, Recording, RecordingSession } from "./types";
+import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 
 const KEY = "enigma-premiado:v1";
 const EVENT = "enigma-premiado:change";
@@ -111,10 +111,6 @@ export function saveDraw(draw: Draw): boolean {
   return update((s) => ({ ...s, draws: [...s.draws, draw] }));
 }
 
-export function startRecording(session: RecordingSession): boolean {
-  return update((s) => ({ ...s, recording: session }));
-}
-
 /** Removes the running test from the state and files it under its draw's "Gravações". */
 function closeSession(s: AppState, now: number): { state: AppState; saved: Recording | null } {
   const session = s.recording;
@@ -167,4 +163,9 @@ export function simulateBotMessage(
     }),
   }));
   return out;
+}
+
+/** Files a finished real recording under its draw's "Gravações". */
+export function addRecording(drawId: string, rec: Recording): boolean {
+  return updateDraw(drawId, (d) => ({ ...d, recordings: [...(d.recordings ?? []), rec] }));
 }

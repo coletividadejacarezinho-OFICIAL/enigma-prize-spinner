@@ -15,6 +15,7 @@ import {
   merchantOf,
   todayISO,
 } from "@/lib/enigma/logic";
+import { roundsOf } from "@/lib/enigma/rounds";
 import { useAppState } from "@/lib/enigma/store";
 import { cn } from "@/lib/utils";
 
@@ -143,9 +144,19 @@ function Sorteios() {
                                 </span>
                               )}
                             </div>
-                            <p className="mt-0.5 font-bold">{m.name}</p>
-                            <p className="text-sm text-muted-foreground">{d.prize}</p>
-                            {d.result ? (
+                            {roundsOf(d, state.merchants).map((r) => (
+                              <div key={r.index} className={r.index > 0 ? "mt-1.5" : ""}>
+                                <p className="mt-0.5 font-bold">{r.merchantName}</p>
+                                <p className="text-sm text-muted-foreground">{r.prize}</p>
+                                {r.result && (d.extraPrizes?.length ?? 0) > 0 && (
+                                  <p className="flex items-center gap-1.5 text-sm font-bold text-gold">
+                                    <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <span className="truncate">{r.result.winner}</span>
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                            {d.result && d.extraPrizes?.length ? null : d.result ? (
                               <p className="mt-1 flex items-center gap-1.5 font-bold text-gold">
                                 <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 <span className="truncate">Ganhador(a): {d.result.winner}</span>
@@ -195,7 +206,7 @@ function Sorteios() {
                                     {formatDuration(r.durationMs)}
                                   </span>
                                   <span className="shrink-0 rounded-full border border-gold/70 px-1.5 py-0.5 text-[10px] font-bold text-gold">
-                                    Simulação
+                                    {r.real ? "Vídeo" : "Simulação"}
                                   </span>
                                 </Link>
                               </li>

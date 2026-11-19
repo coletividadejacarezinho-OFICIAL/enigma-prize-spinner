@@ -16,15 +16,23 @@ export type Merchant = {
 
 export type RecordingMode = "roleta-voz" | "roleta-camera" | "voz";
 
-/** A simulated test recording: no camera, microphone or file is ever used. */
+/**
+ * A recording of a draw. Older ones are simulated tests (no camera, no file);
+ * `real` ones have a video kept in this browser's IndexedDB under the same id.
+ */
 export type Recording = {
   id: string;
   mode: RecordingMode;
   mic: boolean;
   startedAt: number;
   durationMs: number;
-  /** Set when the wheel was spun during this test. */
+  /** Set when the wheel was spun during this recording (first result). */
   winner?: string;
+  real?: true;
+  mimeType?: string;
+  size?: number;
+  /** Every round decided while recording. */
+  rounds?: { prize: string; merchant: string; winner: string }[];
 };
 
 export type RecordingSession = {
@@ -71,6 +79,16 @@ export type BotMessage = {
   at: number;
 };
 
+/** A courtesy after the first one; the first stays in the draw's own merchant/prize/result fields. */
+export type Prize = {
+  id: string;
+  merchantId?: string;
+  merchant: string;
+  merchantLogo?: string;
+  prize: string;
+  result?: DrawResult;
+};
+
 export type Draw = {
   id: string;
   /** YYYY-MM-DD */
@@ -90,7 +108,14 @@ export type Draw = {
   entries?: Entry[];
   botMessages?: BotMessage[];
   isSample?: true;
+  /** Result of the first courtesy; set as soon as any round is spun, so it also locks the list. */
   result?: DrawResult;
+  /** Courtesies 2, 3…: same list of names, one winner each, spun in order. */
+  extraPrizes?: Prize[];
+  /** "Quem ganhar pode ganhar de novo neste sorteio?" — only asked with 2 or more courtesies. */
+  repeatWinners?: boolean;
+  /** Round the Roleta shows (0-based); moves on only through "Sortear próxima cortesia". */
+  shownRound?: number;
   recordings?: Recording[];
   createdAt: number;
 };

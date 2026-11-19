@@ -1,13 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Camera, ChevronLeft, Mic, MicOff, Trophy, UserRound } from "lucide-react";
 
-import { GoldButton } from "@/components/enigma/GoldButton";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { RecordingSummary } from "@/components/enigma/RecordingDone";
+import { VideoActions } from "@/components/enigma/VideoActions";
 import { Wheel } from "@/components/enigma/Wheel";
-import { formatDuration, merchantOf } from "@/lib/enigma/logic";
+import { formatDateBR, formatDuration, merchantOf } from "@/lib/enigma/logic";
 import { setCurrent, useAppState } from "@/lib/enigma/store";
-import { RECORDING_MODES } from "@/lib/enigma/types";
+import { RECORDING_MODES, type Recording } from "@/lib/enigma/types";
+import { loadVideo, videoFileName } from "@/lib/enigma/videos";
 
 export const Route = createFileRoute("/sorteios/gravacoes/$drawId/$recordingId")({
   head: () => ({
@@ -45,6 +49,8 @@ function Previa() {
       </div>
     );
   }
+
+  if (rec.real) return <RealRecording drawId={draw.id} date={draw.date} rec={rec} back={back} />;
 
   const shop = merchantOf(state.merchants, draw);
   const mode = RECORDING_MODES.find((m) => m.id === rec.mode);
@@ -130,6 +136,78 @@ function Previa() {
       >
         Voltar à roleta
       </GoldButton>
+    </div>
+  );
+}
+
+/** A recorded video: kept in this browser, with "Assistir", "Salvar vídeo" and "Compartilhar". */
+function RealRecording({
+  drawId,
+  date,
+  rec,
+  back,
+}: {
+  drawId: string;
+  date: string;
+  rec: Recording;
+  back: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const [blob, setBlob] = useState<Blob | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void loadVideo(rec.id).then((b) => alive && setBlob(b));
+    return () => {
+      alive = false;
+    };
+  }, [rec.id]);
+
+  return (
+    <div className="px-4 pb-24 pt-3">
+      {back}
+      <div className="flex items-center gap-2">
+        <h1 className="text-3xl font-extrabold">Gravação</h1>
+        <span className="rounded-full border border-gold px-2 py-0.5 text-xs font-bold text-gold">Vídeo</span>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {formatDateBR(date)} · {formatDuration(rec.durationMs)}
+      </p>
+      {(rec.rounds ?? []).length > 0 ? (
+        <ul className="mt-3 space-y-1">
+          {(rec.rounds ?? []).map((r, i) => (
+            <li key={i} className="rounded-xl bg-card px-3 py-2 text-sm">
+              <span className="text-muted-foreground">
+                {r.prize} · {r.merchant}
+              </span>
+              <span className="block font-bold text-gold">{r.winner}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 rounded-xl bg-card px-3 py-2 text-sm font-bold text-muted-foreground">
+          Sem sorteio durante a gravação
+        </p>
+      )}
+      <div className="mt-4">
+        {blob === undefined ? (
+          <p className="text-center text-sm text-muted-foreground">Abrindo o vídeo…</p>
+        ) : blob ? (
+          <VideoActions blob={blob} filename={videoFileName(date, rec.mimeType ?? blob.type)} />
+        ) : (
+          <p className="rounded-2xl border-2 border-dashed border-border p-4 text-center text-muted-foreground">
+            O vídeo não está mais guardado neste aparelho.
+          </p>
+        )}
+      </div>
+      <SecondaryButton
+        className="mt-2"
+        onClick={() => {
+          setCurrent(drawId);
+          navigate({ to: "/" });
+        }}
+      >
+        Voltar à roleta
+      </SecondaryButton>
     </div>
   );
 }

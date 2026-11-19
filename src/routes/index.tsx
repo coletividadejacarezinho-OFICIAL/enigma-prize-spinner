@@ -2,51 +2,74 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Camera,
   ClipboardCheck,
+  ListChecks,
   Maximize2,
   MessageCircle,
   Minimize2,
   Plus,
   Send,
+  SkipForward,
   Square,
   Trophy,
   UserPlus,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
+import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
-import { RecordSheet } from "@/components/enigma/RecordSheet";
-import { RecordingDoneDialog } from "@/components/enigma/RecordingDone";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
+import { VideoDoneDialog } from "@/components/enigma/VideoActions";
 import { Wheel } from "@/components/enigma/Wheel";
-import { entriesOf, needsConfirmation, readyEntries } from "@/lib/enigma/entries";
 import {
-  formatDateBR,
-  merchantOf,
-  micFor,
-  pickWinnerIndex,
-  secureRandom,
-  resultMessage,
-  targetRotation,
-} from "@/lib/enigma/logic";
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { entriesOf, needsConfirmation, readyEntries } from "@/lib/enigma/entries";
+import { formatDateBR, newId, pickWinnerIndex, secureRandom, targetRotation } from "@/lib/enigma/logic";
 import {
   exitDeviceFullscreen,
   requestDeviceFullscreen,
   setPresentation,
   usePresentation,
 } from "@/lib/enigma/presentation";
-import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
 import {
-  currentDraw,
-  endRecording,
+  setRecFrame,
   startRecording,
-  updateDraw,
-  useAppState,
-} from "@/lib/enigma/store";
+  stopRecording,
+  stopStream,
+  useRecorder,
+  type RecFrame,
+} from "@/lib/enigma/recorder";
+import {
+  allRoundsDone,
+  drawResultMessage,
+  needsRepeatAnswer,
+  nextRound,
+  poolFor,
+  roundLabel,
+  roundsOf,
+  shownRound,
+  withRoundResult,
+} from "@/lib/enigma/rounds";
+import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
+import { addRecording, currentDraw, endRecording, updateDraw, useAppState } from "@/lib/enigma/store";
 import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
+import { saveVideo, videoFileName } from "@/lib/enigma/videos";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -77,10 +100,16 @@ function Roleta() {
   const navigate = useNavigate();
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number } | null>(null);
   const spinningRef = useRef(false);
-  const [recordOpen, setRecordOpen] = useState(false);
-  const [done, setDone] = useState<{ recording: Recording; drawId: string } | null>(null);
+  const spinFrameRef = useRef<RecFrame["spin"]>(null);
+  const frameRef = useRef<RecFrame | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [videoDone, setVideoDone] = useState<Parameters<typeof VideoDoneDialog>[0]["video"]>(null);
+  const [stopping, setStopping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [repeatAsk, setRepeatAsk] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const rec = useRecorder();
   // Full screen only changes what is shown around the same wheel, so a spin in progress,
   // the names and the saved result are untouched when entering or leaving it.
   const full = usePresentation();
@@ -103,6 +132,17 @@ function Roleta() {
     };
   }, []);
 
+  // A simulated test left running by an older version is filed under its draw.
+  const staleTest = !!state?.recording;
+  useEffect(() => {
+    if (staleTest) endRecording(Date.now());
+  }, [staleTest]);
+
+  // While recording, the video always shows what is on screen now.
+  useEffect(() => {
+    if (rec && frameRef.current) setRecFrame(frameRef.current);
+  });
+
   const enterFull = () => {
     setPresentation(true);
     void requestDeviceFullscreen().then((ok) => {
@@ -119,49 +159,175 @@ function Roleta() {
   if (!state) return <RoletaSkeleton />;
 
   const draw = currentDraw(state);
-  const shop = merchantOf(state.merchants, draw);
-  const count = draw.names.length;
-  const result = draw.result;
+  const rounds = roundsOf(draw, state.merchants);
+  const total = rounds.length;
+  const multi = total > 1;
+  const ri = shownRound(draw);
+  const round = rounds[ri] ?? rounds[0]!;
+  const isLast = ri === total - 1;
+  const pool = poolFor(draw, ri);
+  const count = pool.length;
+  const result = round.result;
+  const done = allRoundsDone(draw);
   const spinning = spin !== null;
   const showResult = !!result && !spinning;
   // The wheel only uses the confirmed list; a list changed in Nomes must be confirmed again.
   const dirty = needsConfirmation(draw);
   const readyCount = readyEntries(entriesOf(draw)).length;
-  const canSpin = count >= MIN_NAMES_TO_SPIN && !dirty;
-  const session = state.recording?.drawId === draw.id ? state.recording : undefined;
-  const recording = !!session;
-  const showRecordButton = recording || (!full && canSpin && !result);
+  const canSpin = count >= MIN_NAMES_TO_SPIN && !dirty && !result;
+  const recording = !!rec;
+  const showRecordButton = recording || (!full && !done && !dirty && count >= MIN_NAMES_TO_SPIN);
 
-  const handleStartRecording = (mode: Parameters<typeof micFor>[0], mic: boolean) => {
-    startRecording({ drawId: draw.id, mode, mic: micFor(mode, mic), startedAt: Date.now() });
-    setRecordOpen(false);
+  frameRef.current = {
+    group: GROUP_NAME,
+    date: formatDateBR(draw.date),
+    roundLabel: multi ? `Prêmio ${ri + 1} de ${total}` : "",
+    prize: round.prize,
+    merchant: round.merchantName,
+    names: pool,
+    rotation: result?.rotation ?? 0,
+    spin: spinning ? spinFrameRef.current : null,
+    winner: showResult && result ? result.winner : null,
+    summary:
+      summaryOpen && done
+        ? rounds.map((r) => ({ prize: r.prize, merchant: r.merchantName, winner: r.result?.winner ?? "" }))
+        : null,
   };
 
-  const handleEndRecording = () => {
-    const rec = endRecording(Date.now());
-    if (rec) setDone({ recording: rec, drawId: draw.id });
-  };
-
-  const handleSpin = () => {
-    if (spinningRef.current || draw.result || !canSpin) return;
+  const doSpin = () => {
+    if (spinningRef.current || result || !canSpin) return;
     spinningRef.current = true;
     if (state.sound) unlockSound();
     const index = pickWinnerIndex(count);
     const rotation = targetRotation(0, index, count, secureRandom());
-    const winner = draw.names[index] ?? "";
+    const winner = pool[index] ?? "";
     // Save the result before animating so leaving or reloading keeps the same winner.
-    updateDraw(draw.id, (d) => ({ ...d, result: { winner, index, rotation, at: Date.now() } }));
+    updateDraw(draw.id, (d) => withRoundResult(d, ri, { winner, index, rotation, at: Date.now() }));
+    spinFrameRef.current = { from: 0, to: rotation, startedAt: performance.now(), durationMs: SPIN_MS };
     setSpin({ from: 0, durationMs: SPIN_MS, key: Date.now() });
+  };
+
+  const handleSpin = () => {
+    if (needsRepeatAnswer(draw)) {
+      setRepeatAsk(true);
+      return;
+    }
+    doSpin();
+  };
+
+  const answerRepeat = (yes: boolean) => {
+    updateDraw(draw.id, (d) => ({ ...d, repeatWinners: yes }));
+    setRepeatAsk(false);
+    doSpin();
   };
 
   const handleSpinEnd = () => {
     spinningRef.current = false;
+    spinFrameRef.current = null;
     setSpin(null);
     if (state.sound) playWin();
+    if (multi && isLast) setSummaryOpen(true);
   };
 
-  // Built from the saved result of the round on the wheel, never from a new spin.
-  const message = showResult ? resultMessage(draw, shop.name, GROUP_NAME) : null;
+  const handleStartRecording = (stream: MediaStream) => {
+    setCameraOpen(false);
+    if (!frameRef.current || !startRecording(stream, draw.id, frameRef.current)) {
+      stopStream(stream);
+      toast.error("Este celular não conseguiu começar a gravação.");
+    }
+  };
+
+  const handleEndRecording = async () => {
+    if (stopping) return;
+    setStopping(true);
+    const out = await stopRecording();
+    setStopping(false);
+    if (!out) return;
+    const decided = rounds
+      .filter((r) => r.result && r.result.at >= out.startedAt)
+      .map((r) => ({ prize: r.prize, merchant: r.merchantName, winner: r.result?.winner ?? "" }));
+    const recording: Recording = {
+      id: newId(),
+      mode: "roleta-camera",
+      mic: true,
+      startedAt: out.startedAt,
+      durationMs: out.durationMs,
+      real: true,
+      mimeType: out.mimeType,
+      size: out.blob.size,
+      rounds: decided,
+      ...(decided[0] ? { winner: decided[0].winner } : {}),
+    };
+    const saved = (await saveVideo(recording.id, out.blob)) && addRecording(draw.id, recording);
+    setVideoDone({
+      blob: out.blob,
+      filename: videoFileName(draw.date, out.mimeType, draw.recordings?.length ?? 0),
+      recording,
+      saved,
+    });
+  };
+
+  // Built from the saved results of the round on the wheel, never from a new spin.
+  const message = drawResultMessage(draw, state.merchants, GROUP_NAME);
+
+  const goldButton = (() => {
+    if (!result && (dirty || count < MIN_NAMES_TO_SPIN)) {
+      if (dirty && readyCount >= MIN_NAMES_TO_SPIN) {
+        return (
+          <GoldButton onClick={() => { exitFull(); navigate({ to: "/nomes" }); }}>
+            <ClipboardCheck aria-hidden="true" /> Confirmar lista nova
+          </GoldButton>
+        );
+      }
+      if (ri > 0 && !dirty) {
+        return (
+          <GoldButton disabled className="text-lg">
+            Faltam nomes para esta cortesia
+          </GoldButton>
+        );
+      }
+      return (
+        <GoldButton onClick={() => { exitFull(); navigate({ to: "/nomes" }); }}>
+          <UserPlus aria-hidden="true" /> Adicionar nomes
+        </GoldButton>
+      );
+    }
+    if (showResult && !isLast) {
+      return (
+        <GoldButton
+          onClick={() => updateDraw(draw.id, nextRound)}
+          className={showRecordButton ? "px-2 text-lg leading-tight" : ""}
+        >
+          <SkipForward className="shrink-0" aria-hidden="true" /> Sortear próxima cortesia
+        </GoldButton>
+      );
+    }
+    if (showResult && multi) {
+      return (
+        <GoldButton onClick={() => setSummaryOpen(true)} className={recording ? "px-2 text-lg" : ""}>
+          <ListChecks className="shrink-0" aria-hidden="true" /> Ver resumo
+        </GoldButton>
+      );
+    }
+    if (showResult) {
+      return (
+        <GoldButton onClick={() => setShareOpen(true)} className={recording ? "px-2 text-lg leading-tight" : ""}>
+          <MessageCircle className="shrink-0" aria-hidden="true" /> Mandar no WhatsApp
+        </GoldButton>
+      );
+    }
+    return (
+      <GoldButton onClick={handleSpin} disabled={spinning}>
+        {spinning ? "Girando…" : "Girar roleta"}
+      </GoldButton>
+    );
+  })();
+
+  const hint = (text: string) => (
+    <p className="flex h-11 items-center justify-center text-center text-sm font-semibold leading-tight text-muted-foreground">
+      {text}
+    </p>
+  );
 
   return (
     <div
@@ -177,12 +343,14 @@ function Roleta() {
       />
 
       <section className="mx-4 flex items-center gap-3 rounded-2xl bg-card p-3">
-        <MerchantLogo src={shop.logo} className="h-12 w-12" />
+        <MerchantLogo src={round.merchantLogo} className="h-12 w-12" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-muted-foreground">
-            Oferecimento: <span className="font-bold text-foreground">{shop.name}</span>
+            Oferecimento: <span className="font-bold text-foreground">{round.merchantName}</span>
           </p>
-          <p className="font-display text-lg font-bold leading-snug text-gold">{draw.prize}</p>
+          <p className="font-display text-lg font-bold leading-snug text-gold" data-testid="prize-label">
+            {multi ? roundLabel(ri, total, round.prize) : round.prize}
+          </p>
         </div>
       </section>
 
@@ -207,13 +375,14 @@ function Roleta() {
       </div>
 
       <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
-        {session && (
+        {rec && (
           <div className="absolute left-4 top-1 z-20">
-            <RecIndicator startedAt={session.startedAt} />
+            <RecIndicator startedAt={rec.startedAt} />
           </div>
         )}
         <Wheel
-          names={draw.names}
+          key={`${draw.id}-${ri}`}
+          names={pool}
           rotation={result?.rotation ?? 0}
           spin={spin}
           {...(state.sound ? { onTick: playTick } : {})}
@@ -227,12 +396,13 @@ function Roleta() {
             >
               <p className="flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wide text-gold">
                 <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
+                {multi ? ` · Prêmio ${ri + 1} de ${total}` : ""}
               </p>
-              <p className="mt-1 break-words font-display text-4xl font-extrabold leading-tight">
+              <p className="mt-1 break-words font-display text-4xl font-extrabold leading-tight" data-testid="winner">
                 {result.winner}
               </p>
-              <p className="mt-3 text-base font-bold text-gold">{draw.prize}</p>
-              <p className="text-sm text-muted-foreground">Oferecimento: {shop.name}</p>
+              <p className="mt-3 text-base font-bold text-gold">{round.prize}</p>
+              <p className="text-sm text-muted-foreground">Oferecimento: {round.merchantName}</p>
             </div>
           </div>
         )}
@@ -251,63 +421,37 @@ function Roleta() {
           {showRecordButton &&
             (recording ? (
               <button
-                onClick={handleEndRecording}
-                disabled={spinning}
+                onClick={() => void handleEndRecording()}
+                disabled={spinning || stopping}
                 className="flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-rec bg-card px-2 text-base font-extrabold leading-tight disabled:opacity-50"
               >
                 <Square className="h-4 w-4 shrink-0 fill-rec text-rec" aria-hidden="true" />
-                <span>Encerrar gravação</span>
+                <span>{stopping ? "Encerrando…" : "Encerrar gravação"}</span>
               </button>
             ) : (
               <button
-                onClick={() => setRecordOpen(true)}
+                onClick={() => setCameraOpen(true)}
                 disabled={spinning}
-                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-4 text-lg font-extrabold active:bg-accent disabled:opacity-50"
+                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-3 text-base font-extrabold leading-tight active:bg-accent disabled:opacity-50"
               >
-                <Camera className="h-6 w-6 shrink-0 text-gold" aria-hidden="true" /> Gravar
+                <Camera className="h-6 w-6 shrink-0 text-gold" aria-hidden="true" /> Gravar comigo
               </button>
             ))}
-          {!canSpin && !result ? (
-            <GoldButton
-              onClick={() => {
-                exitFull();
-                navigate({ to: "/nomes" });
-              }}
-            >
-              {dirty && readyCount >= MIN_NAMES_TO_SPIN ? (
-                <>
-                  <ClipboardCheck aria-hidden="true" /> Confirmar lista nova
-                </>
-              ) : (
-                <>
-                  <UserPlus aria-hidden="true" /> Adicionar nomes
-                </>
-              )}
-            </GoldButton>
-          ) : showResult ? (
-            <GoldButton
-              onClick={() => setShareOpen(true)}
-              className={recording ? "px-2 text-lg leading-tight" : ""}
-            >
-              <MessageCircle className="shrink-0" aria-hidden="true" /> Mandar no WhatsApp
-            </GoldButton>
-          ) : (
-            <GoldButton onClick={handleSpin} disabled={spinning}>
-              {spinning ? "Girando…" : "Girar roleta"}
-            </GoldButton>
-          )}
+          {goldButton}
         </div>
         {full ? (
           <SecondaryButton onClick={exitFull} className="border border-gold/60">
             <Minimize2 className="text-gold" aria-hidden="true" /> Sair da tela cheia
           </SecondaryButton>
         ) : recording ? (
-          <p className="flex h-11 items-center justify-center text-center text-sm font-semibold text-muted-foreground">
-            {result
-              ? "Ao terminar de falar, toque em Encerrar gravação."
-              : "Apresente a cortesia e toque em Girar roleta."}
-          </p>
-        ) : result ? (
+          hint(
+            result
+              ? isLast
+                ? "Ao terminar de falar, toque em Encerrar gravação."
+                : "Quando quiser, toque em Sortear próxima cortesia."
+              : "Fale com o público e toque em Girar roleta.",
+          )
+        ) : done ? (
           <SecondaryButton
             onClick={() => navigate({ to: "/sorteios/novo" })}
             disabled={spinning}
@@ -315,10 +459,16 @@ function Roleta() {
           >
             <Plus aria-hidden="true" /> Novo sorteio
           </SecondaryButton>
+        ) : result ? (
+          hint(spinning ? "" : `Ganhador(a) guardado. Falta ${total - ri - 1 === 1 ? "1 cortesia" : `${total - ri - 1} cortesias`}.`)
         ) : dirty && count > 0 ? (
-          <p className="flex h-11 items-center justify-center text-center text-sm font-semibold text-muted-foreground">
-            A lista mudou em Nomes. Confirme antes de girar.
-          </p>
+          hint("A lista mudou em Nomes. Confirme antes de girar.")
+        ) : canSpin && ri > 0 ? (
+          hint(
+            draw.repeatWinners === false
+              ? `${count} nomes nesta rodada: quem já ganhou saiu da roleta.`
+              : `${count} nomes nesta rodada.`,
+          )
         ) : canSpin ? (
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
             <SecondaryButton onClick={() => navigate({ to: "/nomes" })} disabled={spinning} className="px-2 text-[15px]">
@@ -337,28 +487,75 @@ function Roleta() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         date={draw.date}
-        shopName={shop.name}
-        prize={draw.prize}
+        shopName={round.merchantName}
+        prize={round.prize}
         onPreview={() => {
           setInviteOpen(false);
           navigate({ to: "/convite/previa", search: { estado: "aguardando" } });
         }}
       />
-      <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />
-      <RecordSheet open={recordOpen} onOpenChange={setRecordOpen} onStart={handleStartRecording} />
-      <RecordingDoneDialog
-        recording={done?.recording ?? null}
-        date={draw.date}
-        merchant={shop.name}
-        prize={draw.prize}
-        onClose={() => setDone(null)}
-        onPreview={() => {
-          if (!done) return;
-          const params = { drawId: done.drawId, recordingId: done.recording.id };
-          setDone(null);
-          navigate({ to: "/sorteios/gravacoes/$drawId/$recordingId", params });
-        }}
+
+      <AlertDialog open={repeatAsk} onOpenChange={setRepeatAsk}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl border-border bg-card sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-2xl leading-tight">
+              Quem ganhar pode ganhar de novo neste sorteio?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-muted-foreground">
+              Este sorteio tem {total} cortesias. Se for “Não”, quem ganhar sai da roleta nas próximas rodadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => answerRepeat(true)} className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent">
+              Sim
+            </button>
+            <button onClick={() => answerRepeat(false)} className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent">
+              Não
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={summaryOpen && done && !spinning} onOpenChange={setSummaryOpen}>
+        <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Resumo do sorteio</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {formatDateBR(draw.date)} · {total} cortesias
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-2" data-testid="summary">
+            {rounds.map((r) => (
+              <li key={r.index} className="rounded-2xl bg-card p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Prêmio {r.index + 1} · {r.merchantName}
+                </p>
+                <p className="font-bold text-gold">{r.prize}</p>
+                <p className="mt-1 flex items-center gap-1.5 font-display text-xl font-extrabold">
+                  <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" /> {r.result?.winner}
+                </p>
+              </li>
+            ))}
+          </ol>
+          <GoldButton
+            className="px-3 text-lg"
+            onClick={() => {
+              setSummaryOpen(false);
+              setShareOpen(true);
+            }}
+          >
+            <MessageCircle aria-hidden="true" /> Compartilhar no WhatsApp
+          </GoldButton>
+        </DialogContent>
+      </Dialog>
+
+      <ResultShareDialog
+        text={shareOpen ? message : null}
+        onClose={() => setShareOpen(false)}
+        {...(multi ? { title: "Compartilhar no WhatsApp" } : {})}
       />
+      <CameraDialog open={cameraOpen} onClose={() => setCameraOpen(false)} onStart={handleStartRecording} />
+      <VideoDoneDialog video={videoDone} onClose={() => setVideoDone(null)} />
     </div>
   );
 }

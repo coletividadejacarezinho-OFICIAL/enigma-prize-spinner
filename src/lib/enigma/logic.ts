@@ -57,8 +57,23 @@ export function createDraw(input: {
   merchant: Merchant;
   prize: string;
   confirmed: boolean;
+  /** Courtesies after the first one, all drawn from the same list of names. */
+  more?: { merchant: Merchant; prize: string }[];
+  repeatWinners?: boolean;
 }): Draw {
+  const more = input.more ?? [];
   return {
+    ...(more.length > 0
+      ? {
+          extraPrizes: more.map((p) => ({
+            id: newId(),
+            merchantId: p.merchant.id,
+            merchant: p.merchant.name,
+            prize: p.prize.trim(),
+          })),
+        }
+      : {}),
+    ...(more.length > 0 && input.repeatWinners !== undefined ? { repeatWinners: input.repeatWinners } : {}),
     id: newId(),
     date: input.date,
     merchantId: input.merchant.id,
@@ -165,13 +180,18 @@ export function buildListao(
   const latestPast = new Map<string, string>();
   const earliestFuture = new Map<string, string>();
   for (const d of state.draws) {
-    if (d.isSample || d.confirmed !== true || !d.merchantId) continue;
-    if (d.date <= today) {
-      const prev = latestPast.get(d.merchantId);
-      if (!prev || d.date > prev) latestPast.set(d.merchantId, d.date);
-    } else {
-      const prev = earliestFuture.get(d.merchantId);
-      if (!prev || d.date < prev) earliestFuture.set(d.merchantId, d.date);
+    if (d.isSample || d.confirmed !== true) continue;
+    // Every courtesy of the draw puts its shop on the Listão.
+    const ids = [d.merchantId, ...(d.extraPrizes ?? []).map((p) => p.merchantId)];
+    for (const id of new Set(ids)) {
+      if (!id) continue;
+      if (d.date <= today) {
+        const prev = latestPast.get(id);
+        if (!prev || d.date > prev) latestPast.set(id, d.date);
+      } else {
+        const prev = earliestFuture.get(id);
+        if (!prev || d.date < prev) earliestFuture.set(id, d.date);
+      }
     }
   }
   const active: ListaoEntry[] = [];

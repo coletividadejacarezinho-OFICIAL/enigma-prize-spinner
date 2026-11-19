@@ -4,6 +4,8 @@ import { toast } from "sonner";
 
 import { DrawForm } from "@/components/enigma/DrawForm";
 import { GoldButton } from "@/components/enigma/GoldButton";
+import { newId } from "@/lib/enigma/logic";
+import { applyPrizes, roundsOf } from "@/lib/enigma/rounds";
 import { updateDraw, useAppState } from "@/lib/enigma/store";
 
 export const Route = createFileRoute("/sorteios/editar/$drawId")({
@@ -44,21 +46,44 @@ function EditarSorteio() {
           merchants={state.merchants}
           initial={{
             date: draw.date,
-            merchantId: draw.merchantId ?? "",
-            prize: draw.prize,
+            prizes: roundsOf(draw, state.merchants).map((r) => ({
+              key: `r${r.index}`,
+              ...(r.index > 0 ? { id: draw.extraPrizes?.[r.index - 1]?.id ?? "" } : {}),
+              merchantId: r.merchantId ?? "",
+              prize: r.prize,
+              ...(r.result ? { locked: true } : {}),
+            })),
             confirmed: draw.confirmed ?? null,
+            repeatWinners: draw.repeatWinners ?? null,
           }}
           onSubmit={(v) => {
-            const merchant = state.merchants.find((m) => m.id === v.merchantId);
-            if (!merchant) return;
-            const ok = updateDraw(draw.id, (d) => ({
-              ...d,
-              date: v.date,
-              merchantId: merchant.id,
-              merchant: merchant.name,
-              prize: v.prize,
-              confirmed: v.confirmed,
+            const prizes = v.prizes.map((p) => ({
+              ...(p.id ? { id: p.id } : {}),
+              merchant: state.merchants.find((m) => m.id === p.merchantId),
+              prize: p.prize,
             }));
+            if (prizes.some((p) => !p.merchant)) return;
+            const ok = updateDraw(draw.id, (d) => {
+              const next = applyPrizes(
+                d,
+                prizes.flatMap((p) => (p.merchant ? [{ ...p, merchant: p.merchant }] : [])),
+                newId,
+              );
+              const { repeatWinners: _r, ...rest } = next;
+              return {
+                ...rest,
+                date: v.date,
+                confirmed: v.confirmed,
+                // The repeat answer can't change once a round was drawn.
+                ...(d.result
+                  ? d.repeatWinners !== undefined
+                    ? { repeatWinners: d.repeatWinners }
+                    : {}
+                  : v.prizes.length > 1 && v.repeatWinners !== null
+                    ? { repeatWinners: v.repeatWinners }
+                    : {}),
+              };
+            });
             if (!ok) return void toast.error("O celular está sem espaço para guardar.");
             toast.success("Sorteio atualizado.");
             navigate({ to: "/sorteios" });
