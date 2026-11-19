@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { GoldButton, SecondaryButton } from "./GoldButton";
 import { MerchantLogo } from "./Logos";
 import { fieldClass } from "./fields";
-import { report } from "@/lib/enigma/feedback";
+import { report, reportPartner } from "@/lib/enigma/feedback";
 import { formatDateBR, newId, todayISO } from "@/lib/enigma/logic";
 import {
   appendOffers,
@@ -24,7 +24,8 @@ import {
   sameShopRounds,
   type Offer,
 } from "@/lib/enigma/partners";
-import { updateSim, useSim } from "@/lib/enigma/partners-store";
+import { PartnerRecovery } from "./PartnerRecovery";
+import { partnersRepo, usePartners, usePartnerSnapshot } from "@/lib/enigma/partners-repo";
 import { repo } from "@/lib/enigma/repo";
 import { roundIdOf, roundsOf } from "@/lib/enigma/rounds";
 import type { AppState, Draw } from "@/lib/enigma/types";
@@ -34,22 +35,21 @@ export const ENSAIO_TAG = "Ensaio: nada é enviado de verdade.";
 /** Opens an invite in the merchant's test view. */
 export function useOpenInvite() {
   const navigate = useNavigate();
-  return (kind: "geral" | "individual", merchantId?: string) => {
+  return async (kind: "geral" | "individual", merchantId?: string) => {
     const id = newId();
-    const ok = updateSim(({ session: _s, ...s }) => ({
-      ...s,
-      invites: [...s.invites, { id, kind, ...(merchantId ? { merchantId } : {}), createdAt: Date.now() }],
-    }));
-    if (!ok) return void toast.error("Não foi possível salvar o ensaio. Libere espaço e tente de novo.");
+    const result = await partnersRepo.createInvite({ id, kind, ...(merchantId ? { merchantId } : {}), createdAt: Date.now() });
+    if (!reportPartner(result)) return;
     navigate({ to: "/parceiros/loja", search: { convite: id } });
   };
 }
 
 export function PartnerTools({ state }: { state: AppState }) {
-  const sim = useSim();
+  const partnerSnapshot = usePartnerSnapshot();
+  const sim = partnerSnapshot?.kind === "ok" ? partnerSnapshot.state : null;
   const openInvite = useOpenInvite();
   const hasBurguer = state.merchants.some((m) => m.name.toLowerCase() === "burguer 7");
   const pending = (sim?.offers ?? []).filter((o) => !o.confirmed);
+  if (partnerSnapshot?.kind === "broken") return <PartnerRecovery />;
   return (
     <>
       <SecondaryButton onClick={() => openInvite("geral")} className="mt-1">
@@ -102,7 +102,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   /** Records each offer's link, but only for offers whose prize is really saved in a round. */
-  const finish = (offers: Offer[]) => {
+  const finish = async (offers: Offer[]) => {
     const now = latest();
     if (!now) return false;
     const found = offers.map((o) => [o, placementOf(now.draws, o)] as const);
@@ -110,17 +110,11 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
       setError("A oferta ainda não foi salva na rodada. Confira o destino e tente novamente.");
       return false;
     }
-    const ok = updateSim((s) => ({
-      ...s,
-      offers: s.offers.map((x) => {
-        const f = found.find(([o]) => o.id === x.id)?.[1];
-        return f && !x.confirmed
-          ? { ...x, confirmed: { ...f, at: Date.now(), linked: !!now.draws.find((d) => d.id === f.drawId)?.offerLinks?.[x.id] } }
-          : x;
-      }),
-    }));
-    if (!ok) toast.error("A rodada foi salva, mas as ofertas não. Toque de novo: nada será duplicado.");
-    return ok;
+    const result = await partnersRepo.confirmOffers(found.map(([offer, placement]) => ({
+      offerId: offer.id, drawId: placement!.drawId, roundId: placement!.roundId, at: Date.now(),
+    })));
+    if (!reportPartner(result)) setError("A rodada foi salva. Confira as ofertas e tente confirmar novamente.");
+    return result.ok;
   };
 
   const run = async (fn: () => Promise<boolean>) => {
@@ -143,12 +137,12 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   };
 
   /** If any selected offer is already in a round, finish only those and keep the others pending. */
-  const recover = (): boolean | null => {
+  const recover = async (): Promise<boolean | null> => {
     const now = latest();
     if (!now) return false;
     const plan = planOffers(now.draws, sel);
     if (plan.recovered.length === 0) return null;
-    if (!finish(plan.recovered.map((r) => r.offer))) return false;
+    if (!(await finish(plan.recovered.map((r) => r.offer)))) return false;
     toast.success(recoveryMessage(plan, now.draws, formatDateBR));
     setPicked(plan.fresh.map((o) => o.id));
     setMode(null);
@@ -157,7 +151,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
 
   const create = () =>
     run(async () => {
-      const r = recover();
+      const r = await recover();
       if (r !== null) return r;
       if (!date) {
         toast.error("Escolha a data.");
@@ -176,7 +170,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
         return false;
       }
       setCreatedId(d.id);
-      if (!finish(sel)) return false;
+      if (!(await finish(sel))) return false;
       toast.success(`Rascunho criado com ${sel.length} ${sel.length === 1 ? "prêmio" : "prêmios"}.`);
       return true;
     });
@@ -184,11 +178,11 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   const add = () =>
     run(async () => {
       if (!target) return false;
-      const r = recover();
+      const r = await recover();
       if (r !== null) return r;
       const ok = await repo.editDraw(target.id, (d) => appendOffers(d, sel, latest()?.merchants ?? state.merchants, links));
       if (!report(ok)) return false;
-      if (!finish(sel)) return false;
+      if (!(await finish(sel))) return false;
       toast.success(`Ofertas adicionadas à rodada de ${formatDateBR(target.date)}.`);
       return true;
     });
@@ -324,12 +318,8 @@ function OfferCard({
   const linked = offer.merchantId ? state.merchants.find((m) => m.id === offer.merchantId) : undefined;
   const match = linked ? undefined : findExisting(state.merchants, offer.name, offer.whatsapp);
 
-  const attachShop = (merchantId: string) =>
-    updateSim((s) => ({
-      ...s,
-      offers: s.offers.map((x) => (x.id === offer.id ? { ...x, merchantId } : x)),
-      accounts: s.accounts.map((a) => (a.id === offer.accountId ? { ...a, merchantId } : a)),
-    }));
+  const attachShop = async (merchantId: string) =>
+    reportPartner(await partnersRepo.attachShop({ offerId: offer.id, merchantId }));
 
   const createShop = async () => {
     const id = offerMerchantId(offer);
@@ -343,7 +333,7 @@ function OfferCard({
       });
       if (!report(ok)) return;
     }
-    if (!attachShop(id)) return void toast.error("Não foi possível salvar o ensaio.");
+    if (!(await attachShop(id))) return void toast.error("Não foi possível salvar o ensaio.");
     toast.success(`${offer.name} cadastrado.`);
   };
 
@@ -390,7 +380,7 @@ function OfferCard({
 
 /** Per drawn courtesy of a shop: send winner (fictitious phone) to the shop view; shows "retirado". */
 export function WinnerToShopCard({ draw, state }: { draw: Draw; state: AppState }) {
-  const sim = useSim();
+  const sim = usePartners();
   const rounds = roundsOf(draw, state.merchants).filter((r) => r.result && r.merchantId);
   if (!sim || rounds.length === 0 || draw.isSample) return null;
   return (
@@ -418,24 +408,13 @@ export function WinnerToShopCard({ draw, state }: { draw: Draw; state: AppState 
                 <p className="mt-1 text-sm">Enviado à loja · tel. {sent.phone} · aguardando retirada</p>
               ) : (
                 <button
-                  onClick={() => {
-                    const ok = updateSim((s) => ({
-                      ...s,
-                      notices: [
-                        ...s.notices,
-                        {
-                          id: newId(),
-                          merchantId: r.merchantId!,
-                          drawId: draw.id,
-                          roundId,
-                          winner: r.result!.winner,
-                          phone: fakePhone(r.result!.winner),
-                          sentAt: Date.now(),
-                        },
-                      ],
-                    }));
-                    if (ok) toast.success(`Ganhador enviado para ${r.merchantName} (ensaio).`);
-                    else toast.error("Não foi possível salvar o ensaio.");
+                  onClick={async () => {
+                    const result = await partnersRepo.saveNotice({
+                      id: newId(), merchantId: r.merchantId!, drawId: draw.id,
+                      roundId, winner: r.result!.winner, phone: fakePhone(r.result!.winner),
+                      sentAt: Date.now(),
+                    });
+                    if (reportPartner(result)) toast.success(`Ganhador enviado para ${r.merchantName} (ensaio).`);
                   }}
                   className="mt-1 flex h-11 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-extrabold text-primary-foreground"
                 >

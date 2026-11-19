@@ -184,3 +184,13 @@ it("oferta acrescentada em A permanece em A após falha, releitura e escolha de 
   expect(savedState().draws[0]?.extraPrizes).toHaveLength(1);
   expect(savedState().draws[1]?.extraPrizes).toBeUndefined();
 });
+
+it("mostra recuperação e preserva registros de parceiros ilegíveis", () => {
+  localStorage.clear();
+  repo.reload();
+  localStorage.setItem("enigma-premiado:p1-ensaio", "null");
+  render(<Panel />);
+  expect(screen.getByText("Confira os dados dos parceiros")).toBeTruthy();
+  expect(screen.queryByText("Convidar comerciante")).toBeNull();
+  expect(localStorage.getItem("enigma-premiado:p1-ensaio")).toBe("null");
+});

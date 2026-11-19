@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { receiveBotMessage, type BotInput } from "./entries";
 import { finishRecording, migrateState } from "./logic";
+import { restorePending, RESTORE_KEY } from "./restore-lock";
 import { SIM_KEY } from "./partners-store";
 import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 
@@ -68,11 +69,11 @@ export function snap(): StoreSnapshot {
   if (loaded.kind === "empty") {
     // First open: no draws yet. Rehearsal draws are only created on request.
     const fresh = emptyState();
-    if (!write(fresh)) memoryOnly = fresh;
+    if (restorePending() || !write(fresh)) memoryOnly = fresh;
     return snap();
   }
   // Older data is upgraded on screen; saving the upgrade is a bonus, the original stays if it fails.
-  if (loaded.migrated) write(loaded.state, false);
+  if (loaded.migrated && !restorePending()) write(loaded.state, false);
   return (cachedSnap = { kind: "ok", state: loaded.state });
 }
 
@@ -132,7 +133,8 @@ export function emptyState(): AppState {
 }
 
 /** Like `update`, but says whether reading or saving failed. Errors thrown by `fn` propagate. */
-export function tryUpdate(fn: (state: AppState) => AppState): "ok" | "read" | "write" {
+export function tryUpdate(fn: (state: AppState) => AppState): "ok" | "read" | "write" | "restore" {
+  if (restorePending()) return "restore";
   const s = snap();
   if (s.kind !== "ok") return "read";
   return write(fn(s.state)) ? "ok" : "write";
@@ -140,6 +142,7 @@ export function tryUpdate(fn: (state: AppState) => AppState): "ok" | "read" | "w
 
 /** Applies a change and saves it. Returns false when the phone's storage is full. */
 export function update(fn: (state: AppState) => AppState): boolean {
+  if (restorePending()) return false;
   const s = snap();
   if (s.kind !== "ok") return false;
   return write(fn(s.state));
@@ -243,7 +246,7 @@ export function addRecording(drawId: string, rec: Recording): boolean {
 
 /* ---------- E05: restore journal (data and videos are saved separately) ---------- */
 
-export const RESTORE_KEY = "enigma-premiado:restore";
+export { RESTORE_KEY } from "./restore-lock";
 
 export type RestoreJournal = {
   phase: "videos" | "data";

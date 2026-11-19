@@ -1,10 +1,12 @@
 /** Browser-only (E07): keeps a finished recording and says "saved" only once both the file and its link to the draw are read back. */
+import { restorePending } from "./restore-lock";
 import { repo } from "./repo";
 import { loadState, rawSavedData } from "./store";
 import type { Recording } from "./types";
 import { loadVideo, saveVideo } from "./videos";
 
 export async function keepRecording(drawId: string, rec: Recording, blob: Blob): Promise<boolean> {
+  if (restorePending()) return false;
   if (!(await saveVideo(rec.id, blob))) return false;
   const back = await loadVideo(rec.id);
   if (!back || back.size !== blob.size) return false;

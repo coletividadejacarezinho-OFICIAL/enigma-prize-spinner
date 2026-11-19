@@ -3,6 +3,7 @@
  * swapped (local browser storage today, a server database in E03) without touching screens.
  * Every operation takes explicit draw / courtesy ids and returns a typed result.
  */
+import { stableJson } from "./restore";
 import { markDelivered } from "./agenda";
 import { useSyncExternalStore } from "react";
 
@@ -20,11 +21,12 @@ import { commitSpin, nextRound as nextRoundRule, roundIndexOf, shownRound } from
 import * as local from "./store";
 import type { AppState, BotOutcome, Draw, DrawResult, Entry, Merchant, Recording } from "./types";
 
-export type RepoError = "read" | "write" | "unavailable" | "conflict";
+export type RepoError = "read" | "write" | "unavailable" | "conflict" | "restore";
 export type RepoResult<T = void> =
   { ok: true; value: T } | { ok: false; error: RepoError; message: string };
 
 export const MESSAGES: Record<RepoError, string> = {
+  restore: "Conclua a recuperação da cópia antes de salvar novos dados.",
   read: "Não foi possível abrir os dados deste celular. Toque em “Tentar novamente”.",
   write: local.SAVE_FAIL,
   unavailable: "Esta ação precisa de internet. Conecte o celular e tente de novo.",
@@ -46,7 +48,7 @@ export type SpinInput = {
 export type Preferences = { sound?: boolean; volume?: number; groupLogo?: string | null; demoTools?: boolean };
 
 export interface EnigmaRepo {
-  readonly kind: "local";
+  readonly kind: "local" | "memory" | "remote";
   subscribe(cb: () => void): () => void;
   /** null while opening (server render / hydration). */
   getSnapshot(): Snapshot | null;
@@ -130,7 +132,10 @@ export const localRepo: EnigmaRepo = {
   },
   async createDraw(draw, { makeCurrent }) {
     return run((s) => {
-      const next = { ...s, draws: [...s.draws, draw] };
+      if (makeCurrent && draw.draft) throw new Conflict();
+      const existing = s.draws.find((d) => d.id === draw.id);
+      if (existing && stableJson(existing) !== stableJson(draw)) throw new Conflict();
+      const next = existing ? s : { ...s, draws: [...s.draws, draw] };
       return makeCurrent ? local.switchCurrent(next, draw.id) : next;
     });
   },
