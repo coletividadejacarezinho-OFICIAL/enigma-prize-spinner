@@ -77,3 +77,17 @@ export async function shareVideo(blob: Blob, filename: string): Promise<"ok" | "
     return e instanceof DOMException && e.name === "AbortError" ? "cancelled" : "unsupported";
   }
 }
+
+export async function deleteVideo(id: string): Promise<boolean> {
+  try {
+    await run("readwrite", (s) => s.delete(id));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Strict version for restore: throws when the browser refuses. */
+export async function putVideoOrThrow(id: string, blob: Blob): Promise<void> {
+  await run("readwrite", (s) => s.put(blob, id));
+}

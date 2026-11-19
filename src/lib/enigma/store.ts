@@ -239,3 +239,84 @@ export function simulateBotMessage(
 export function addRecording(drawId: string, rec: Recording): boolean {
   return updateDraw(drawId, (d) => ({ ...d, recordings: [...(d.recordings ?? []), rec] }));
 }
+
+/* ---------- E05: restore journal (data and videos are saved separately) ---------- */
+
+export const RESTORE_KEY = "enigma-premiado:restore";
+
+export type RestoreJournal = {
+  phase: "videos" | "data";
+  prevRaw: string | null;
+  newRaw: string;
+  /** Videos this restore adds; deleted again if the restore is rolled back. */
+  newVideoIds: string[];
+};
+
+function readJournal(): RestoreJournal | null {
+  try {
+    const j = window.localStorage.getItem(RESTORE_KEY);
+    return j ? (JSON.parse(j) as RestoreJournal) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeJournal(j: RestoreJournal): boolean {
+  try {
+    window.localStorage.setItem(RESTORE_KEY, JSON.stringify(j));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearJournal() {
+  try {
+    window.localStorage.removeItem(RESTORE_KEY);
+  } catch {
+    /* nothing else to do */
+  }
+}
+
+/** Saves the restored text as the app's data; false when the browser refuses. */
+export function writeRestoredRaw(raw: string): boolean {
+  try {
+    window.localStorage.setItem(KEY, raw);
+  } catch {
+    return false;
+  }
+  retryLoad();
+  return true;
+}
+
+/** Puts the data back as it was before a restore that did not finish. */
+export function writeRawBack(prevRaw: string | null) {
+  try {
+    if (prevRaw === null) window.localStorage.removeItem(KEY);
+    else window.localStorage.setItem(KEY, prevRaw);
+  } catch {
+    /* journal stays; retried on next open */
+    return false;
+  }
+  retryLoad();
+  return true;
+}
+
+/**
+ * On open, a restore left halfway is settled: phase "data" means every video is in place, so
+ * the data write is finished; phase "videos" means data was never touched, so it is rolled back
+ * and the returned video ids must be deleted.
+ */
+export function settleRestore(): { outcome: "none" | "finished" | "rolledBack"; deleteVideos: string[] } {
+  const j = readJournal();
+  if (!j) return { outcome: "none", deleteVideos: [] };
+  if (j.phase === "data") {
+    if (getRaw().raw !== j.newRaw && !writeRestoredRaw(j.newRaw)) {
+      writeRawBack(j.prevRaw);
+      return { outcome: "rolledBack", deleteVideos: j.newVideoIds };
+    }
+    return { outcome: "finished", deleteVideos: [] };
+  }
+  writeRawBack(j.prevRaw);
+  return { outcome: "rolledBack", deleteVideos: j.newVideoIds };
+}

@@ -18,6 +18,8 @@ import { FirstRun, Opening } from "../components/enigma/FirstRun";
 import { OfflineNotice } from "../components/enigma/OfflineNotice";
 import { useSnapshot } from "../lib/enigma/repo";
 import { initInstallPrompt } from "../lib/enigma/install";
+import { settleOnOpen } from "../lib/enigma/restore-import";
+import { toast } from "sonner";
 import { usePresentation } from "../lib/enigma/presentation";
 import { Toaster } from "../components/ui/sonner";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -160,6 +162,13 @@ function RootComponent() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const needsDraw = path === "/" || path === "/nomes" || path.startsWith("/convite");
   const empty = store?.kind === "ok" && store.state.draws.length === 0 && needsDraw;
+  useEffect(() => {
+    // A restore interrupted by closing the page is finished or undone before anything else.
+    void settleOnOpen().then((r) => {
+      if (r === "finished") toast.success("A restauração da cópia foi concluída.");
+      if (r === "rolledBack") toast.info("A restauração anterior não terminou e foi desfeita. Seus dados estão como antes.");
+    });
+  }, []);
   useEffect(() => initInstallPrompt(), []);
 
   return (
