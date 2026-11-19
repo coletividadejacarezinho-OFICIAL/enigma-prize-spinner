@@ -143,7 +143,7 @@ function RootComponent() {
         <Outlet />
       </div>
       <BottomNav />
-      <Toaster position="top-center" richColors />
+      <Toaster position="top-center" richColors duration={2500} />
     </QueryClientProvider>
   );
 }

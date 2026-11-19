@@ -1,4 +1,4 @@
-import type { AppState, Draw } from "./types";
+import { LISTAO_DAYS, type AppState, type Draw, type Merchant } from "./types";
 
 export const SAMPLE_NAMES = [
   "Ana Souza",
@@ -38,26 +38,134 @@ export function createSampleState(): AppState {
     isSample: true,
     createdAt: Date.now(),
   };
-  return { version: 1, draws: [sample], currentId: sample.id, sound: true };
+  return { version: 1, draws: [sample], merchants: [], currentId: sample.id, sound: true };
 }
 
 /** A new round always starts with an empty list of names. */
 export function createDraw(input: {
   date: string;
-  merchant: string;
+  merchant: Merchant;
   prize: string;
-  merchantLogo?: string;
+  confirmed: boolean;
 }): Draw {
-  const draw: Draw = {
+  return {
     id: newId(),
     date: input.date,
-    merchant: input.merchant.trim(),
+    merchantId: input.merchant.id,
+    merchant: input.merchant.name,
     prize: input.prize.trim(),
+    confirmed: input.confirmed,
     names: [],
     createdAt: Date.now(),
   };
-  if (input.merchantLogo) draw.merchantLogo = input.merchantLogo;
-  return draw;
+}
+
+export function createMerchant(input: { name: string; logo?: string | undefined }): Merchant {
+  const m: Merchant = { id: newId(), name: cleanName(input.name), createdAt: Date.now() };
+  if (input.logo) m.logo = input.logo;
+  return m;
+}
+
+/** Name and logo to show for a draw: the registered shop's current data when there is one. */
+export function merchantOf(
+  merchants: Merchant[],
+  draw: Draw,
+): { name: string; logo: string | undefined } {
+  const m = draw.merchantId ? merchants.find((x) => x.id === draw.merchantId) : undefined;
+  if (m) return { name: m.name, logo: m.logo };
+  return { name: draw.merchant, logo: draw.merchantLogo };
+}
+
+/**
+ * Older saved data had no shop records: give it an empty list and turn the shop
+ * names of real (non-test) draws into registered shops, once per name.
+ */
+export function migrateState(state: AppState): AppState {
+  const merchants: Merchant[] = Array.isArray(state.merchants) ? [...state.merchants] : [];
+  let changed = !Array.isArray(state.merchants);
+  const draws = state.draws.map((d) => {
+    if (d.merchantId || d.isSample) return d;
+    const key = normalizeForCompare(d.merchant);
+    let m = merchants.find((x) => normalizeForCompare(x.name) === key);
+    if (!m) {
+      m = createMerchant({ name: d.merchant, logo: d.merchantLogo });
+      m.createdAt = d.createdAt;
+      merchants.push(m);
+    } else if (!m.logo && d.merchantLogo) {
+      m.logo = d.merchantLogo;
+    }
+    changed = true;
+    return { ...d, merchantId: m.id };
+  });
+  return changed ? { ...state, merchants, draws } : state;
+}
+
+/** Adds whole days to a YYYY-MM-DD date. */
+export function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+export type ListaoEntry = {
+  merchant: Merchant;
+  /** Most recent confirmed draw date that has already arrived. */
+  since: string;
+  /** Last day on the Listão (inclusive). */
+  until: string;
+};
+
+export type ScheduledEntry = { merchant: Merchant; starts: string };
+
+/**
+ * The Listão da Alegria: shops with a confirmed courtesy, each listed once.
+ * A shop stays for LISTAO_DAYS calendar days counting its latest arrived draw date;
+ * a confirmed courtesy dated in the future is only scheduled.
+ */
+export function buildListao(
+  state: Pick<AppState, "draws" | "merchants">,
+  today: string,
+): { active: ListaoEntry[]; scheduled: ScheduledEntry[] } {
+  const latestPast = new Map<string, string>();
+  const earliestFuture = new Map<string, string>();
+  for (const d of state.draws) {
+    if (d.isSample || d.confirmed !== true || !d.merchantId) continue;
+    if (d.date <= today) {
+      const prev = latestPast.get(d.merchantId);
+      if (!prev || d.date > prev) latestPast.set(d.merchantId, d.date);
+    } else {
+      const prev = earliestFuture.get(d.merchantId);
+      if (!prev || d.date < prev) earliestFuture.set(d.merchantId, d.date);
+    }
+  }
+  const active: ListaoEntry[] = [];
+  const scheduled: ScheduledEntry[] = [];
+  for (const merchant of state.merchants) {
+    const since = latestPast.get(merchant.id);
+    const until = since ? addDaysISO(since, LISTAO_DAYS - 1) : undefined;
+    if (since && until && today <= until) {
+      active.push({ merchant, since, until });
+      continue;
+    }
+    const starts = earliestFuture.get(merchant.id);
+    if (starts) scheduled.push({ merchant, starts });
+  }
+  const byName = (a: { merchant: Merchant }, b: { merchant: Merchant }) =>
+    a.merchant.name.localeCompare(b.merchant.name, "pt-BR");
+  active.sort(byName);
+  scheduled.sort((a, b) => a.starts.localeCompare(b.starts) || byName(a, b));
+  return { active, scheduled };
+}
+
+export function listaoText(groupName: string, today: string, entries: ListaoEntry[]): string {
+  const lines = [groupName, "🎉 Listão da Alegria", formatDateBR(today), ""];
+  if (entries.length === 0) lines.push("Nenhum comércio em divulgação hoje");
+  else {
+    lines.push("Parceiros em divulgação:");
+    for (const e of entries) lines.push(`• ${e.merchant.name}`);
+  }
+  return lines.join("\n");
 }
 
 export function cleanName(name: string): string {
@@ -138,14 +246,14 @@ export function segmentAtPointer(rotation: number, count: number): number {
   return Math.min(count - 1, Math.floor(angle / seg));
 }
 
-export function shareText(draw: Draw, groupName: string): string {
+export function shareText(draw: Draw, merchantName: string, groupName: string): string {
   const lines = [
     `🎉 Enigma Premiado — ${groupName}`,
     `Sorteio de ${formatDateBR(draw.date)}`,
     "",
     `Ganhador(a): ${draw.result?.winner ?? ""}`,
     `Cortesia: ${draw.prize}`,
-    `Oferecimento: ${draw.merchant}`,
+    `Oferecimento: ${merchantName}`,
   ];
   return lines.join("\n");
 }

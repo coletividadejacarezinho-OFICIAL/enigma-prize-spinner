@@ -27,6 +27,7 @@ import {
   cleanName,
   findDuplicates,
   formatDateBR,
+  merchantOf,
   normalizeForCompare,
   parsePastedList,
 } from "@/lib/enigma/logic";
@@ -127,7 +128,7 @@ function Nomes() {
     <div className="pb-44">
       <AppHeader
         logo={state.groupLogo}
-        subtitle={`${draw.merchant} · ${formatDateBR(draw.date)}`}
+        subtitle={`${merchantOf(state.merchants, draw).name} · ${formatDateBR(draw.date)}`}
       />
 
       <div className="px-4">

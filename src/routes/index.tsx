@@ -9,6 +9,7 @@ import { MerchantLogo } from "@/components/enigma/Logos";
 import { Wheel } from "@/components/enigma/Wheel";
 import {
   formatDateBR,
+  merchantOf,
   pickWinnerIndex,
   secureRandom,
   shareText,
@@ -49,6 +50,7 @@ function Roleta() {
   if (!state) return <RoletaSkeleton />;
 
   const draw = currentDraw(state);
+  const shop = merchantOf(state.merchants, draw);
   const count = draw.names.length;
   const result = draw.result;
   const spinning = spin !== null;
@@ -74,7 +76,7 @@ function Roleta() {
   };
 
   const handleShare = async () => {
-    const text = shareText(draw, GROUP_NAME);
+    const text = shareText(draw, shop.name, GROUP_NAME);
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title: APP_NAME, text });
@@ -99,10 +101,10 @@ function Roleta() {
       />
 
       <section className="mx-4 flex items-center gap-3 rounded-2xl bg-card p-3">
-        <MerchantLogo src={draw.merchantLogo} className="h-12 w-12" />
+        <MerchantLogo src={shop.logo} className="h-12 w-12" />
         <div className="min-w-0">
           <p className="text-xs font-semibold text-muted-foreground">
-            Oferecimento: <span className="font-bold text-foreground">{draw.merchant}</span>
+            Oferecimento: <span className="font-bold text-foreground">{shop.name}</span>
           </p>
           <p className="font-display text-lg font-bold leading-snug text-gold">{draw.prize}</p>
         </div>
@@ -140,7 +142,7 @@ function Roleta() {
                 {result.winner}
               </p>
               <p className="mt-3 text-base font-bold text-gold">{draw.prize}</p>
-              <p className="text-sm text-muted-foreground">Oferecimento: {draw.merchant}</p>
+              <p className="text-sm text-muted-foreground">Oferecimento: {shop.name}</p>
             </div>
           </div>
         )}

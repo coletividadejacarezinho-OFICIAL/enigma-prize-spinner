@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Draw, Merchant } from "@/lib/enigma/types";
 import {
+  addDaysISO,
+  buildListao,
   createDraw,
+  merchantOf,
+  migrateState,
   createSampleState,
   findDuplicates,
   formatDateBR,
@@ -40,7 +45,8 @@ describe("Enigma Premiado rules", () => {
   });
 
   it("starts a new round with an empty list, never the example names", () => {
-    const draw = createDraw({ date: "2026-11-19", merchant: "Loja", prize: "Brinde" });
+    const merchant: Merchant = { id: "m1", name: "Loja", createdAt: 0 };
+    const draw = createDraw({ date: "2026-11-19", merchant, prize: "Brinde", confirmed: true });
     expect(draw.names).toEqual([]);
     expect(draw.isSample).toBeUndefined();
   });
@@ -58,5 +64,88 @@ describe("Enigma Premiado rules", () => {
     expect(dups.get(0)).toEqual([0, 2]);
     expect(dups.get(2)).toEqual([0, 2]);
     expect(dups.has(1)).toBe(false);
+  });
+
+  it("shows the chosen shop's logo and name with the courtesy exactly as typed", () => {
+    const burguer: Merchant = { id: "b7", name: "Burguer 7", logo: "data:logo", createdAt: 0 };
+    const draw = createDraw({
+      date: "2026-11-19",
+      merchant: burguer,
+      prize: "Um hambúrguer com batata",
+      confirmed: true,
+    });
+    expect(merchantOf([burguer], draw)).toEqual({ name: "Burguer 7", logo: "data:logo" });
+    expect(draw.prize).toBe("Um hambúrguer com batata");
+    expect(draw.date).toBe("2026-11-19");
+  });
+});
+
+describe("Listão da Alegria", () => {
+  const shop = (id: string, name: string): Merchant => ({ id, name, createdAt: 0 });
+  const draw = (merchantId: string, date: string, confirmed = true, extra: Partial<Draw> = {}): Draw => ({
+    id: `${merchantId}-${date}`,
+    date,
+    merchantId,
+    merchant: merchantId,
+    prize: "Brinde",
+    confirmed,
+    names: [],
+    createdAt: 0,
+    ...extra,
+  });
+  const a = shop("a", "Açougue Boi Bom");
+  const b = shop("b", "Burguer 7");
+
+  it("counts 30 calendar days including the draw day", () => {
+    const state = { merchants: [a], draws: [draw("a", "2026-11-01")] };
+    expect(buildListao(state, "2026-11-01").active).toHaveLength(1);
+    expect(buildListao(state, "2026-11-30").active).toHaveLength(1);
+    expect(buildListao(state, "2026-12-01").active).toHaveLength(0);
+    expect(buildListao(state, "2026-11-30").active[0]?.until).toBe("2026-11-30");
+  });
+
+  it("leaves out courtesies not yet confirmed and the test round", () => {
+    const state = {
+      merchants: [a, b],
+      draws: [draw("a", "2026-11-10", false), draw("b", "2026-11-10", true, { isSample: true })],
+    };
+    expect(buildListao(state, "2026-11-19").active).toEqual([]);
+  });
+
+  it("lists each shop once, counting from its latest courtesy that has arrived", () => {
+    const state = {
+      merchants: [a],
+      draws: [draw("a", "2026-10-01"), draw("a", "2026-11-15"), draw("a", "2026-12-20")],
+    };
+    const { active, scheduled } = buildListao(state, "2026-11-19");
+    expect(active).toHaveLength(1);
+    expect(active[0]?.since).toBe("2026-11-15");
+    expect(active[0]?.until).toBe("2026-12-14");
+    expect(scheduled).toEqual([]);
+  });
+
+  it("schedules a confirmed courtesy dated in the future instead of listing it", () => {
+    const state = { merchants: [b], draws: [draw("b", "2026-11-25")] };
+    const { active, scheduled } = buildListao(state, "2026-11-19");
+    expect(active).toEqual([]);
+    expect(scheduled[0]?.starts).toBe("2026-11-25");
+  });
+
+  it("adds days across months and years", () => {
+    expect(addDaysISO("2026-12-15", 29)).toBe("2027-01-13");
+  });
+
+  it("turns shop names from older rounds into registered shops", () => {
+    const old = {
+      version: 1 as const,
+      currentId: "x",
+      sound: true,
+      draws: [{ ...draw("x", "2026-11-19", false), merchantId: undefined, merchant: "Mercado Bom Preço" }].map(
+        ({ merchantId: _m, ...d }) => d,
+      ),
+    } as unknown as Parameters<typeof migrateState>[0];
+    const next = migrateState(old);
+    expect(next.merchants.map((m) => m.name)).toEqual(["Mercado Bom Preço"]);
+    expect(next.draws[0]?.merchantId).toBe(next.merchants[0]?.id);
   });
 });

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { createSampleState } from "./logic";
-import type { AppState, Draw } from "./types";
+import { createSampleState, migrateState } from "./logic";
+import type { AppState, Draw, Merchant } from "./types";
 
 const KEY = "enigma-premiado:v1";
 const EVENT = "enigma-premiado:change";
@@ -26,6 +26,11 @@ function read(): AppState {
     try {
       const parsed: unknown = JSON.parse(raw);
       if (isState(parsed) && parsed.draws.length > 0) {
+        const migrated = migrateState(parsed);
+        if (migrated !== parsed) {
+          write(migrated);
+          return migrated;
+        }
         cachedRaw = raw;
         cachedState = parsed;
         return parsed;
@@ -86,4 +91,21 @@ export function addDraw(draw: Draw): boolean {
 
 export function setCurrent(id: string): boolean {
   return update((s) => ({ ...s, currentId: id }));
+}
+
+export function saveMerchant(merchant: Merchant): boolean {
+  return update((s) => {
+    const exists = s.merchants.some((m) => m.id === merchant.id);
+    return {
+      ...s,
+      merchants: exists
+        ? s.merchants.map((m) => (m.id === merchant.id ? merchant : m))
+        : [...s.merchants, merchant],
+    };
+  });
+}
+
+/** Adds a draft or ready round without putting it on the wheel. */
+export function saveDraw(draw: Draw): boolean {
+  return update((s) => ({ ...s, draws: [...s.draws, draw] }));
 }

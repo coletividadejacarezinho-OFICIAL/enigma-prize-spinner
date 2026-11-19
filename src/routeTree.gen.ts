@@ -13,7 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as NomesRouteImport } from './routes/nomes'
 import { Route as SorteiosIndexRouteImport } from './routes/sorteios.index'
+import { Route as SorteiosListaoRouteImport } from './routes/sorteios.listao'
 import { Route as SorteiosNovoRouteImport } from './routes/sorteios.novo'
+import { Route as SorteiosComerciosMerchantIdRouteImport } from './routes/sorteios.comercios.$merchantId'
+import { Route as SorteiosComerciosNovoRouteImport } from './routes/sorteios.comercios.novo'
+import { Route as SorteiosEditarDrawIdRouteImport } from './routes/sorteios.editar.$drawId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,9 +39,30 @@ const SorteiosIndexRoute = SorteiosIndexRouteImport.update({
   path: '/sorteios/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SorteiosListaoRoute = SorteiosListaoRouteImport.update({
+  id: '/sorteios/listao',
+  path: '/sorteios/listao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SorteiosNovoRoute = SorteiosNovoRouteImport.update({
   id: '/sorteios/novo',
   path: '/sorteios/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SorteiosComerciosMerchantIdRoute =
+  SorteiosComerciosMerchantIdRouteImport.update({
+    id: '/sorteios/comercios/$merchantId',
+    path: '/sorteios/comercios/$merchantId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SorteiosComerciosNovoRoute = SorteiosComerciosNovoRouteImport.update({
+  id: '/sorteios/comercios/novo',
+  path: '/sorteios/comercios/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SorteiosEditarDrawIdRoute = SorteiosEditarDrawIdRouteImport.update({
+  id: '/sorteios/editar/$drawId',
+  path: '/sorteios/editar/$drawId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -45,38 +70,82 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios/': typeof SorteiosIndexRoute
+  '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
+  '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
+  '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios': typeof SorteiosIndexRoute
+  '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
+  '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
+  '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios/': typeof SorteiosIndexRoute
+  '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
+  '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
+  '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios/'
+  fullPaths:
+    | '/'
+    | '/ajustes'
+    | '/nomes'
+    | '/sorteios/listao'
+    | '/sorteios/novo'
+    | '/sorteios/'
+    | '/sorteios/comercios/$merchantId'
+    | '/sorteios/comercios/novo'
+    | '/sorteios/editar/$drawId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios'
-  id: '__root__' | '/' | '/ajustes' | '/nomes' | '/sorteios/novo' | '/sorteios/'
+  to:
+    | '/'
+    | '/ajustes'
+    | '/nomes'
+    | '/sorteios/listao'
+    | '/sorteios/novo'
+    | '/sorteios'
+    | '/sorteios/comercios/$merchantId'
+    | '/sorteios/comercios/novo'
+    | '/sorteios/editar/$drawId'
+  id:
+    | '__root__'
+    | '/'
+    | '/ajustes'
+    | '/nomes'
+    | '/sorteios/listao'
+    | '/sorteios/novo'
+    | '/sorteios/'
+    | '/sorteios/comercios/$merchantId'
+    | '/sorteios/comercios/novo'
+    | '/sorteios/editar/$drawId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AjustesRoute: typeof AjustesRoute
   NomesRoute: typeof NomesRoute
+  SorteiosListaoRoute: typeof SorteiosListaoRoute
   SorteiosNovoRoute: typeof SorteiosNovoRoute
   SorteiosIndexRoute: typeof SorteiosIndexRoute
+  SorteiosComerciosMerchantIdRoute: typeof SorteiosComerciosMerchantIdRoute
+  SorteiosComerciosNovoRoute: typeof SorteiosComerciosNovoRoute
+  SorteiosEditarDrawIdRoute: typeof SorteiosEditarDrawIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -109,11 +178,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SorteiosIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sorteios/listao': {
+      id: '/sorteios/listao'
+      path: '/sorteios/listao'
+      fullPath: '/sorteios/listao'
+      preLoaderRoute: typeof SorteiosListaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sorteios/novo': {
       id: '/sorteios/novo'
       path: '/sorteios/novo'
       fullPath: '/sorteios/novo'
       preLoaderRoute: typeof SorteiosNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sorteios/comercios/$merchantId': {
+      id: '/sorteios/comercios/$merchantId'
+      path: '/sorteios/comercios/$merchantId'
+      fullPath: '/sorteios/comercios/$merchantId'
+      preLoaderRoute: typeof SorteiosComerciosMerchantIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sorteios/comercios/novo': {
+      id: '/sorteios/comercios/novo'
+      path: '/sorteios/comercios/novo'
+      fullPath: '/sorteios/comercios/novo'
+      preLoaderRoute: typeof SorteiosComerciosNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sorteios/editar/$drawId': {
+      id: '/sorteios/editar/$drawId'
+      path: '/sorteios/editar/$drawId'
+      fullPath: '/sorteios/editar/$drawId'
+      preLoaderRoute: typeof SorteiosEditarDrawIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -123,8 +220,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AjustesRoute: AjustesRoute,
   NomesRoute: NomesRoute,
+  SorteiosListaoRoute: SorteiosListaoRoute,
   SorteiosNovoRoute: SorteiosNovoRoute,
   SorteiosIndexRoute: SorteiosIndexRoute,
+  SorteiosComerciosMerchantIdRoute: SorteiosComerciosMerchantIdRoute,
+  SorteiosComerciosNovoRoute: SorteiosComerciosNovoRoute,
+  SorteiosEditarDrawIdRoute: SorteiosEditarDrawIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
