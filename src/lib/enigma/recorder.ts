@@ -7,8 +7,11 @@
 import { useSyncExternalStore } from "react";
 
 import { pickType, recordedMusicLevel, type Needs } from "./capture";
+import { wheelEase } from "./jingle";
+import { segmentAtPointer } from "./logic";
 import { audioContext, setRecordTap } from "./sound";
 import type { RecordingMode } from "./types";
+import { wheelFontSize, wheelLabel, wheelZoom } from "./wheel-visual";
 
 export type CameraProblem = "denied" | "missing" | "busy" | "unsupported" | "other";
 
@@ -79,11 +82,9 @@ export type RecFrame = {
   prize: string;
   merchant: string;
   names: string[];
-  /** Slice text (E06): names, or numbered marks on big wheels. */
-  labels?: string[];
   rotation: number;
   /** Same animation as the on-screen wheel, timed with performance.now(). */
-  spin: { from: number; to: number; startedAt: number; durationMs: number } | null;
+  spin: { from: number; to: number; startedAt: number; durationMs: number; zoom: boolean } | null;
   winner: string | null;
   /** Public number of the winner in the confirmed list (E06). */
   winnerNumber?: number | null;
@@ -385,14 +386,6 @@ export function cancelRecording() {
 
 /* ---------- painting ---------- */
 
-const ease = (t: number) => 1 - Math.pow(1 - t, 4);
-
-function currentRotation(f: RecFrame): number {
-  if (!f.spin) return f.rotation;
-  const t = Math.min(1, (performance.now() - f.spin.startedAt) / f.spin.durationMs);
-  return f.spin.from + (f.spin.to - f.spin.from) * ease(Math.max(0, t));
-}
-
 function colorIndex(i: number, count: number) {
   let c = i % 8;
   if (count > 1 && i === count - 1 && c === 0) c = 2;
@@ -487,7 +480,25 @@ function paint(s: Session) {
   ctx.fillText(wrap(ctx, `Oferecimento: ${f.merchant}`, W - 112, 1)[0] ?? "", 56, Math.max(y, 290));
 
   if (f.summary) paintSummary(ctx, c, f.summary);
-  else paintWheel(ctx, c, f.labels ?? f.names, currentRotation(f), W / 2, 660, 300);
+  else {
+    const spin = f.spin;
+    const progress = spin
+      ? Math.max(0, Math.min(1, (performance.now() - spin.startedAt) / spin.durationMs))
+      : 0;
+    const rotation = spin ? spin.from + (spin.to - spin.from) * wheelEase(progress) : f.rotation;
+    const zoom = wheelZoom(progress, spin?.zoom ?? false);
+    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom);
+    const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
+    if (focus) {
+      ctx.fillStyle = c.bg;
+      roundRect(ctx, 56, 918, W - 112, 50, 25);
+      ctx.fill();
+      ctx.textAlign = "center";
+      ctx.fillStyle = c.ink;
+      ctx.font = `800 27px ${DISPLAY}`;
+      ctx.fillText(focus, W / 2, 952, W - 152);
+    }
+  }
 
   // Bottom row: winner box on the left, face on the right.
   ctx.fillStyle = c.card;
@@ -537,9 +548,19 @@ function paintWheel(
   cx: number,
   cy: number,
   r: number,
+  zoom: number,
 ) {
   const count = names.length;
   ctx.save();
+  if (zoom > 1) {
+    const top = cy - r - 16;
+    ctx.beginPath();
+    ctx.rect(30, top, W - 60, 2 * (r + 16));
+    ctx.clip();
+    ctx.translate(cx, top);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-cx, -top);
+  }
   ctx.fillStyle = c.goldDeep;
   ctx.beginPath();
   ctx.arc(cx, cy, r + 16, 0, Math.PI * 2);
@@ -567,25 +588,12 @@ function paintWheel(
     ctx.fill();
     if (count > 1) {
       ctx.strokeStyle = c.bg;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = count > 100 ? 0.36 : count > 40 ? 0.6 : 1.8;
       ctx.stroke();
     }
   }
   if (count > 0) {
-    const size =
-      (count > 60
-        ? 7
-        : count <= 6
-          ? 9
-          : count <= 10
-            ? 7.5
-            : count <= 16
-              ? 6
-              : count <= 30
-                ? 4.5
-                : 3.2) *
-      (r / 100);
-    const maxChars = count <= 10 ? 14 : 18;
+    const size = wheelFontSize(count) * (r / 100);
     ctx.font = `800 ${size}px ${DISPLAY}`;
     ctx.textBaseline = "middle";
     names.forEach((name, i) => {
@@ -593,7 +601,7 @@ function paintWheel(
       const center = count === 1 ? 0 : (i + 0.5) * seg;
       const light = count > 1 && (colorIndex(i, count) === 1 || colorIndex(i, count) === 4);
       const flip = center > 180;
-      const label = name.length > maxChars ? `${name.slice(0, maxChars - 1)}…` : name;
+      const label = wheelLabel(name, count);
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rad(-90 + center + rotation));
@@ -619,6 +627,8 @@ function paintWheel(
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.1, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+  ctx.save();
   ctx.fillStyle = c.gold;
   ctx.strokeStyle = c.goldDeep;
   ctx.lineWidth = 3;

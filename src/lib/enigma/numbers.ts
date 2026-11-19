@@ -10,8 +10,6 @@ import type { Draw } from "./types";
 
 /** Most people one wheel can take; more are never cut silently, the list just cannot be confirmed. */
 export const MAX_PARTICIPANTS = 250;
-/** Up to this many slices the wheel shows names; above it, numbered marks. */
-export const WHEEL_NAME_LIMIT = 60;
 
 export type Numbered = { number: number; name: string; entryId?: string };
 
@@ -47,19 +45,6 @@ export function winnerNumber(
     (winner.entryId ? all.find((x) => x.entryId === winner.entryId) : undefined) ??
     all.find((x) => x.name === winner.winner);
   return hit ? hit.number : null;
-}
-
-/** Step between numbered marks on a big wheel, so marks stay readable on a phone. */
-export function markStep(count: number): number {
-  if (count <= WHEEL_NAME_LIMIT) return 1;
-  return count <= 120 ? 5 : 10;
-}
-
-/** Text for each slice: names on small wheels; on big ones "1", every step-th number, rest blank. */
-export function wheelLabels(pool: Numbered[]): string[] {
-  if (pool.length <= WHEEL_NAME_LIMIT) return pool.map((p) => p.name);
-  const step = markStep(pool.length);
-  return pool.map((p) => (p.number === 1 || p.number % step === 0 ? String(p.number) : ""));
 }
 
 /** Search by number ("250", "nº 250") or by part of the name, ignoring accents and case. */
