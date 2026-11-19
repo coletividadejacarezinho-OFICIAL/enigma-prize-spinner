@@ -1,5 +1,17 @@
+import { toast } from "sonner";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Disc3, Eye, ThumbsUp, Hourglass, MessageCircle, Pencil, Play, Trophy, UserRound } from "lucide-react";
+import {
+  ChevronLeft,
+  Disc3,
+  Eye,
+  ThumbsUp,
+  Hourglass,
+  MessageCircle,
+  Pencil,
+  Play,
+  Trophy,
+  UserRound,
+} from "lucide-react";
 import { useState } from "react";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
@@ -10,7 +22,7 @@ import { WinnerArtDialog } from "@/components/enigma/WinnerArt";
 import { winnerChoices } from "@/lib/enigma/cards";
 import { formatDateBR, merchantOf } from "@/lib/enigma/logic";
 import { drawResultMessage, roundsOf } from "@/lib/enigma/rounds";
-import { setCurrent, useAppState } from "@/lib/enigma/store";
+import { setCurrent, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
 import { GROUP_NAME } from "@/lib/enigma/types";
 import { DEMO_AUDIENCE, audienceTotals } from "@/lib/enigma/watch";
 
@@ -38,7 +50,10 @@ function VerSorteio() {
   if (!state) return <div className="h-dvh" aria-busy="true" />;
 
   const back = (
-    <Link to="/sorteios" className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground">
+    <Link
+      to="/sorteios"
+      className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground"
+    >
       <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Voltar
     </Link>
   );
@@ -84,16 +99,21 @@ function VerSorteio() {
                 <MerchantLogo src={r.merchantLogo} className="h-11 w-11" />
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-muted-foreground">
-                    Prêmio {r.index + 1} de {rounds.length} · <span className="font-bold text-foreground">{r.merchantName}</span>
+                    Prêmio {r.index + 1} de {rounds.length} ·{" "}
+                    <span className="font-bold text-foreground">{r.merchantName}</span>
                   </p>
-                  <p className="break-words font-display text-lg font-bold leading-snug text-gold">{r.prize}</p>
+                  <p className="break-words font-display text-lg font-bold leading-snug text-gold">
+                    {r.prize}
+                  </p>
                 </div>
               </div>
               <p className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 font-bold">
                 {r.result ? (
                   <>
                     <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />
-                    <span className="min-w-0 break-words font-display text-xl font-extrabold">{r.result.winner}</span>
+                    <span className="min-w-0 break-words font-display text-xl font-extrabold">
+                      {r.result.winner}
+                    </span>
                   </>
                 ) : (
                   <span className="text-sm text-muted-foreground">Ainda não sorteado</span>
@@ -103,44 +123,45 @@ function VerSorteio() {
           ))}
           <li className="px-1 text-sm text-muted-foreground">
             {draw.names.length} {draw.names.length === 1 ? "participante" : "participantes"} ·{" "}
-            {draw.repeatWinners === false ? "quem ganhou não concorre de novo" : "quem ganhou pode ganhar de novo"}
+            {draw.repeatWinners === false
+              ? "quem ganhou não concorre de novo"
+              : "quem ganhou pode ganhar de novo"}
           </li>
         </ol>
       ) : (
-      <>
-      <section className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3">
-        <MerchantLogo src={shop.logo} className="h-12 w-12" />
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-muted-foreground">
-            Oferecimento: <span className="font-bold text-foreground">{shop.name}</span>
-          </p>
-          <p className="break-words font-display text-lg font-bold leading-snug text-gold">
-            {draw.prize}
-          </p>
-        </div>
-      </section>
+        <>
+          <section className="mt-3 flex items-center gap-3 rounded-2xl bg-card p-3">
+            <MerchantLogo src={shop.logo} className="h-12 w-12" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Oferecimento: <span className="font-bold text-foreground">{shop.name}</span>
+              </p>
+              <p className="break-words font-display text-lg font-bold leading-snug text-gold">
+                {draw.prize}
+              </p>
+            </div>
+          </section>
 
-      {draw.result ? (
-        <section className="mt-3 rounded-3xl border-2 border-gold bg-card p-4 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wide text-gold">
-            <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
-          </p>
-          <p className="mt-1 break-words font-display text-3xl font-extrabold leading-tight">
-            {draw.result.winner}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {draw.names.length} {draw.names.length === 1 ? "participante" : "participantes"}
-          </p>
-        </section>
-      ) : (
-        <section className="mt-3 rounded-2xl border-2 border-dashed border-border p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            Ainda não girou · {draw.names.length} {draw.names.length === 1 ? "nome" : "nomes"}
-          </p>
-        </section>
-      )}
-
-      </>
+          {draw.result ? (
+            <section className="mt-3 rounded-3xl border-2 border-gold bg-card p-4 text-center">
+              <p className="flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wide text-gold">
+                <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
+              </p>
+              <p className="mt-1 break-words font-display text-3xl font-extrabold leading-tight">
+                {draw.result.winner}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {draw.names.length} {draw.names.length === 1 ? "participante" : "participantes"}
+              </p>
+            </section>
+          ) : (
+            <section className="mt-3 rounded-2xl border-2 border-dashed border-border p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Ainda não girou · {draw.names.length} {draw.names.length === 1 ? "nome" : "nomes"}
+              </p>
+            </section>
+          )}
+        </>
       )}
 
       <div className="mt-4 space-y-1">
@@ -150,7 +171,8 @@ function VerSorteio() {
           </GoldButton>
         ) : (
           <p className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-4 text-center text-lg font-bold text-muted-foreground">
-            <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" /> Resultado ainda não disponível
+            <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" /> Resultado ainda não
+            disponível
           </p>
         )}
         {artChoices.length > 0 && (
@@ -160,14 +182,18 @@ function VerSorteio() {
         )}
         <SecondaryButton
           onClick={() => {
-            setCurrent(draw.id);
+            if (!setCurrent(draw.id)) return void toast.error(SAVE_FAIL);
             navigate({ to: "/" });
           }}
         >
           <Disc3 aria-hidden="true" /> {isCurrent ? "Ver na roleta" : "Abrir na roleta"}
         </SecondaryButton>
         {!draw.isSample && (
-          <SecondaryButton onClick={() => navigate({ to: "/sorteios/editar/$drawId", params: { drawId: draw.id } })}>
+          <SecondaryButton
+            onClick={() =>
+              navigate({ to: "/sorteios/editar/$drawId", params: { drawId: draw.id } })
+            }
+          >
             <Pencil aria-hidden="true" /> Editar sorteio
           </SecondaryButton>
         )}
@@ -180,8 +206,13 @@ function VerSorteio() {
           </summary>
           <ol className="mt-2 space-y-1">
             {draw.names.map((name, i) => (
-              <li key={`${i}-${name}`} className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-1.5 text-sm">
-                <span className="w-6 shrink-0 text-right font-bold text-muted-foreground">{i + 1}</span>
+              <li
+                key={`${i}-${name}`}
+                className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-1.5 text-sm"
+              >
+                <span className="w-6 shrink-0 text-right font-bold text-muted-foreground">
+                  {i + 1}
+                </span>
                 <span className="min-w-0 break-words font-semibold">{name}</span>
               </li>
             ))}

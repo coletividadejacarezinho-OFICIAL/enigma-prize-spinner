@@ -34,12 +34,13 @@ use the editor.
 - All app data lives in the browser's localStorage via `src/lib/enigma/store.ts` (useSyncExternalStore, null on the server); no database, auth or external services in this stage — the owner asked for local-only data.
 - Pure draw rules (wheel angle math, duplicates, date format, new-round defaults) live in `src/lib/enigma/logic.ts` with tests in `src/test/enigma-logic.test.ts`; keep UI files free of that logic so it stays testable.
 - A spin saves its result (winner, index, final rotation) before the animation starts, so reloads, tab changes and double taps can never change the winner; a new spin only happens through a new round.
+- A refused save changes nothing on screen; callers show `SAVE_FAIL` and keep input. The wheel turns only after `commitSpin()` saves. Unreadable data shows `DataRecovery`, never overwritten.
 - Wheel angles run clockwise from the top pointer; `targetRotation` and `segmentAtPointer` must stay inverse of each other.
 - Picked images are shrunk to small data URLs before saving, to stay within localStorage limits.
 - The app is phone-first: content sits in a `max-w-md` column with a fixed four-tab bottom bar from `__root.tsx`; every screen must fit 360 × 740.
 - Partner shops are records in `state.merchants`; a draw links one by `merchantId` and keeps its own date and courtesy. Always show a draw's shop through `merchantOf()` so renamed shops and new logos reach the wheel; `migrateState()` upgrades older saved data on read.
 - The Listão da Alegria is computed only by `buildListao()` (confirmed, non-test draws; LISTAO_DAYS inclusive from the latest arrived date; future dates scheduled), and both the Sorteios card count and the list use that same result so they can never disagree.
-- The "Cadastrar agora" dialog sits outside the draw `<form>`: React submit events bubble through portals.
+- "Cadastrar agora" dialog sits outside the draw `<form>` (submit bubbles through portals).
 - Real recording (stage 8) lives in `src/lib/enigma/recorder.ts`: getUserMedia (front camera + mic) only after "Gravar comigo"; the Roleta pushes what is on screen with `setRecFrame()` and the module paints wheel, prize, winner and a mirrored face circle (bottom right, never over prize or winner) on a canvas recorded with the voice. Videos are kept in IndexedDB (`videos.ts`), metadata in the draw's `recordings` with `real: true`; older simulated recordings stay readable.
 - The WhatsApp result message comes only from `resultMessage()` (null without a saved result) and opens through `whatsappLink()` (wa.me with prefilled text) inside `ResultShareDialog`; the app never claims a message was sent, only that it was copied.
 - Tapping a draw in Sorteios opens `/sorteios/ver/$drawId`, which never changes the current round; only its "Abrir na roleta" button calls `setCurrent()`.
@@ -50,7 +51,7 @@ use the editor.
 - Stage 7 list rules (entries, duplicates, pending review, bot simulation, 19:30 window, group list message) live in the pure `src/lib/enigma/entries.ts`, tested in `src/test/enigma-entries.test.ts`.
 - `draw.entries` is the working Nomes list; `draw.names` is the confirmed list and the only source for the wheel, the spin and `listMessage()`. `needsConfirmation()` compares them and blocks the spin until `confirmList()`; a spun draw never changes `names`.
 - Ready entries never share a display name (`sameNameEntry`); a repeated name becomes a question or a pending entry, never a silent delete. Bot dedup is by sender id kept in `senderIds`, merged by `mergeEntry()`.
-- Bot times are "HH:MM" Jacarezinho local strings compared with `BOT_CLOSE_TIME`; the bot test is simulation only, with no real WhatsApp or network.
+- Bot times are local "HH:MM" strings vs `BOT_CLOSE_TIME`; the bot test is simulation only.
 
 - Several courtesies (stage 8): the first stays in the draw's own merchant/prize/result fields, the rest in `extraPrizes`; read them only through `roundsOf()` in `src/lib/enigma/rounds.ts` (tested in `src/test/enigma-rounds.test.ts`). Rounds are spun in order, so `draw.result` set still means "list locked".
 - Each round's wheel comes from `poolFor()` (earlier winners removed when `repeatWinners === false`); results are saved with `withRoundResult()` and the Roleta moves on only via `nextRound()`. The WhatsApp result for any draw comes from `drawResultMessage()`.

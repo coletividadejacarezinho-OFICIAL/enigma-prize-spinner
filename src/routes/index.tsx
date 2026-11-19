@@ -43,7 +43,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { entriesOf, needsConfirmation, readyEntries } from "@/lib/enigma/entries";
-import { formatDateBR, newId, pickWinnerIndex, secureRandom, targetRotation } from "@/lib/enigma/logic";
+import {
+  formatDateBR,
+  newId,
+  pickWinnerIndex,
+  secureRandom,
+  targetRotation,
+} from "@/lib/enigma/logic";
 import {
   exitDeviceFullscreen,
   requestDeviceFullscreen,
@@ -60,6 +66,7 @@ import {
 } from "@/lib/enigma/recorder";
 import {
   allRoundsDone,
+  commitSpin,
   drawResultMessage,
   needsRepeatAnswer,
   nextRound,
@@ -70,7 +77,14 @@ import {
   withRoundResult,
 } from "@/lib/enigma/rounds";
 import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
-import { addRecording, currentDraw, endRecording, updateDraw, useAppState } from "@/lib/enigma/store";
+import {
+  SAVE_FAIL,
+  addRecording,
+  currentDraw,
+  endRecording,
+  updateDraw,
+  useAppState,
+} from "@/lib/enigma/store";
 import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
 import { saveVideo, videoFileName } from "@/lib/enigma/videos";
 
@@ -195,20 +209,52 @@ function Roleta() {
     winner: showResult && result ? result.winner : null,
     summary:
       summaryOpen && done
-        ? rounds.map((r) => ({ prize: r.prize, merchant: r.merchantName, winner: r.result?.winner ?? "" }))
+        ? rounds.map((r) => ({
+            prize: r.prize,
+            merchant: r.merchantName,
+            winner: r.result?.winner ?? "",
+          }))
         : null,
   };
 
-  const doSpin = () => {
+  const doSpin = (repeat?: boolean) => {
     if (spinningRef.current || result || !canSpin) return;
     spinningRef.current = true;
     if (state.sound) unlockSound();
-    const index = pickWinnerIndex(count);
-    const rotation = targetRotation(0, index, count, secureRandom());
-    const winner = pool[index] ?? "";
-    // Save the result before animating so leaving or reloading keeps the same winner.
-    updateDraw(draw.id, (d) => withRoundResult(d, ri, { winner, index, rotation, at: Date.now() }));
-    spinFrameRef.current = { from: 0, to: rotation, startedAt: performance.now(), durationMs: SPIN_MS };
+    const wheelNames =
+      repeat === undefined ? pool : poolFor({ ...draw, repeatWinners: repeat }, ri);
+    const index = pickWinnerIndex(wheelNames.length);
+    const rotation = targetRotation(0, index, wheelNames.length, secureRandom());
+    const winner = wheelNames[index] ?? "";
+    // Save the result first; the wheel only turns after the browser confirms the save.
+    let status = "changed" as "saved" | "already" | "changed";
+    const ok = updateDraw(draw.id, (d) => {
+      const r = commitSpin(
+        d,
+        { drawId: draw.id, round: ri, pool: wheelNames, repeatWinners: repeat },
+        {
+          winner,
+          index,
+          rotation,
+          at: Date.now(),
+        },
+      );
+      status = r.status;
+      return r.draw;
+    });
+    if (!ok || status !== "saved") {
+      spinningRef.current = false;
+      if (!ok) toast.error(SAVE_FAIL);
+      else if (status === "changed")
+        toast.error("O sorteio mudou nesta tela. Confira e tente de novo.");
+      return;
+    }
+    spinFrameRef.current = {
+      from: 0,
+      to: rotation,
+      startedAt: performance.now(),
+      durationMs: SPIN_MS,
+    };
     setSpin({ from: 0, durationMs: SPIN_MS, key: Date.now() });
   };
 
@@ -221,9 +267,9 @@ function Roleta() {
   };
 
   const answerRepeat = (yes: boolean) => {
-    updateDraw(draw.id, (d) => ({ ...d, repeatWinners: yes }));
+    // The answer is saved together with the first result, so a refused save can be tried again.
     setRepeatAsk(false);
-    doSpin();
+    doSpin(yes);
   };
 
   const handleSpinEnd = () => {
@@ -279,7 +325,12 @@ function Roleta() {
     if (!result && (dirty || count < MIN_NAMES_TO_SPIN)) {
       if (dirty && readyCount >= MIN_NAMES_TO_SPIN) {
         return (
-          <GoldButton onClick={() => { exitFull(); navigate({ to: "/nomes" }); }}>
+          <GoldButton
+            onClick={() => {
+              exitFull();
+              navigate({ to: "/nomes" });
+            }}
+          >
             <ClipboardCheck aria-hidden="true" /> Confirmar lista nova
           </GoldButton>
         );
@@ -292,7 +343,12 @@ function Roleta() {
         );
       }
       return (
-        <GoldButton onClick={() => { exitFull(); navigate({ to: "/nomes" }); }}>
+        <GoldButton
+          onClick={() => {
+            exitFull();
+            navigate({ to: "/nomes" });
+          }}
+        >
           <UserPlus aria-hidden="true" /> Adicionar nomes
         </GoldButton>
       );
@@ -300,7 +356,9 @@ function Roleta() {
     if (showResult && !isLast) {
       return (
         <GoldButton
-          onClick={() => updateDraw(draw.id, nextRound)}
+          onClick={() => {
+            if (!updateDraw(draw.id, nextRound)) toast.error(SAVE_FAIL);
+          }}
           className={showRecordButton ? "px-2 text-lg leading-tight" : ""}
         >
           <SkipForward className="shrink-0" aria-hidden="true" /> Sortear próxima cortesia
@@ -309,14 +367,20 @@ function Roleta() {
     }
     if (showResult && multi) {
       return (
-        <GoldButton onClick={() => setSummaryOpen(true)} className={recording ? "px-2 text-lg" : ""}>
+        <GoldButton
+          onClick={() => setSummaryOpen(true)}
+          className={recording ? "px-2 text-lg" : ""}
+        >
           <ListChecks className="shrink-0" aria-hidden="true" /> Ver resumo
         </GoldButton>
       );
     }
     if (showResult) {
       return (
-        <GoldButton onClick={() => setShareOpen(true)} className={recording ? "px-2 text-lg leading-tight" : ""}>
+        <GoldButton
+          onClick={() => setShareOpen(true)}
+          className={recording ? "px-2 text-lg leading-tight" : ""}
+        >
           <MessageCircle className="shrink-0" aria-hidden="true" /> Mandar no WhatsApp
         </GoldButton>
       );
@@ -353,14 +417,23 @@ function Roleta() {
           <p className="text-xs font-semibold text-muted-foreground">
             Oferecimento: <span className="font-bold text-foreground">{round.merchantName}</span>
           </p>
-          <p className="font-display text-lg font-bold leading-snug text-gold" data-testid="prize-label">
+          <p
+            className="font-display text-lg font-bold leading-snug text-gold"
+            data-testid="prize-label"
+          >
             {multi ? roundLabel(ri, total, round.prize) : round.prize}
           </p>
         </div>
       </section>
 
       <div className="mt-1 flex h-9 items-center gap-2 px-4 text-xs text-muted-foreground">
-        <p className={full ? "flex min-w-0 flex-1 items-center justify-center gap-2" : "flex min-w-0 flex-1 items-center gap-2"}>
+        <p
+          className={
+            full
+              ? "flex min-w-0 flex-1 items-center justify-center gap-2"
+              : "flex min-w-0 flex-1 items-center gap-2"
+          }
+        >
           {(full || !draw.isSample) && <span className="truncate">{APP_NAME} ·</span>}
           <span className="shrink-0 font-semibold">{formatDateBR(draw.date)}</span>
           {draw.isSample && (
@@ -403,7 +476,10 @@ function Roleta() {
                 <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
                 {multi ? ` · Prêmio ${ri + 1} de ${total}` : ""}
               </p>
-              <p className="mt-1 break-words font-display text-4xl font-extrabold leading-tight" data-testid="winner">
+              <p
+                className="mt-1 break-words font-display text-4xl font-extrabold leading-tight"
+                data-testid="winner"
+              >
                 {result.winner}
               </p>
               <p className="mt-3 text-base font-bold text-gold">{round.prize}</p>
@@ -482,10 +558,18 @@ function Roleta() {
           )
         ) : canSpin ? (
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
-            <SecondaryButton onClick={() => navigate({ to: "/nomes" })} disabled={spinning} className="px-2 text-[15px]">
+            <SecondaryButton
+              onClick={() => navigate({ to: "/nomes" })}
+              disabled={spinning}
+              className="px-2 text-[15px]"
+            >
               Editar nomes
             </SecondaryButton>
-            <SecondaryButton onClick={() => setInviteOpen(true)} disabled={spinning} className="whitespace-nowrap px-2 text-[15px]">
+            <SecondaryButton
+              onClick={() => setInviteOpen(true)}
+              disabled={spinning}
+              className="whitespace-nowrap px-2 text-[15px]"
+            >
               <Send aria-hidden="true" /> Convidar para assistir
             </SecondaryButton>
           </div>
@@ -513,14 +597,21 @@ function Roleta() {
               Quem ganhar pode ganhar de novo neste sorteio?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-muted-foreground">
-              Este sorteio tem {total} cortesias. Se for “Não”, quem ganhar sai da roleta nas próximas rodadas.
+              Este sorteio tem {total} cortesias. Se for “Não”, quem ganhar sai da roleta nas
+              próximas rodadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => answerRepeat(true)} className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent">
+            <button
+              onClick={() => answerRepeat(true)}
+              className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent"
+            >
               Sim
             </button>
-            <button onClick={() => answerRepeat(false)} className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent">
+            <button
+              onClick={() => answerRepeat(false)}
+              className="h-14 rounded-2xl bg-secondary text-lg font-bold active:bg-accent"
+            >
               Não
             </button>
           </div>
@@ -543,7 +634,8 @@ function Roleta() {
                 </p>
                 <p className="font-bold text-gold">{r.prize}</p>
                 <p className="mt-1 flex items-center gap-1.5 font-display text-xl font-extrabold">
-                  <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" /> {r.result?.winner}
+                  <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />{" "}
+                  {r.result?.winner}
                 </p>
               </li>
             ))}
@@ -589,7 +681,11 @@ function Roleta() {
         groupLogo={state.groupLogo}
         initial={art ?? 0}
       />
-      <CameraDialog open={cameraOpen} onClose={() => setCameraOpen(false)} onStart={handleStartRecording} />
+      <CameraDialog
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onStart={handleStartRecording}
+      />
       <VideoDoneDialog video={videoDone} onClose={() => setVideoDone(null)} />
     </div>
   );
@@ -597,7 +693,10 @@ function Roleta() {
 
 function RoletaSkeleton() {
   return (
-    <div className="flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col" aria-busy="true">
+    <div
+      className="flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col"
+      aria-busy="true"
+    >
       <div className="h-16" />
       <div className="mx-4 h-[4.5rem] rounded-2xl bg-card" />
       <div className="wheel-box flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-5">

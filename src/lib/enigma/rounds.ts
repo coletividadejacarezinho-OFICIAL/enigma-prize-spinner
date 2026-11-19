@@ -140,9 +140,14 @@ export function applyPrizes(draw: Draw, prizes: PrizeInput[], newId: () => strin
  * WhatsApp result for a whole draw. One courtesy keeps the stage 4 message;
  * several courtesies list each prize, shop and winner, and wait until every round is done.
  */
-export function drawResultMessage(draw: Draw, merchants: Merchant[], groupName: string): string | null {
+export function drawResultMessage(
+  draw: Draw,
+  merchants: Merchant[],
+  groupName: string,
+): string | null {
   const rounds = roundsOf(draw, merchants);
-  if (rounds.length === 1) return resultMessage(draw, rounds[0]?.merchantName ?? draw.merchant, groupName);
+  if (rounds.length === 1)
+    return resultMessage(draw, rounds[0]?.merchantName ?? draw.merchant, groupName);
   if (!allRoundsDone(draw)) return null;
   const lines = ["🏆 Resultado do Enigma Premiado", groupName, `📅 ${formatDateBR(draw.date)}`];
   for (const r of rounds) {
@@ -153,6 +158,45 @@ export function drawResultMessage(draw: Draw, merchants: Merchant[], groupName: 
       `🎉 Ganhador(a): ${r.result?.winner ?? ""}`,
     );
   }
-  lines.push("", "Parabéns! Chame a administração no privado para combinar a retirada.", "Reaja com 👍 aqui no grupo!");
+  lines.push(
+    "",
+    "Parabéns! Chame a administração no privado para combinar a retirada.",
+    "Reaja com 👍 aqui no grupo!",
+  );
   return lines.join("\n");
+}
+
+export type SpinPlan = {
+  drawId: string;
+  round: number;
+  pool: string[];
+  repeatWinners?: boolean | undefined;
+};
+
+/**
+ * Saves one round's result only if the draw, round and wheel names are still what the screen showed.
+ * "already": the round has a saved result, which is kept. "changed": nothing is saved.
+ * An answer to "Quem ganhar pode ganhar de novo?" is saved together with the first result.
+ */
+export function commitSpin(
+  draw: Draw,
+  plan: SpinPlan,
+  result: DrawResult,
+): { draw: Draw; status: "saved" | "already" | "changed" } {
+  if (draw.id !== plan.drawId || shownRound(draw) !== plan.round)
+    return { draw, status: "changed" };
+  if (roundResult(draw, plan.round)) return { draw, status: "already" };
+  const base =
+    plan.repeatWinners === undefined ? draw : { ...draw, repeatWinners: plan.repeatWinners };
+  if (needsRepeatAnswer(base) || !canShowRound(base, plan.round))
+    return { draw, status: "changed" };
+  const pool = poolFor(base, plan.round);
+  if (
+    pool.length !== plan.pool.length ||
+    pool.some((n, i) => n !== plan.pool[i]) ||
+    pool[result.index] !== result.winner
+  ) {
+    return { draw, status: "changed" };
+  }
+  return { draw: withRoundResult(base, plan.round, result), status: "saved" };
 }

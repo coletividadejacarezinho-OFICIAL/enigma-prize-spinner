@@ -10,15 +10,21 @@ import { InstallCard } from "@/components/enigma/InstallCard";
 import { GroupLogo } from "@/components/enigma/Logos";
 import { Switch } from "@/components/ui/switch";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
-import { update, useAppState } from "@/lib/enigma/store";
+import { update, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
 
 export const Route = createFileRoute("/ajustes")({
   head: () => ({
     meta: [
       { title: "Ajustes — Enigma Premiado" },
-      { name: "description", content: "Logo do grupo, som da roleta, teste do bot e instalar no celular." },
+      {
+        name: "description",
+        content: "Logo do grupo, som da roleta, teste do bot e instalar no celular.",
+      },
       { property: "og:title", content: "Ajustes — Enigma Premiado" },
-      { property: "og:description", content: "Logo do grupo, som da roleta, teste do bot e instalar no celular." },
+      {
+        property: "og:description",
+        content: "Logo do grupo, som da roleta, teste do bot e instalar no celular.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -42,11 +48,13 @@ function Ajustes() {
     }
   };
 
-  const removeLogo = () =>
-    update((s) => {
+  const removeLogo = () => {
+    const ok = update((s) => {
       const { groupLogo: _removed, ...rest } = s;
       return rest;
     });
+    if (!ok) toast.error(SAVE_FAIL);
+  };
 
   return (
     <div className="pb-24">
@@ -99,7 +107,9 @@ function Ajustes() {
             </span>
             <Switch
               checked={state.sound}
-              onCheckedChange={(on) => update((s) => ({ ...s, sound: on }))}
+              onCheckedChange={(on) => {
+                if (!update((s) => ({ ...s, sound: on }))) toast.error(SAVE_FAIL);
+              }}
               className="scale-125"
               aria-label="Som da roleta"
             />

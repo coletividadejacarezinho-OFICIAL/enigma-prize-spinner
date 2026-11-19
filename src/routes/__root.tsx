@@ -13,6 +13,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { BottomNav } from "../components/enigma/BottomNav";
+import { DataRecovery } from "../components/enigma/DataRecovery";
+import { useStoreSnapshot } from "../lib/enigma/store";
 import { initInstallPrompt } from "../lib/enigma/install";
 import { usePresentation } from "../lib/enigma/presentation";
 import { Toaster } from "../components/ui/sonner";
@@ -150,6 +152,8 @@ function RootComponent() {
   });
   // Roleta full screen hides the tabs too.
   const presenting = usePresentation();
+  const store = useStoreSnapshot();
+  const broken = store?.kind === "broken";
   useEffect(() => initInstallPrompt(), []);
 
   return (
@@ -164,9 +168,9 @@ function RootComponent() {
             : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
         }
       >
-        <Outlet />
+        {broken ? <DataRecovery raw={store.raw} /> : <Outlet />}
       </div>
-      {!isViewerPage && !presenting && <BottomNav />}
+      {!isViewerPage && !presenting && !broken && <BottomNav />}
       <Toaster
         position="top-center"
         richColors

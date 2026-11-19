@@ -44,15 +44,24 @@ import {
   renameEntry,
   sameNameEntry,
 } from "@/lib/enigma/entries";
-import { cleanName, formatDateBR, merchantOf, normalizeForCompare, parsePastedList } from "@/lib/enigma/logic";
-import { currentDraw, updateDraw, useAppState } from "@/lib/enigma/store";
+import {
+  cleanName,
+  formatDateBR,
+  merchantOf,
+  normalizeForCompare,
+  parsePastedList,
+} from "@/lib/enigma/logic";
+import { SAVE_FAIL, currentDraw, updateDraw, useAppState } from "@/lib/enigma/store";
 import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Entry } from "@/lib/enigma/types";
 
 export const Route = createFileRoute("/nomes")({
   head: () => ({
     meta: [
       { title: "Nomes — Enigma Premiado" },
-      { name: "description", content: "Digite ou cole os nomes conferidos e confirme a lista do sorteio." },
+      {
+        name: "description",
+        content: "Digite ou cole os nomes conferidos e confirme a lista do sorteio.",
+      },
       { property: "og:title", content: "Nomes — Enigma Premiado" },
       {
         property: "og:description",
@@ -109,11 +118,24 @@ function Nomes() {
   const change = (fn: (list: Entry[]) => Entry[]) =>
     updateDraw(draw.id, (d) => (d.result ? d : { ...d, entries: fn(entriesOf(d)) }));
 
-  /** Adds names in order and stops at the first one that is already in the list. */
-  const addNames = (queue: string[]) => {
+  /** Runs a change; when the browser refuses to save, says so and returns false. */
+  const save = (fn: (list: Entry[]) => Entry[]) => {
+    const ok = change(fn);
+    if (!ok) toast.error(SAVE_FAIL);
+    return ok;
+  };
+
+  /**
+   * Adds names in order and stops at the first one that is already in the list.
+   * `before` is saved in the same step, so a refused save leaves everything to retry.
+   * Returns null when nothing was saved.
+   */
+  const addNames = (queue: string[], before?: (list: Entry[]) => Entry[]) => {
     const out: { ask: Ask | null; added: number } = { ask: null, added: 0 };
-    change((list) => {
-      let next = list;
+    const ok = save((list) => {
+      out.ask = null;
+      out.added = 0;
+      let next = before ? before(list) : list;
       for (let i = 0; i < queue.length; i++) {
         const name = queue[i] ?? "";
         const match = sameNameEntry(next, name);
@@ -126,6 +148,7 @@ function Nomes() {
       }
       return next;
     });
+    if (!ok) return null;
     setAsk(out.ask);
     return out.added;
   };
@@ -136,7 +159,7 @@ function Nomes() {
       inputRef.current?.focus();
       return;
     }
-    addNames([name]);
+    if (addNames([name]) === null) return; // keep the typed name to try again
     setText("");
     inputRef.current?.focus();
   };
@@ -144,9 +167,10 @@ function Nomes() {
   const addPasted = () => {
     const list = parsePastedList(pasteText);
     if (list.length === 0) return;
+    const added = addNames(list);
+    if (added === null) return; // the pasted list stays in the box
     setPasteText("");
     setPasteOpen(false);
-    const added = addNames(list);
     if (added > 0) toast.success(`${plural(added, "nome adicionado", "nomes adicionados")}.`);
   };
 
@@ -154,24 +178,31 @@ function Nomes() {
 
   const askSame = () => {
     if (!ask) return;
-    toast.success(`Mantida uma vaga para ${askMatch?.name ?? ask.name}.`);
-    const rest = ask.rest;
-    setAsk(null);
-    addNames(rest);
+    const kept = askMatch?.name ?? ask.name;
+    // On a refused save the question stays open with the names still to add.
+    if (addNames(ask.rest) === null) return;
+    toast.success(`Mantida uma vaga para ${kept}.`);
   };
 
   const askDifferent = () => {
     if (!ask || !askMatch) return;
-    setDiff({ mode: "new", matchId: askMatch.id, first: askMatch.name, second: ask.name, rest: ask.rest });
+    setDiff({
+      mode: "new",
+      matchId: askMatch.id,
+      first: askMatch.name,
+      second: ask.name,
+      rest: ask.rest,
+    });
     setAsk(null);
   };
 
   const askLater = () => {
     if (!ask) return;
     const { name, matchId, rest } = ask;
-    change((list) => [...list, manualEntry(name, Date.now(), { kind: "repetido", withId: matchId })]);
-    setAsk(null);
-    addNames(rest);
+    addNames(rest, (list) => [
+      ...list,
+      manualEntry(name, Date.now(), { kind: "repetido", withId: matchId }),
+    ]);
   };
 
   const diffError = (() => {
@@ -192,11 +223,19 @@ function Nomes() {
     const first = cleanName(diff.first);
     const second = cleanName(diff.second);
     if (diff.mode === "new") {
-      change((list) => [...renameEntry(list, diff.matchId, first), manualEntry(second, Date.now())]);
+      const before = (list: Entry[]) => [
+        ...renameEntry(list, diff.matchId, first),
+        manualEntry(second, Date.now()),
+      ];
+      if (addNames(diff.rest, before) === null) return; // the two names stay in the dialog
       setDiff(null);
-      addNames(diff.rest);
     } else {
-      change((list) => confirmEntry(renameEntry(list, diff.matchId, first), diff.pendingId, second));
+      if (
+        !save((list) =>
+          confirmEntry(renameEntry(list, diff.matchId, first), diff.pendingId, second),
+        )
+      )
+        return;
       setDiff(null);
       if (pending.length > 1) setReviewOpen(true);
     }
@@ -204,25 +243,34 @@ function Nomes() {
 
   const confirmPending = (e: Entry) => {
     const match = reasonMatch(e, entries);
-    const twin = match && normalizeForCompare(match.name) === normalizeForCompare(e.name) ? match : sameNameEntry(entries, e.name, [e.id]);
+    const twin =
+      match && normalizeForCompare(match.name) === normalizeForCompare(e.name)
+        ? match
+        : sameNameEntry(entries, e.name, [e.id]);
     if (twin) {
       setReviewOpen(false);
-      setDiff({ mode: "pending", matchId: twin.id, pendingId: e.id, first: twin.name, second: e.name });
+      setDiff({
+        mode: "pending",
+        matchId: twin.id,
+        pendingId: e.id,
+        first: twin.name,
+        second: e.name,
+      });
       return;
     }
-    change((list) => confirmEntry(list, e.id));
+    if (!save((list) => confirmEntry(list, e.id))) return;
     toast.success(`${e.name} entrou na lista.`);
     if (pending.length <= 1) setReviewOpen(false);
   };
 
   const samePerson = (e: Entry, match: Entry) => {
-    change((list) => mergeEntry(list, e.id, match.id));
+    if (!save((list) => mergeEntry(list, e.id, match.id))) return;
     toast.success(`Mantida uma vaga para ${match.name}.`);
     if (pending.length <= 1) setReviewOpen(false);
   };
 
   const dropPending = (e: Entry) => {
-    change((list) => removeEntry(list, e.id));
+    if (!save((list) => removeEntry(list, e.id))) return;
     if (pending.length <= 1) setReviewOpen(false);
   };
 
@@ -235,13 +283,13 @@ function Nomes() {
       toast.error(`Já tem “${taken.name}” na lista. Acrescente um detalhe, como o bairro.`);
       return;
     }
-    change((list) => renameEntry(list, editing.id, value));
+    if (!save((list) => renameEntry(list, editing.id, value))) return;
     setEditing(null);
   };
 
   const confirmRemove = () => {
     if (!removing) return;
-    change((list) => removeEntry(list, removing.id));
+    if (!save((list) => removeEntry(list, removing.id))) return;
     setRemoveOpen(false);
   };
 
@@ -251,7 +299,7 @@ function Nomes() {
       return;
     }
     if (!canConfirm) return;
-    updateDraw(draw.id, confirmList);
+    if (!updateDraw(draw.id, confirmList)) return void toast.error(SAVE_FAIL);
     toast.success(`Lista confirmada: ${plural(ready.length, "nome", "nomes")} na roleta.`);
     navigate({ to: "/" });
   };
@@ -338,7 +386,9 @@ function Nomes() {
         {!locked && pending.length > 0 && (
           <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border-2 border-gold/60 bg-card p-3">
             <p className="min-w-0 text-sm">
-              <span className="block font-bold">{plural(pending.length, "entrada", "entradas")} para conferir</span>
+              <span className="block font-bold">
+                {plural(pending.length, "entrada", "entradas")} para conferir
+              </span>
               <span className="text-muted-foreground">Ficam fora da roleta até você decidir.</span>
             </p>
             <button
@@ -389,7 +439,10 @@ function Nomes() {
                         aria-label="Corrigir nome"
                         className="h-11 min-w-0 rounded-lg border-2 border-gold bg-background px-3 text-base focus:outline-hidden"
                       />
-                      <button type="submit" className="h-11 rounded-lg bg-primary px-3 font-bold text-primary-foreground">
+                      <button
+                        type="submit"
+                        className="h-11 rounded-lg bg-primary px-3 font-bold text-primary-foreground"
+                      >
                         Salvar
                       </button>
                       <button
@@ -438,7 +491,9 @@ function Nomes() {
       </div>
 
       <div className="fixed inset-x-0 bottom-[calc(4rem_+_env(safe-area-inset-bottom))] z-30 mx-auto max-w-md bg-linear-to-t from-background via-background to-transparent px-4 pb-3 pt-6">
-        {hint && <p className="mb-2 text-center text-sm font-semibold text-muted-foreground">{hint}</p>}
+        {hint && (
+          <p className="mb-2 text-center text-sm font-semibold text-muted-foreground">{hint}</p>
+        )}
         <GoldButton onClick={confirmAndOpen} disabled={!locked && !canConfirm}>
           {locked ? "Ver resultado na roleta" : "Usar estes nomes na roleta"}
         </GoldButton>
@@ -467,7 +522,9 @@ function Nomes() {
           />
           <DialogFooter>
             <GoldButton onClick={addPasted} disabled={pastedCount === 0} className="text-lg">
-              {pastedCount > 0 ? `Adicionar ${plural(pastedCount, "nome", "nomes")}` : "Adicionar nomes"}
+              {pastedCount > 0
+                ? `Adicionar ${plural(pastedCount, "nome", "nomes")}`
+                : "Adicionar nomes"}
             </GoldButton>
           </DialogFooter>
         </DialogContent>
@@ -485,7 +542,10 @@ function Nomes() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <button onClick={askSame} className="h-12 w-full rounded-xl bg-secondary text-base font-bold active:bg-accent">
+            <button
+              onClick={askSame}
+              className="h-12 w-full rounded-xl bg-secondary text-base font-bold active:bg-accent"
+            >
               É a mesma pessoa
             </button>
             <button
@@ -495,7 +555,10 @@ function Nomes() {
             >
               São duas pessoas
             </button>
-            <button onClick={askLater} className="h-12 w-full rounded-xl border-2 border-gold/60 text-base font-bold text-gold">
+            <button
+              onClick={askLater}
+              className="h-12 w-full rounded-xl border-2 border-gold/60 text-base font-bold text-gold"
+            >
               Deixar para conferir
             </button>
           </div>
@@ -558,7 +621,9 @@ function Nomes() {
                       {e.botTime ? ` às ${e.botTime}` : ""}
                     </p>
                   )}
-                  <p className="mt-1 text-sm text-muted-foreground">{pendingReasonText(e, entries)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {pendingReasonText(e, entries)}
+                  </p>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <button
                       onClick={() => confirmPending(e)}
@@ -591,7 +656,9 @@ function Nomes() {
       <AlertDialog open={confirmShare} onOpenChange={setConfirmShare}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl border-border bg-card sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-2xl">Confirmar a lista nova?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-2xl">
+              Confirmar a lista nova?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-muted-foreground">
               {canConfirm
                 ? `A lista mudou. Ao confirmar, a roleta e a mensagem passam a ter os mesmos ${plural(ready.length, "nome", "nomes")}.`
@@ -599,11 +666,13 @@ function Nomes() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="h-12 rounded-xl text-base font-bold">Voltar</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 rounded-xl text-base font-bold">
+              Voltar
+            </AlertDialogCancel>
             {canConfirm && (
               <AlertDialogAction
                 onClick={() => {
-                  updateDraw(draw.id, confirmList);
+                  if (!updateDraw(draw.id, confirmList)) return void toast.error(SAVE_FAIL);
                   setShareOpen(true);
                 }}
                 className="btn-gold h-12 rounded-xl text-base font-bold"
@@ -635,20 +704,27 @@ function Nomes() {
         onClose={() => setListImageOpen(false)}
         title="Lista como imagem"
         description="Só os nomes confirmados, na mesma ordem da roleta."
-        renderKey={JSON.stringify([listCardData(draw, state.merchants), state.groupLogo?.length ?? 0])}
+        renderKey={JSON.stringify([
+          listCardData(draw, state.merchants),
+          state.groupLogo?.length ?? 0,
+        ])}
         make={() => renderListCards(listCardData(draw, state.merchants), state.groupLogo)}
       />
 
       <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl border-border bg-card sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-2xl">Remover {removing?.name}?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-2xl">
+              Remover {removing?.name}?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-muted-foreground">
               O nome sai da lista deste sorteio.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="h-12 rounded-xl text-base font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 rounded-xl text-base font-bold">
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmRemove}
               className="h-12 rounded-xl bg-destructive text-base font-bold text-destructive-foreground hover:bg-destructive/90"

@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Camera, ChevronLeft, Mic, MicOff, Trophy, UserRound } from "lucide-react";
 
@@ -9,7 +10,7 @@ import { RecordingSummary } from "@/components/enigma/RecordingDone";
 import { VideoActions } from "@/components/enigma/VideoActions";
 import { Wheel } from "@/components/enigma/Wheel";
 import { formatDateBR, formatDuration, merchantOf } from "@/lib/enigma/logic";
-import { setCurrent, useAppState } from "@/lib/enigma/store";
+import { setCurrent, useAppState, SAVE_FAIL } from "@/lib/enigma/store";
 import { RECORDING_MODES, type Recording } from "@/lib/enigma/types";
 import { loadVideo, videoFileName } from "@/lib/enigma/videos";
 
@@ -37,7 +38,10 @@ function Previa() {
   const draw = state.draws.find((d) => d.id === drawId);
   const rec = draw?.recordings?.find((r) => r.id === recordingId);
   const back = (
-    <Link to="/sorteios" className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground">
+    <Link
+      to="/sorteios"
+      className="flex h-11 w-fit items-center gap-1 font-bold text-muted-foreground"
+    >
       <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Voltar
     </Link>
   );
@@ -102,7 +106,11 @@ function Previa() {
             )}
             <div className="flex h-8 items-end gap-1" aria-hidden="true">
               {[3, 6, 4, 8, 5, 7, 3, 6, 4].map((h, i) => (
-                <span key={i} className="w-1.5 rounded-full bg-gold/70" style={{ height: `${h * 4}px` }} />
+                <span
+                  key={i}
+                  className="w-1.5 rounded-full bg-gold/70"
+                  style={{ height: `${h * 4}px` }}
+                />
               ))}
             </div>
           </div>
@@ -124,13 +132,18 @@ function Previa() {
       </div>
 
       <div className="mt-4">
-        <RecordingSummary recording={rec} date={draw.date} merchant={shop.name} prize={draw.prize} />
+        <RecordingSummary
+          recording={rec}
+          date={draw.date}
+          merchant={shop.name}
+          prize={draw.prize}
+        />
       </div>
 
       <GoldButton
         className="mt-4"
         onClick={() => {
-          setCurrent(draw.id);
+          if (!setCurrent(draw.id)) return void toast.error(SAVE_FAIL);
           navigate({ to: "/" });
         }}
       >
@@ -167,7 +180,9 @@ function RealRecording({
       {back}
       <div className="flex items-center gap-2">
         <h1 className="text-3xl font-extrabold">Gravação</h1>
-        <span className="rounded-full border border-gold px-2 py-0.5 text-xs font-bold text-gold">Vídeo</span>
+        <span className="rounded-full border border-gold px-2 py-0.5 text-xs font-bold text-gold">
+          Vídeo
+        </span>
       </div>
       <p className="text-sm text-muted-foreground">
         {formatDateBR(date)} · {formatDuration(rec.durationMs)}
@@ -202,7 +217,7 @@ function RealRecording({
       <SecondaryButton
         className="mt-2"
         onClick={() => {
-          setCurrent(drawId);
+          if (!setCurrent(drawId)) return void toast.error(SAVE_FAIL);
           navigate({ to: "/" });
         }}
       >

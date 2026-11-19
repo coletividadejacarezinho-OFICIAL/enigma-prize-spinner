@@ -6,57 +6,91 @@ import type { AppState, BotOutcome, Draw, Merchant, Recording } from "./types";
 const KEY = "enigma-premiado:v1";
 const EVENT = "enigma-premiado:change";
 
-let cachedRaw: string | null = null;
-let cachedState: AppState | null = null;
-
 function isState(value: unknown): value is AppState {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<AppState>;
   return v.version === 1 && Array.isArray(v.draws) && typeof v.currentId === "string";
 }
 
-function read(): AppState {
-  let raw: string | null = null;
+/** Shown whenever the browser refuses to save. */
+export const SAVE_FAIL =
+  "Não foi possível salvar. Confira o espaço disponível no celular e tente novamente.";
+
+/** What the saved text holds: nothing yet (first open), a valid state, or data the app cannot read. */
+export type Loaded =
+  { kind: "empty" } | { kind: "ok"; state: AppState; migrated: boolean } | { kind: "broken" };
+
+/** Pure: reads the saved text without ever changing it. */
+export function loadState(raw: string | null): Loaded {
+  if (raw === null || raw === "") return { kind: "empty" };
   try {
-    raw = window.localStorage.getItem(KEY);
+    const parsed: unknown = JSON.parse(raw);
+    if (!isState(parsed) || parsed.draws.length === 0) return { kind: "broken" };
+    const state = migrateState(parsed);
+    return { kind: "ok", state, migrated: state !== parsed };
   } catch {
-    raw = null;
+    return { kind: "broken" };
   }
-  if (raw !== null && raw === cachedRaw && cachedState) return cachedState;
-  if (raw) {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (isState(parsed) && parsed.draws.length > 0) {
-        const migrated = migrateState(parsed);
-        if (migrated !== parsed) {
-          write(migrated);
-          return migrated;
-        }
-        cachedRaw = raw;
-        cachedState = parsed;
-        return parsed;
-      }
-    } catch {
-      // fall through to a fresh sample
-    }
-  }
-  const fresh = createSampleState();
-  write(fresh);
-  return fresh;
 }
 
-function write(state: AppState): boolean {
-  const raw = JSON.stringify(state);
+export type StoreSnapshot =
+  { kind: "ok"; state: AppState } | { kind: "broken"; raw: string | null };
+
+let cachedRaw: string | null | undefined;
+let cachedSnap: StoreSnapshot | null = null;
+/** First open where the browser refuses to save: keep the sample in memory only. */
+let memoryOnly: AppState | null = null;
+
+function getRaw(): { raw: string | null; readable: boolean } {
+  try {
+    return { raw: window.localStorage.getItem(KEY), readable: true };
+  } catch {
+    return { raw: null, readable: false };
+  }
+}
+
+function snap(): StoreSnapshot {
+  const { raw, readable } = getRaw();
+  if (cachedSnap && raw === cachedRaw) return cachedSnap;
+  if (raw === null && memoryOnly) {
+    cachedRaw = raw;
+    return (cachedSnap = { kind: "ok", state: memoryOnly });
+  }
+  if (!readable) {
+    cachedRaw = raw;
+    return (cachedSnap = { kind: "broken", raw: null });
+  }
+  const loaded = loadState(raw);
   cachedRaw = raw;
-  cachedState = state;
+  if (loaded.kind === "broken") return (cachedSnap = { kind: "broken", raw });
+  if (loaded.kind === "empty") {
+    const fresh = createSampleState();
+    if (!write(fresh)) memoryOnly = fresh;
+    return snap();
+  }
+  // Older data is upgraded on screen; saving the upgrade is a bonus, the original stays if it fails.
+  if (loaded.migrated) write(loaded.state, false);
+  return (cachedSnap = { kind: "ok", state: loaded.state });
+}
+
+function write(state: AppState, notify = true): boolean {
+  const raw = JSON.stringify(state);
   try {
     window.localStorage.setItem(KEY, raw);
-    return true;
   } catch {
+    // Nothing changes on screen: a refused save must never look done.
     return false;
-  } finally {
-    window.dispatchEvent(new Event(EVENT));
   }
+  memoryOnly = null;
+  cachedRaw = raw;
+  cachedSnap = { kind: "ok", state };
+  if (notify) window.dispatchEvent(new Event(EVENT));
+  return true;
+}
+
+function read(): AppState | null {
+  const s = snap();
+  return s.kind === "ok" ? s.state : null;
 }
 
 function subscribe(cb: () => void) {
@@ -68,14 +102,33 @@ function subscribe(cb: () => void) {
   };
 }
 
-/** Returns null during server render and hydration, then the saved state. */
+/** Returns null during server render and hydration, or when the saved data cannot be read. */
 export function useAppState(): AppState | null {
   return useSyncExternalStore(subscribe, read, () => null);
 }
 
+/** null on the server; "broken" when saved data exists but cannot be read (it is kept untouched). */
+export function useStoreSnapshot(): StoreSnapshot | null {
+  return useSyncExternalStore(subscribe, snap, () => null);
+}
+
+/** "Tentar novamente" on the recovery screen. */
+export function retryLoad() {
+  cachedSnap = null;
+  cachedRaw = undefined;
+  window.dispatchEvent(new Event(EVENT));
+}
+
+/** The saved text exactly as it is, for "Baixar cópia dos dados". */
+export function rawSavedData(): string | null {
+  return getRaw().raw;
+}
+
 /** Applies a change and saves it. Returns false when the phone's storage is full. */
 export function update(fn: (state: AppState) => AppState): boolean {
-  return write(fn(read()));
+  const s = snap();
+  if (s.kind !== "ok") return false;
+  return write(fn(s.state));
 }
 
 export function currentDraw(state: AppState): Draw {
@@ -132,12 +185,12 @@ function closeSession(s: AppState, now: number): { state: AppState; saved: Recor
 
 export function endRecording(now: number): Recording | null {
   let saved: Recording | null = null;
-  update((s) => {
+  const ok = update((s) => {
     const r = closeSession(s, now);
     saved = r.saved;
     return r.state;
   });
-  return saved;
+  return ok ? saved : null;
 }
 
 /** Putting another round on the wheel ends a test recording of the previous one. */
@@ -153,7 +206,7 @@ export function simulateBotMessage(
   now: number,
 ): { outcome: BotOutcome; matchName?: string } | null {
   let out: { outcome: BotOutcome; matchName?: string } | null = null;
-  update((s) => ({
+  const ok = update((s) => ({
     ...s,
     draws: s.draws.map((d) => {
       if (d.id !== drawId || d.result) return d;
@@ -162,7 +215,7 @@ export function simulateBotMessage(
       return r.draw;
     }),
   }));
-  return out;
+  return ok ? out : null;
 }
 
 /** Files a finished real recording under its draw's "Gravações". */
