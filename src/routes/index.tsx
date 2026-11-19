@@ -463,18 +463,11 @@ function Roleta() {
         </div>
       </section>
 
-      <div className="mt-1 flex h-9 items-center gap-2 px-4 text-xs text-muted-foreground">
-        <p
-          className={
-            full
-              ? "flex min-w-0 flex-1 items-center justify-center gap-2"
-              : "flex min-w-0 flex-1 items-center gap-2"
-          }
-        >
-          {(full || !draw.isSample) && <span className="truncate">{APP_NAME} ·</span>}
+      <div className="mt-1 flex min-h-9 flex-wrap items-center justify-end gap-1.5 px-4 text-xs text-muted-foreground">
+        <p className="mr-auto flex min-h-9 min-w-0 items-center gap-1.5">
           <span className="shrink-0 font-semibold">{formatDateBR(draw.date)}</span>
           {draw.isSample && (
-            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 font-semibold">
+            <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold">
               Sorteio de teste
             </span>
           )}
