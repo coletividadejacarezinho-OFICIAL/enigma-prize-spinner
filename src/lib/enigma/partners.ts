@@ -120,13 +120,22 @@ export const offerRoundId = (o: Pick<Offer, "id">) => `of-${o.id}`;
 export const offerMerchantId = (o: Pick<Offer, "id">) => `mc-${o.id}`;
 
 /** Where an offer already sits in the saved draws (round id = draw id for the first prize). */
-export function placementOf(draws: Draw[], o: Pick<Offer, "id">): { drawId: string; roundId: string } | undefined {
+export function placementOf(
+  draws: Draw[],
+  o: Pick<Offer, "id"> & Partial<Pick<Offer, "merchantId">>,
+): { drawId: string; roundId: string } | undefined {
   for (const d of draws) {
     const linked = d.offerLinks?.[o.id];
-    if (linked && (linked === d.id || d.extraPrizes?.some((p) => p.id === linked)))
-      return { drawId: d.id, roundId: linked };
-    if (d.id === offerDrawId(o)) return { drawId: d.id, roundId: d.id };
-    if (d.extraPrizes?.some((p) => p.id === offerRoundId(o))) return { drawId: d.id, roundId: offerRoundId(o) };
+    const roundId = linked ?? (d.id === offerDrawId(o)
+      ? d.id
+      : d.extraPrizes?.find((p) => p.id === offerRoundId(o))?.id);
+    if (!roundId) continue;
+    const merchantId = roundId === d.id
+      ? d.merchantId
+      : d.extraPrizes?.find((p) => p.id === roundId)?.merchantId;
+    if (!merchantId || (o.merchantId && merchantId !== o.merchantId))
+      throw new Error("O comércio do prêmio foi alterado. Confira o vínculo antes de confirmar a oferta.");
+    return { drawId: d.id, roundId };
   }
   return undefined;
 }
