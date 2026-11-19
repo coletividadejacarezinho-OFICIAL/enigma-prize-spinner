@@ -2,6 +2,7 @@
  * Share-as-image artwork (stage 10): what each picture shows and how it is split
  * into numbered pictures. Pure functions only; the drawing lives in cards-render.ts.
  */
+import { winnerNumber } from "./numbers";
 import { formatDateBR, type ListaoEntry, type ScheduledEntry } from "./logic";
 import { allRoundsDone, roundsOf } from "./rounds";
 import type { Draw, Merchant } from "./types";
@@ -168,6 +169,8 @@ export type WinnerCard = {
   /** "Prêmio 2 de 3" for draws with several courtesies. */
   label: string | null;
   winner: string;
+  /** Public number in the confirmed list (E06); null for results that cannot be matched. */
+  number: number | null;
   prize: string;
   merchantName: string;
   merchantLogo?: string;
@@ -183,6 +186,7 @@ export function winnerCardData(draw: Draw, merchants: Merchant[], index: number)
     round: index,
     label: rounds.length > 1 ? `Prêmio ${index + 1} de ${rounds.length}` : null,
     winner: r.result.winner,
+    number: winnerNumber(draw, r.result),
     prize: r.prize,
     merchantName: r.merchantName,
     ...(r.merchantLogo ? { merchantLogo: r.merchantLogo } : {}),
@@ -191,7 +195,7 @@ export function winnerCardData(draw: Draw, merchants: Merchant[], index: number)
 
 export type SummaryCard = {
   date: string;
-  rows: { label: string; winner: string; prize: string; merchantName: string; merchantLogo?: string }[];
+  rows: { label: string; winner: string; number: number | null; prize: string; merchantName: string; merchantLogo?: string }[];
 };
 
 /** All results together, only for draws with several courtesies once every one is spun. */
@@ -203,6 +207,7 @@ export function summaryCardData(draw: Draw, merchants: Merchant[]): SummaryCard 
     rows: rounds.map((r) => ({
       label: `Prêmio ${r.index + 1}`,
       winner: r.result?.winner ?? "",
+      number: winnerNumber(draw, r.result),
       prize: r.prize,
       merchantName: r.merchantName,
       ...(r.merchantLogo ? { merchantLogo: r.merchantLogo } : {}),

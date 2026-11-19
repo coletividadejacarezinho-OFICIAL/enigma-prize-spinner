@@ -20,7 +20,8 @@ import {
 import { formatDateBR } from "./logic";
 import { APP_NAME, GROUP_NAME } from "./types";
 
-export type CardImage = { blob: Blob; url: string; filename: string };
+/** `numbers`: list pictures only, the public numbers printed on that picture (for checks). */
+export type CardImage = { blob: Blob; url: string; filename: string; numbers?: number[] };
 
 const W = 1080;
 const H = 1920;
@@ -393,7 +394,7 @@ export async function renderListCards(list: ListCard, groupLogoSrc?: string): Pr
 
   // Names keep their size; long ones take a second line instead of shrinking.
   const measureNames = (colW: number) => {
-    const lines = list.names.map((n) => wrap(probe.ctx, n, colW - NUM_W - 24, 800, NAME_SIZE, SANS));
+    const lines = list.names.map((n) => wrap(probe.ctx, n, colW - NUM_W - 24, 800, NAME_SIZE, DISPLAY));
     return { lines, heights: lines.map((l) => l.length * NAME_LH + ROW_PAD * 2) };
   };
 
@@ -436,7 +437,7 @@ export async function renderListCards(list: ListCard, groupLogoSrc?: string): Pr
         drawLines(k.ctx, [`${i + 1}`], x + NUM_W, ry + ROW_PAD, NAME_LH, NAME_SIZE);
         k.ctx.textAlign = "left";
         k.ctx.fillStyle = k.pal.ink;
-        setFont(k.ctx, 800, NAME_SIZE, SANS);
+        setFont(k.ctx, 800, NAME_SIZE, DISPLAY);
         drawLines(k.ctx, lines, x + NUM_W + 20, ry + ROW_PAD, NAME_LH, NAME_SIZE);
         ry += h + ROW_GAP;
       }
@@ -448,7 +449,8 @@ export async function renderListCards(list: ListCard, groupLogoSrc?: string): Pr
       k.ctx.fillText("Nenhum nome confirmado ainda", W / 2, y + 80);
       k.ctx.textAlign = "left";
     }
-    out.push(await toFile(k.canvas, cardFileName("lista", list.date, p, pages.length)));
+    const img = await toFile(k.canvas, cardFileName("lista", list.date, p, pages.length));
+    out.push({ ...img, numbers: page.flat().map((i) => i + 1) });
   }
   return out;
 }
@@ -655,8 +657,8 @@ export async function renderWinnerCard(card: WinnerCard, groupLogoSrc?: string):
   y += trophyArea + g(20);
   ctx.textAlign = "center";
   ctx.fillStyle = pal.gold;
-  setFont(ctx, 800, 36, SANS, 8);
-  ctx.fillText("GANHADOR(A)", W / 2, y + 36);
+  setFont(ctx, 800, 40, DISPLAY, 4);
+  ctx.fillText(card.number ? `GANHADOR(A) · Nº ${card.number}` : "GANHADOR(A)", W / 2, y + 36);
   y += 46 + 12;
   ctx.fillStyle = pal.ink;
   setFont(ctx, 800, winner.size, DISPLAY);
@@ -696,7 +698,7 @@ export async function renderSummaryCards(card: SummaryCard, groupLogoSrc?: strin
   const layout = card.rows.map((r) => {
     const head = wrap(probe.ctx, `${r.label.toUpperCase()} · ${r.merchantName}`, textW, 800, 28, SANS);
     const prize = wrap(probe.ctx, r.prize, textW, 800, 40, DISPLAY);
-    const winner = wrap(probe.ctx, r.winner, CONTENT_W - 60 - 72, 800, 60, DISPLAY);
+    const winner = wrap(probe.ctx, r.number ? `Nº ${r.number} · ${r.winner}` : r.winner, CONTENT_W - 60 - 72, 800, 60, DISPLAY);
     const topH = Math.max(L, head.length * 38 + 6 + prize.length * 48);
     return { head, prize, winner, topH, h: 30 + topH + 24 + winner.length * 68 + 30 };
   });

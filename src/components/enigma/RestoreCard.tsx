@@ -3,7 +3,13 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { GoldButton } from "@/components/enigma/GoldButton";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { applyRestore, previewRestore, type Preview } from "@/lib/enigma/restore-import";
 
 function plural(n: number, one: string, many: string) {
@@ -88,7 +94,10 @@ export function RestoreCard() {
               <ul className="space-y-1">
                 <li>{plural(plan.counts.official, "sorteio oficial", "sorteios oficiais")}</li>
                 <li>{plural(plan.counts.rehearsals, "ensaio", "ensaios")}</li>
-                <li>{plural(plan.counts.courtesies, "cortesia", "cortesias")}, {plural(plan.counts.results, "com ganhador", "com ganhador")}</li>
+                <li>
+                  {plural(plan.counts.courtesies, "cortesia", "cortesias")},{" "}
+                  {plural(plan.counts.results, "com ganhador", "com ganhador")}
+                </li>
                 <li>
                   {plural(preview.backup.files.size, "vídeo na cópia", "vídeos na cópia")}
                   {preview.backup.missingVideos.length > 0 &&
@@ -99,7 +108,9 @@ export function RestoreCard() {
                 <div className="rounded-xl bg-destructive/15 p-3 text-destructive" role="alert">
                   <p className="font-bold">Não dá para restaurar: há conflito.</p>
                   <ul className="mt-1 list-disc pl-5">
-                    {plan.conflicts.map((c) => <li key={c}>{c}</li>)}
+                    {plan.conflicts.map((c) => (
+                      <li key={c}>{c}</li>
+                    ))}
                   </ul>
                   <p className="mt-1">Nada foi alterado.</p>
                 </div>
@@ -114,14 +125,29 @@ export function RestoreCard() {
                     <p>
                       Entram {plural(plan.addDraws.length, "sorteio novo", "sorteios novos")} e{" "}
                       {plural(plan.addMerchants.length, "comércio novo", "comércios novos")}.{" "}
-                      {plan.sameDraws > 0 && `${plural(plan.sameDraws, "sorteio igual fica", "sorteios iguais ficam")} como está. `}
+                      {plan.sameDraws > 0 &&
+                        `${plural(plan.sameDraws, "sorteio igual fica", "sorteios iguais ficam")} como está. `}
                       Seus ajustes continuam iguais.
                     </p>
                   )}
-                  {plan.writeVideos.size > 0 && <p>{plural(plan.writeVideos.size, "vídeo será guardado", "vídeos serão guardados")}.</p>}
+                  {plan.writeVideos.size > 0 && (
+                    <p>
+                      {plural(
+                        plan.writeVideos.size,
+                        "vídeo será guardado",
+                        "vídeos serão guardados",
+                      )}
+                      .
+                    </p>
+                  )}
                   {plan.unavailableVideos.length > 0 && (
                     <p className="text-destructive">
-                      {plural(plan.unavailableVideos.length, "vídeo ficará indisponível", "vídeos ficarão indisponíveis")}; o histórico é mantido.
+                      {plural(
+                        plan.unavailableVideos.length,
+                        "vídeo ficará indisponível",
+                        "vídeos ficarão indisponíveis",
+                      )}
+                      ; o histórico é mantido.
                     </p>
                   )}
                 </div>

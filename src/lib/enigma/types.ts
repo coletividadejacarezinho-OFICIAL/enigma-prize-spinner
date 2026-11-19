@@ -129,6 +129,8 @@ export type AppState = {
   currentId: string;
   groupLogo?: string;
   sound: boolean;
+  /** Spin track volume 0..1 (E06); missing = 0.7. */
+  volume?: number;
   /** Test recording in progress, kept so switching tabs doesn't stop it. */
   recording?: RecordingSession;
 };

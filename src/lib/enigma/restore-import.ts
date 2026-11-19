@@ -1,8 +1,22 @@
 /** Browser-only: reads the zip on the phone and applies a confirmed restore with a journal. */
 import JSZip from "jszip";
-import { checkBackup, planRestore, type CheckedBackup, type LocalVideo, type RestorePlan } from "./restore";
+import {
+  checkBackup,
+  planRestore,
+  type CheckedBackup,
+  type LocalVideo,
+  type RestorePlan,
+} from "./restore";
 import { videoRefs } from "./backup";
-import { clearJournal, rawSavedData, settleRestore, snap, writeJournal, writeRawBack, writeRestoredRaw } from "./store";
+import {
+  clearJournal,
+  rawSavedData,
+  settleRestore,
+  snap,
+  writeJournal,
+  writeRawBack,
+  writeRestoredRaw,
+} from "./store";
 import { deleteVideo, loadVideo, putVideoOrThrow } from "./videos";
 
 export type Preview =
@@ -12,7 +26,8 @@ export type Preview =
 async function sameBytes(a: Blob, b: Blob) {
   if (a.size !== b.size) return false;
   const [x, y] = await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
-  const u = new Uint8Array(x), v = new Uint8Array(y);
+  const u = new Uint8Array(x),
+    v = new Uint8Array(y);
   for (let i = 0; i < u.length; i++) if (u[i] !== v[i]) return false;
   return true;
 }
@@ -23,10 +38,17 @@ export async function previewRestore(file: File): Promise<Preview> {
   try {
     zip = await JSZip.loadAsync(file);
   } catch {
-    return { ok: false, message: "Este arquivo não é uma cópia do Enigma Premiado (não é um .zip válido)." };
+    return {
+      ok: false,
+      message: "Este arquivo não é uma cópia do Enigma Premiado (não é um .zip válido).",
+    };
   }
   const entry = zip.file("copia.json");
-  if (!entry) return { ok: false, message: "Este arquivo não é uma cópia do Enigma Premiado (falta o copia.json)." };
+  if (!entry)
+    return {
+      ok: false,
+      message: "Este arquivo não é uma cópia do Enigma Premiado (falta o copia.json).",
+    };
   let json: unknown;
   try {
     json = JSON.parse(await entry.async("string"));
@@ -37,13 +59,20 @@ export async function previewRestore(file: File): Promise<Preview> {
   const checked = checkBackup(json, paths);
   if (!checked.ok) return checked;
   const s = snap();
-  if (s.kind !== "ok") return { ok: false, message: "Os dados deste aparelho não podem ser lidos agora. Nada foi alterado." };
+  if (s.kind !== "ok")
+    return {
+      ok: false,
+      message: "Os dados deste aparelho não podem ser lidos agora. Nada foi alterado.",
+    };
   const localVideos = new Map<string, LocalVideo>();
   for (const { rec } of videoRefs(checked.backup.state)) {
     const mine = await loadVideo(rec.id);
     if (!mine) continue;
     const path = checked.backup.files.get(rec.id);
-    if (!path) { localVideos.set(rec.id, "same"); continue; }
+    if (!path) {
+      localVideos.set(rec.id, "same");
+      continue;
+    }
     const theirs = await zip.file(path)!.async("blob");
     localVideos.set(rec.id, (await sameBytes(mine, theirs)) ? "same" : "different");
   }
@@ -67,7 +96,10 @@ export async function applyRestore(p: Extract<Preview, { ok: true }>): Promise<A
   const ids = [...plan.writeVideos.keys()];
   const journal = { phase: "videos" as const, prevRaw, newRaw, newVideoIds: ids };
   if (!writeJournal(journal))
-    return { ok: false, message: "Não há espaço para restaurar neste aparelho. Nada foi alterado." };
+    return {
+      ok: false,
+      message: "Não há espaço para restaurar neste aparelho. Nada foi alterado.",
+    };
   const written: string[] = [];
   try {
     for (const [id, path] of plan.writeVideos) {
@@ -79,7 +111,10 @@ export async function applyRestore(p: Extract<Preview, { ok: true }>): Promise<A
     clearJournal();
     return { ok: false, message: "Não foi possível guardar os vídeos. Nada foi alterado." };
   }
-  if (!writeJournal({ ...journal, phase: "data" }) || (plan.newRaw !== null && !writeRestoredRaw(newRaw))) {
+  if (
+    !writeJournal({ ...journal, phase: "data" }) ||
+    (plan.newRaw !== null && !writeRestoredRaw(newRaw))
+  ) {
     writeRawBack(prevRaw);
     await Promise.all(written.map(deleteVideo));
     clearJournal();

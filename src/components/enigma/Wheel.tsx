@@ -22,6 +22,8 @@ function shorten(name: string, max: number) {
 
 type Props = {
   names: string[];
+  /** Text per slice (E06): names on small wheels, numbered marks on big ones. Defaults to names. */
+  labels?: string[];
   rotation: number;
   /** When set, the wheel animates from `from` to `rotation`. */
   spin?: { from: number; durationMs: number; key: number } | null;
@@ -29,8 +31,9 @@ type Props = {
   onSpinEnd?: () => void;
 };
 
-export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
-  const groupRef = useRef<SVGGElement>(null);
+export function Wheel({ names, labels, rotation, spin, onTick, onSpinEnd }: Props) {
+  // The whole <svg> turns (its centre is symmetric), so the browser can move it as one layer.
+  const groupRef = useRef<SVGSVGElement>(null);
   const count = names.length;
   const seg = count > 0 ? 360 / count : 360;
   const onTickRef = useRef(onTick);
@@ -68,19 +71,25 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spin?.key, rotation]);
 
-  const fontSize = count <= 6 ? 9 : count <= 10 ? 7.5 : count <= 16 ? 6 : count <= 30 ? 4.5 : 3.2;
+  const texts = labels ?? names;
+  const marks = count > 60;
+  const fontSize = marks ? 7 : count <= 6 ? 9 : count <= 10 ? 7.5 : count <= 16 ? 6 : count <= 30 ? 4.5 : 3.2;
   const maxChars = count <= 10 ? 14 : 18;
-  const showText = count <= 60;
+  const showText = count > 0;
 
   return (
     <div className="wheel-size relative">
       <div className="wheel-rim absolute inset-0 rounded-full p-[3.5%]">
         <div className="relative h-full w-full overflow-hidden rounded-full bg-card">
-          <svg viewBox="0 0 200 200" className="h-full w-full" role="img" aria-label="Roleta">
-            <g
-              ref={groupRef}
-              style={{ transformOrigin: "100px 100px", transform: `rotate(${rotation}deg)` }}
-            >
+          <svg
+            ref={groupRef}
+            viewBox="0 0 200 200"
+            className="h-full w-full will-change-transform"
+            style={{ transform: `rotate(${rotation}deg)` }}
+            role="img"
+            aria-label="Roleta"
+          >
+            <g>
               {count === 0 && (
                 <>
                   <circle cx="100" cy="100" r="100" style={{ fill: "var(--muted)" }} />
@@ -117,7 +126,8 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
                   );
                 })}
               {showText &&
-                names.map((name, i) => {
+                texts.map((name, i) => {
+                  if (!name) return null;
                   const center = count === 1 ? 0 : (i + 0.5) * seg;
                   const light = count > 1 && LIGHT.has(colorIndex(i, count));
                   // Names on the left half are turned around so they never read upside down.
@@ -125,7 +135,7 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
                   return (
                     <text
                       key={`t${i}`}
-                      x={flip ? 12 : 188}
+                      x={flip ? (marks ? 4 : 12) : marks ? 196 : 188}
                       y="100"
                       textAnchor={flip ? "start" : "end"}
                       dominantBaseline="central"
@@ -134,7 +144,7 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
                         fill: light ? "var(--wheel-ink-dark)" : "var(--wheel-ink)",
                         fontSize,
                         fontWeight: 800,
-                        fontFamily: "var(--font-sans)",
+                        fontFamily: "var(--font-display)",
                       }}
                     >
                       {shorten(name, maxChars)}

@@ -97,7 +97,9 @@ export function poolFor(draw: Draw, index: number): string[] {
   for (let i = 0; i < index; i++) {
     const r = roundResult(draw, i);
     if (!r) continue;
-    const at = pool.indexOf(r.winner);
+    // Earlier winners leave by their entry ID; older results only have the (unique) name.
+    const name = (r.entryId && draw.entries?.find((e) => e.id === r.entryId)?.name) || r.winner;
+    const at = pool.indexOf(name);
     if (at >= 0) pool.splice(at, 1);
   }
   return pool;

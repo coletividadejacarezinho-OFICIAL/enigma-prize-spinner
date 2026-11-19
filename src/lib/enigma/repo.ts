@@ -5,6 +5,7 @@
  */
 import { useSyncExternalStore } from "react";
 
+import { MAX_PARTICIPANTS } from "./numbers";
 import {
   confirmList as confirmListRule,
   entriesOf,
@@ -41,7 +42,7 @@ export type SpinInput = {
   result: DrawResult;
 };
 
-export type Preferences = { sound?: boolean; groupLogo?: string | null };
+export type Preferences = { sound?: boolean; volume?: number; groupLogo?: string | null };
 
 export interface EnigmaRepo {
   readonly kind: "local";
@@ -151,6 +152,7 @@ export const localRepo: EnigmaRepo = {
       mapDraw(s, drawId, (d) => {
         if (d.result) throw new Conflict();
         const next = confirmListRule(d);
+        if (next.names.length > MAX_PARTICIPANTS) throw new Conflict();
         count = next.names.length;
         return next;
       }),
@@ -194,6 +196,7 @@ export const localRepo: EnigmaRepo = {
   async setPreferences(p) {
     return run((s) => {
       let next: AppState = p.sound === undefined ? s : { ...s, sound: p.sound };
+      if (p.volume !== undefined) next = { ...next, volume: Math.min(1, Math.max(0, p.volume)) };
       if (p.groupLogo === null) {
         const { groupLogo: _removed, ...rest } = next;
         next = rest;

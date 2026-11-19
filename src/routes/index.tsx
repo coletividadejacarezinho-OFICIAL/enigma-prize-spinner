@@ -3,6 +3,7 @@ import {
   Camera,
   ClipboardCheck,
   ListChecks,
+  ListOrdered,
   Maximize2,
   MessageCircle,
   Minimize2,
@@ -75,7 +76,10 @@ import {
   shownRound,
   withRoundResult,
 } from "@/lib/enigma/rounds";
-import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
+import { playReveal, prefersReducedMotion, startSpinTrack, stopAllSound, unlockSound } from "@/lib/enigma/sound";
+import { clampVolume } from "@/lib/enigma/jingle";
+import { numberedList, numberedPool, wheelLabels, winnerNumber } from "@/lib/enigma/numbers";
+import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
@@ -104,6 +108,8 @@ export const Route = createFileRoute("/")({
 });
 
 const SPIN_MS = 5500;
+/** With reduced motion the wheel only eases the last few degrees into the saved result. */
+const CALM_MS = 700;
 
 function Roleta() {
   const state = useAppState();
@@ -121,6 +127,7 @@ function Roleta() {
   const [art, setArt] = useState<WinnerChoice | null>(null);
   const [repeatAsk, setRepeatAsk] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const rec = useRecorder();
   // Full screen only changes what is shown around the same wheel, so a spin in progress,
   // the names and the saved result are untouched when entering or leaving it.
@@ -141,6 +148,7 @@ function Roleta() {
       setPresentation(false);
       deviceFsRef.current = false;
       void exitDeviceFullscreen();
+      stopAllSound();
     };
   }, []);
 
@@ -163,6 +171,7 @@ function Roleta() {
   };
 
   const exitFull = () => {
+    stopAllSound();
     deviceFsRef.current = false;
     setPresentation(false);
     void exitDeviceFullscreen();
@@ -179,7 +188,11 @@ function Roleta() {
   const isLast = ri === total - 1;
   const pool = poolFor(draw, ri);
   const count = pool.length;
+  // Public numbers come from the confirmed list and stay the same on every courtesy.
+  const numbered = numberedPool(draw, ri);
+  const labels = wheelLabels(numbered);
   const result = round.result;
+  const resultNumber = winnerNumber(draw, result);
   const done = allRoundsDone(draw);
   const spinning = spin !== null;
   const showResult = !!result && !spinning;
@@ -197,9 +210,11 @@ function Roleta() {
     prize: round.prize,
     merchant: round.merchantName,
     names: pool,
+    labels,
     rotation: result?.rotation ?? 0,
     spin: spinning ? spinFrameRef.current : null,
     winner: showResult && result ? result.winner : null,
+    winnerNumber: showResult ? resultNumber : null,
     summary:
       summaryOpen && done
         ? rounds.map((r) => ({
@@ -235,13 +250,14 @@ function Roleta() {
           spinningRef.current = false;
           return;
         }
-        spinFrameRef.current = {
-          from: 0,
-          to: r.value.result.rotation,
-          startedAt: performance.now(),
-          durationMs: SPIN_MS,
-        };
-        setSpin({ from: 0, durationMs: SPIN_MS, key: Date.now() });
+        const calm = prefersReducedMotion();
+        const to = r.value.result.rotation;
+        const from = calm ? to - 20 : 0;
+        const durationMs = calm ? CALM_MS : SPIN_MS;
+        spinFrameRef.current = { from, to, startedAt: performance.now(), durationMs };
+        // The music starts with the animation of the saved result, never before.
+        if (state.sound && !calm) startSpinTrack(durationMs, clampVolume(state.volume));
+        setSpin({ from, durationMs, key: Date.now() });
       });
   };
 
@@ -263,7 +279,8 @@ function Roleta() {
     spinningRef.current = false;
     spinFrameRef.current = null;
     setSpin(null);
-    if (state.sound) playWin();
+    stopAllSound();
+    if (state.sound) playReveal(clampVolume(state.volume));
     if (multi && isLast) setSummaryOpen(true);
   };
 
@@ -432,6 +449,14 @@ function Roleta() {
             </span>
           )}
         </p>
+        {count > 0 && (
+          <button
+            onClick={() => setListOpen(true)}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
+          >
+            <ListOrdered className="h-4 w-4 text-gold" aria-hidden="true" /> Lista
+          </button>
+        )}
         {!full && (
           <button
             onClick={enterFull}
@@ -453,7 +478,7 @@ function Roleta() {
           names={pool}
           rotation={result?.rotation ?? 0}
           spin={spin}
-          {...(state.sound ? { onTick: playTick } : {})}
+          labels={labels}
           onSpinEnd={handleSpinEnd}
         />
         {showResult && result && (
@@ -470,9 +495,14 @@ function Roleta() {
                 className="mt-1 break-words font-display text-4xl font-extrabold leading-tight"
                 data-testid="winner"
               >
+                {resultNumber !== null && (
+                  <span className="block text-2xl text-gold" data-testid="winner-number">
+                    Nº {resultNumber}
+                  </span>
+                )}
                 {result.winner}
               </p>
-              <p className="mt-3 text-base font-bold text-gold">{round.prize}</p>
+              <p className="mt-3 font-display text-lg font-bold text-gold">{round.prize}</p>
               <p className="text-sm text-muted-foreground">Oferecimento: {round.merchantName}</p>
             </div>
           </div>
@@ -568,6 +598,14 @@ function Roleta() {
         )}
       </div>
 
+      <NumberedListDialog
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        list={numberedList(draw)}
+        onWheel={new Set(numbered.map((n) => n.number))}
+        highlight={showResult ? resultNumber : null}
+      />
+
       <InviteDialog
         open={inviteOpen}
         onOpenChange={setInviteOpen}
@@ -622,9 +660,12 @@ function Roleta() {
                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                   Prêmio {r.index + 1} · {r.merchantName}
                 </p>
-                <p className="font-bold text-gold">{r.prize}</p>
+                <p className="font-display font-bold text-gold">{r.prize}</p>
                 <p className="mt-1 flex items-center gap-1.5 font-display text-xl font-extrabold">
                   <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />{" "}
+                  {winnerNumber(draw, r.result) !== null && (
+                    <span className="text-gold">Nº {winnerNumber(draw, r.result)}</span>
+                  )}
                   {r.result?.winner}
                 </p>
               </li>

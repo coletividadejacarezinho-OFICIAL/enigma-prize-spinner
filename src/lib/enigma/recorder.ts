@@ -55,10 +55,14 @@ export type RecFrame = {
   prize: string;
   merchant: string;
   names: string[];
+  /** Slice text (E06): names, or numbered marks on big wheels. */
+  labels?: string[];
   rotation: number;
   /** Same animation as the on-screen wheel, timed with performance.now(). */
   spin: { from: number; to: number; startedAt: number; durationMs: number } | null;
   winner: string | null;
+  /** Public number of the winner in the confirmed list (E06). */
+  winnerNumber?: number | null;
   summary: { prize: string; merchant: string; winner: string }[] | null;
 };
 
@@ -325,7 +329,7 @@ function paint(s: Session) {
   ctx.fillText(wrap(ctx, `Oferecimento: ${f.merchant}`, W - 112, 1)[0] ?? "", 56, Math.max(y, 290));
 
   if (f.summary) paintSummary(ctx, c, f.summary);
-  else paintWheel(ctx, c, f.names, currentRotation(f), W / 2, 660, 300);
+  else paintWheel(ctx, c, f.labels ?? f.names, currentRotation(f), W / 2, 660, 300);
 
   // Bottom row: winner box on the left, face on the right.
   ctx.fillStyle = c.card;
@@ -339,7 +343,7 @@ function paint(s: Session) {
     ctx.stroke();
     ctx.fillStyle = c.gold;
     ctx.font = `800 28px ${SANS}`;
-    ctx.fillText("🏆 GANHADOR(A)", 255, 1050);
+    ctx.fillText(f.winnerNumber ? `🏆 GANHADOR(A) · Nº ${f.winnerNumber}` : "🏆 GANHADOR(A)", 255, 1050);
     ctx.fillStyle = c.ink;
     ctx.font = `800 46px ${DISPLAY}`;
     const lines = wrap(ctx, f.winner, 410, 3);
@@ -393,12 +397,13 @@ function paintWheel(ctx: CanvasRenderingContext2D, c: Palette, names: string[], 
       ctx.stroke();
     }
   }
-  if (count > 0 && count <= 60) {
-    const size = (count <= 6 ? 9 : count <= 10 ? 7.5 : count <= 16 ? 6 : count <= 30 ? 4.5 : 3.2) * (r / 100);
+  if (count > 0) {
+    const size = (count > 60 ? 7 : count <= 6 ? 9 : count <= 10 ? 7.5 : count <= 16 ? 6 : count <= 30 ? 4.5 : 3.2) * (r / 100);
     const maxChars = count <= 10 ? 14 : 18;
-    ctx.font = `800 ${size}px ${SANS}`;
+    ctx.font = `800 ${size}px ${DISPLAY}`;
     ctx.textBaseline = "middle";
     names.forEach((name, i) => {
+      if (!name) return;
       const center = count === 1 ? 0 : (i + 0.5) * seg;
       const light = count > 1 && (colorIndex(i, count) === 1 || colorIndex(i, count) === 4);
       const flip = center > 180;

@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ImagePlus, Smartphone, Volume2, VolumeX } from "lucide-react";
+import { ImagePlus, Smartphone } from "lucide-react";
 import { useRef } from "react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { BackupCard } from "@/components/enigma/BackupCard";
 import { RestoreCard } from "@/components/enigma/RestoreCard";
+import { SoundCard } from "@/components/enigma/SoundCard";
 import { BotTestCard } from "@/components/enigma/BotTestCard";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { InstallCard } from "@/components/enigma/InstallCard";
 import { GroupLogo } from "@/components/enigma/Logos";
-import { Switch } from "@/components/ui/switch";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
 import { report } from "@/lib/enigma/feedback";
 import { repo, useAppState } from "@/lib/enigma/repo";
@@ -88,31 +88,7 @@ function Ajustes() {
           />
         </section>
 
-        <section className="rounded-2xl bg-card p-4">
-          <label className="flex items-center justify-between gap-4">
-            <span className="flex items-center gap-3">
-              {state.sound ? (
-                <Volume2 className="h-6 w-6 text-gold" aria-hidden="true" />
-              ) : (
-                <VolumeX className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-              )}
-              <span>
-                <span className="block text-xl font-bold">Som da roleta</span>
-                <span className="block text-sm text-muted-foreground">
-                  {state.sound ? "Ligado" : "Desligado"}
-                </span>
-              </span>
-            </span>
-            <Switch
-              checked={state.sound}
-              onCheckedChange={async (on) => {
-                report(await repo.setPreferences({ sound: on }));
-              }}
-              className="scale-125"
-              aria-label="Som da roleta"
-            />
-          </label>
-        </section>
+        <SoundCard state={state} />
 
         <BotTestCard state={state} />
 

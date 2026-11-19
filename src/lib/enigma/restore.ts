@@ -1,5 +1,11 @@
 /** E05: pure checks and merge rules for "Restaurar cópia de segurança" (tested). */
-import { BACKUP_FORMAT, BACKUP_VERSION, buildManifest, videoRefs, type BackupManifest } from "./backup";
+import {
+  BACKUP_FORMAT,
+  BACKUP_VERSION,
+  buildManifest,
+  videoRefs,
+  type BackupManifest,
+} from "./backup";
 import { loadState } from "./store";
 import type { AppState, Draw, Merchant } from "./types";
 
@@ -50,7 +56,9 @@ export function checkLinks(state: AppState): string | null {
       if (p.merchantId && !merchantIds.has(p.merchantId))
         return `Uma cortesia do sorteio ${draw.id} aponta para um comércio que não está na cópia.`;
     }
-    const pd = dupe([draw.id, ...(draw.extraPrizes ?? []).map((p) => p.id)].filter(Boolean) as string[]);
+    const pd = dupe(
+      [draw.id, ...(draw.extraPrizes ?? []).map((p) => p.id)].filter(Boolean) as string[],
+    );
     if (pd) return `A cortesia ${pd} aparece duas vezes.`;
     const entryIds = (draw.entries ?? []).map((e) => e.id);
     const ed = dupe(entryIds);
@@ -73,22 +81,41 @@ export function checkLinks(state: AppState): string | null {
 }
 
 /** Validates copia.json before anything is saved. `zipPaths` = files present in the zip. */
-export function checkBackup(json: unknown, zipPaths: ReadonlySet<string>): { ok: true; backup: CheckedBackup } | Fail {
-  if (!json || typeof json !== "object") return fail("Este arquivo não é uma cópia do Enigma Premiado.");
+export function checkBackup(
+  json: unknown,
+  zipPaths: ReadonlySet<string>,
+): { ok: true; backup: CheckedBackup } | Fail {
+  if (!json || typeof json !== "object")
+    return fail("Este arquivo não é uma cópia do Enigma Premiado.");
   const m = json as Partial<BackupManifest>;
   if (m.format !== BACKUP_FORMAT) return fail("Este arquivo não é uma cópia do Enigma Premiado.");
   if (m.backupVersion !== BACKUP_VERSION)
-    return fail(`Esta cópia é da versão ${String(m.backupVersion)}, e este aplicativo só abre a versão ${BACKUP_VERSION}.`);
-  if (typeof m.savedData !== "string" || typeof m.exportedAt !== "string" || !m.state || !m.summary || !Array.isArray(m.videos))
+    return fail(
+      `Esta cópia é da versão ${String(m.backupVersion)}, e este aplicativo só abre a versão ${BACKUP_VERSION}.`,
+    );
+  if (
+    typeof m.savedData !== "string" ||
+    typeof m.exportedAt !== "string" ||
+    !m.state ||
+    !m.summary ||
+    !Array.isArray(m.videos)
+  )
     return fail("A cópia está incompleta.");
   const loaded = loadState(m.savedData);
   if (loaded.kind !== "ok") return fail("Os dados dentro da cópia não podem ser lidos.");
   const state = loaded.state;
-  if (!same(state, m.state)) return fail("A cópia não confere: os dados organizados são diferentes dos dados salvos.");
+  if (!same(state, m.state))
+    return fail("A cópia não confere: os dados organizados são diferentes dos dados salvos.");
   const problem = checkLinks(state);
   if (problem) return fail(problem);
   const listed = new Set(m.videos.filter((v) => v.file).map((v) => v.recordingId));
-  const expected = buildManifest(state, m.savedData, m.storageKey ?? "", listed, new Date(m.exportedAt));
+  const expected = buildManifest(
+    state,
+    m.savedData,
+    m.storageKey ?? "",
+    listed,
+    new Date(m.exportedAt),
+  );
   if (!same(expected.summary, m.summary) || !same(expected.videos, m.videos))
     return fail("A cópia não confere: o resumo é diferente dos dados salvos.");
   const files = new Map<string, string>();
@@ -99,7 +126,14 @@ export function checkBackup(json: unknown, zipPaths: ReadonlySet<string>): { ok:
   }
   return {
     ok: true,
-    backup: { exportedAt: m.exportedAt, raw: m.savedData, state, manifest: m as BackupManifest, files, missingVideos },
+    backup: {
+      exportedAt: m.exportedAt,
+      raw: m.savedData,
+      state,
+      manifest: m as BackupManifest,
+      files,
+      missingVideos,
+    },
   };
 }
 
@@ -152,7 +186,10 @@ export function planRestore(
     const mine = ld.get(d.id);
     if (!mine) addDraws.push(d);
     else if (same(mine, d)) sameDraws++;
-    else conflicts.push(`O sorteio de ${d.date.split("-").reverse().join("/")} (${d.prize}) já existe neste aparelho com outros dados.`);
+    else
+      conflicts.push(
+        `O sorteio de ${d.date.split("-").reverse().join("/")} (${d.prize}) já existe neste aparelho com outros dados.`,
+      );
   }
   const writeVideos = new Map<string, string>();
   let videosAlready = 0;
@@ -160,7 +197,8 @@ export function planRestore(
   for (const { rec } of videoRefs(inc)) {
     const status = localVideos.get(rec.id) ?? "absent";
     const path = backup.files.get(rec.id);
-    if (status === "different" && path) conflicts.push("Um vídeo da cópia é diferente do vídeo com o mesmo código neste aparelho.");
+    if (status === "different" && path)
+      conflicts.push("Um vídeo da cópia é diferente do vídeo com o mesmo código neste aparelho.");
     else if (status !== "absent") videosAlready++;
     else if (path) writeVideos.set(rec.id, path);
     else unavailableVideos.push(rec.id);
@@ -169,7 +207,11 @@ export function planRestore(
   if (emptyBrowser) finalState = inc;
   else {
     const l = local as AppState;
-    finalState = { ...l, merchants: [...l.merchants, ...addMerchants], draws: [...l.draws, ...addDraws] };
+    finalState = {
+      ...l,
+      merchants: [...l.merchants, ...addMerchants],
+      draws: [...l.draws, ...addDraws],
+    };
     const problem = conflicts.length ? null : checkLinks(finalState);
     if (problem) conflicts.push(problem);
   }
@@ -187,6 +229,11 @@ export function planRestore(
     videosAlready,
     unavailableVideos,
     newRaw,
-    counts: { official: s.officialDraws.length, rehearsals: s.rehearsalDraws.length, courtesies: s.courtesies, results: s.results },
+    counts: {
+      official: s.officialDraws.length,
+      rehearsals: s.rehearsalDraws.length,
+      courtesies: s.courtesies,
+      results: s.results,
+    },
   };
 }

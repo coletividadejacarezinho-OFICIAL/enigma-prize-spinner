@@ -20,6 +20,7 @@ import { ImageButton } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
 import { WinnerArtDialog } from "@/components/enigma/WinnerArt";
 import { winnerChoices } from "@/lib/enigma/cards";
+import { winnerNumber } from "@/lib/enigma/numbers";
 import { formatDateBR, merchantOf } from "@/lib/enigma/logic";
 import { drawResultMessage, roundsOf } from "@/lib/enigma/rounds";
 import { report } from "@/lib/enigma/feedback";
@@ -113,6 +114,7 @@ function VerSorteio() {
                   <>
                     <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />
                     <span className="min-w-0 break-words font-display text-xl font-extrabold">
+                      {numLabel(draw, r.result)}
                       {r.result.winner}
                     </span>
                   </>
@@ -149,6 +151,7 @@ function VerSorteio() {
                 <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
               </p>
               <p className="mt-1 break-words font-display text-3xl font-extrabold leading-tight">
+                {numLabel(draw, draw.result)}
                 {draw.result.winner}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -297,4 +300,9 @@ function WhoWatched() {
       </p>
     </section>
   );
+}
+
+function numLabel(draw: Parameters<typeof winnerNumber>[0], r: Parameters<typeof winnerNumber>[1]) {
+  const n = winnerNumber(draw, r);
+  return n === null ? null : <span className="mr-1.5 text-gold">Nº {n}</span>;
 }

@@ -125,6 +125,7 @@ describe("Picture data comes from the real screen data", () => {
       round: 1,
       label: "Prêmio 2 de 3",
       winner: "Bia",
+      number: 2,
       prize: "Cesta de pães",
       merchantName: "Padaria Pão de Ouro",
     });

@@ -3,6 +3,7 @@ import { Bot, ClipboardCheck, ClipboardPaste, Pencil, Plus, Send, Trash2 } from 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { overLimitMessage } from "@/lib/enigma/numbers";
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { ImageButton, ImageShareDialog } from "@/components/enigma/ImageShare";
@@ -113,7 +114,8 @@ function Nomes() {
   const pending = pendingEntries(entries);
   const locked = !!draw.result;
   const dirty = needsConfirmation(draw);
-  const canConfirm = ready.length >= MIN_NAMES_TO_SPIN;
+  const tooMany = overLimitMessage(ready.length);
+  const canConfirm = ready.length >= MIN_NAMES_TO_SPIN && !tooMany;
 
   // Always work on the saved list, so quick taps never overwrite each other.
   // Saved through the repo with this draw's id; a spun draw answers with a conflict.
@@ -309,7 +311,9 @@ function Nomes() {
   const showShare = locked || draw.names.length > 0 || canConfirm;
   const hint = locked
     ? null
-    : !canConfirm
+    : tooMany
+      ? tooMany
+      : !canConfirm
       ? `Coloque pelo menos ${MIN_NAMES_TO_SPIN} nomes para girar.`
       : dirty && draw.names.length > 0
         ? "A lista mudou. Confirme de novo para atualizar a roleta."
@@ -656,7 +660,9 @@ function Nomes() {
               Confirmar a lista nova?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-muted-foreground">
-              {canConfirm
+              {tooMany
+                ? tooMany
+                : canConfirm
                 ? `A lista mudou. Ao confirmar, a roleta e a mensagem passam a ter os mesmos ${plural(ready.length, "nome", "nomes")}.`
                 : `Coloque pelo menos ${MIN_NAMES_TO_SPIN} nomes prontos antes de mandar a lista.`}
             </AlertDialogDescription>
