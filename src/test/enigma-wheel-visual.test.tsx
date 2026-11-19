@@ -13,7 +13,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it.each([101, 250])("renders names and slices for %i participants", (count) => {
+it.each([75, 101, 250])("renders names and slices for %i participants", (count) => {
   const { container } = render(<Wheel names={names.slice(0, count)} rotation={0} />);
   const wheel = container.querySelector('svg[aria-label="Roleta"]')!;
   expect(wheel.querySelectorAll("path")).toHaveLength(count);
@@ -62,6 +62,7 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
 });
 
 it("scales dense labels and skips zoom with reduced motion", () => {
+  expect(wheelFontSize(75)).toBeGreaterThan(wheelFontSize(101));
   expect(wheelFontSize(250)).toBeLessThan(wheelFontSize(101));
   expect(wheelZoom(0.7, true)).toBeGreaterThan(1);
   expect(wheelZoom(1, false)).toBe(1);
