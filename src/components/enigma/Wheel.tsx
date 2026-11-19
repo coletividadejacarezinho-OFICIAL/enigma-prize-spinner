@@ -24,11 +24,13 @@ type Props = {
   rotation: number;
   /** When set, the wheel animates from `from` to `rotation`. */
   spin?: { from: number; durationMs: number; key: number; zoom: boolean } | null;
+  idle?: boolean;
+  onIdleRotation?: (rotation: number) => void;
   onTick?: () => void;
   onSpinEnd?: () => void;
 };
 
-export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
+export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onTick, onSpinEnd }: Props) {
   // The whole <svg> turns (its centre is symmetric), so the browser can move it as one layer.
   const groupRef = useRef<SVGSVGElement>(null);
   const rimRef = useRef<HTMLDivElement>(null);
@@ -37,8 +39,10 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
   const seg = count > 0 ? 360 / count : 360;
   const onTickRef = useRef(onTick);
   const onEndRef = useRef(onSpinEnd);
+  const onIdleRef = useRef(onIdleRotation);
   onTickRef.current = onTick;
   onEndRef.current = onSpinEnd;
+  onIdleRef.current = onIdleRotation;
 
   useEffect(() => {
     const el = groupRef.current;
@@ -48,8 +52,21 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
     focus.hidden = true;
     rim.style.transform = "";
     if (!spin) {
-      el.style.transform = `rotate(${rotation}deg)`;
-      return;
+      if (!idle || count === 0) {
+        el.style.transform = `rotate(${rotation}deg)`;
+        return;
+      }
+      // Slow, silent presentation movement; never changes the saved result.
+      const start = performance.now();
+      let raf = 0;
+      const frame = (now: number) => {
+        const angle = ((now - start) * 360 / 90000) % 360;
+        el.style.transform = `rotate(${angle}deg)`;
+        onIdleRef.current?.(angle);
+        raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+      return () => cancelAnimationFrame(raf);
     }
     const start = performance.now();
     const from = spin.from;
@@ -76,13 +93,15 @@ export function Wheel({ names, rotation, spin, onTick, onSpinEnd }: Props) {
         lastSeg = s;
         onTickRef.current?.();
       }
-      if (t < 1) raf = requestAnimationFrame(frame);
+      // Hold the finished close-up for five seconds so the audience can read it.
+      if (t < 1 || (spin.zoom && now - start < spin.durationMs + 5000))
+        raf = requestAnimationFrame(frame);
       else onEndRef.current?.();
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spin?.key, rotation]);
+  }, [spin?.key, rotation, idle, count]);
 
   const fontSize = wheelFontSize(count);
 
