@@ -1,4 +1,5 @@
 /** Browser-only: reads the zip on the phone and applies a confirmed restore with a journal. */
+import { restorePending } from "./restore-lock";
 import { SIM_KEY } from "./partners-store";
 import { mergePartners } from "./partners-backup";
 import JSZip from "jszip";
@@ -103,6 +104,8 @@ export type ApplyResult = { ok: true } | { ok: false; message: string };
  * `settleOnOpen()` finishes (phase data) or rolls back (phase videos). Success only at the end.
  */
 export async function applyRestore(p: Extract<Preview, { ok: true }>): Promise<ApplyResult> {
+  if (restorePending())
+    return { ok: false, message: "Há uma restauração em andamento. Conclua a recuperação antes de importar outra cópia." };
   const { plan, zip, prevRaw } = p;
   if (plan.conflicts.length) return { ok: false, message: "Há conflitos. Nada foi alterado." };
   if (rawSavedData() !== prevRaw)

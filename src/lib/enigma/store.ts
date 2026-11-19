@@ -261,7 +261,25 @@ export type RestoreJournal = {
 function readJournal(): RestoreJournal | null {
   try {
     const j = window.localStorage.getItem(RESTORE_KEY);
-    return j ? (JSON.parse(j) as RestoreJournal) : null;
+    if (!j) return null;
+    const parsed = JSON.parse(j) as RestoreJournal;
+    if (!parsed || !["videos", "data"].includes(parsed.phase) ||
+        (parsed.prevRaw !== null && typeof parsed.prevRaw !== "string") ||
+        typeof parsed.newRaw !== "string" || !Array.isArray(parsed.newVideoIds) ||
+        parsed.newVideoIds.some((id) => typeof id !== "string") ||
+        (parsed.newPartnerRaw !== undefined && typeof parsed.newPartnerRaw !== "string") ||
+        (parsed.prevPartnerRaw !== undefined && parsed.prevPartnerRaw !== null && typeof parsed.prevPartnerRaw !== "string"))
+      return null;
+    if (loadState(parsed.newRaw).kind !== "ok" ||
+        (parsed.prevRaw !== null && loadState(parsed.prevRaw).kind === "broken"))
+      return null;
+    for (const raw of [parsed.newPartnerRaw, parsed.prevPartnerRaw]) {
+      if (typeof raw !== "string") continue;
+      const partner = JSON.parse(raw);
+      if (!partner || !["invites", "accounts", "offers", "notices"].every((key) => Array.isArray(partner[key])))
+        return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -315,7 +333,7 @@ export function writeRawBack(prevRaw: string | null) {
  */
 export function settleRestore(): { outcome: "none" | "finished" | "rolledBack" | "pending"; deleteVideos: string[] } {
   const j = readJournal();
-  if (!j) return { outcome: "none", deleteVideos: [] };
+  if (!j) return { outcome: restorePending() ? "pending" : "none", deleteVideos: [] };
   if (j.phase === "data") {
     try {
       if (j.newPartnerRaw !== undefined) window.localStorage.setItem(SIM_KEY, j.newPartnerRaw);

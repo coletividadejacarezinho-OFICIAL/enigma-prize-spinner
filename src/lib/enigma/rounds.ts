@@ -186,7 +186,7 @@ export function commitSpin(
   plan: SpinPlan,
   result: DrawResult,
 ): { draw: Draw; status: "saved" | "already" | "changed" } {
-  if (draw.id !== plan.drawId || shownRound(draw) !== plan.round)
+  if (draw.draft || draw.id !== plan.drawId || shownRound(draw) !== plan.round)
     return { draw, status: "changed" };
   if (roundResult(draw, plan.round)) return { draw, status: "already" };
   const base =
@@ -195,6 +195,8 @@ export function commitSpin(
     return { draw, status: "changed" };
   const pool = poolFor(base, plan.round);
   if (
+    pool.length < minimumNamesForRound(plan.round) ||
+    !Number.isInteger(result.index) || !Number.isFinite(result.rotation) || !Number.isFinite(result.at) ||
     pool.length !== plan.pool.length ||
     pool.some((n, i) => n !== plan.pool[i]) ||
     pool[result.index] !== result.winner
