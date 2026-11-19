@@ -3,7 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Wheel } from "@/components/enigma/Wheel";
 import { targetRotation } from "@/lib/enigma/logic";
-import { wheelFontSize, wheelZoom } from "@/lib/enigma/wheel-visual";
+import { wheelFontSize, wheelLabel, wheelZoom } from "@/lib/enigma/wheel-visual";
 
 const names = Array.from({ length: 250 }, (_, i) => `Pessoa ${i + 1}`);
 
@@ -20,6 +20,15 @@ it.each([75, 101, 250])("renders names and slices for %i participants", (count) 
   expect(Array.from(wheel.querySelectorAll("text"), (label) => label.textContent)).toEqual(
     names.slice(0, count),
   );
+});
+
+it("shows longer names where the wheel has space, without changing the original", () => {
+  const full = "Mariana Marcial Barbosa de Almeida";
+  expect(wheelLabel("  Rosa  Maria  ", 75)).toBe("Rosa Maria");
+  expect(wheelLabel("Rosana Moura Garlin", 75)).toBe("Rosana Moura Garlin");
+  expect(wheelLabel(full, 75)).toBe("Mariana Marcial Barbosa…");
+  expect(wheelLabel(full, 250).length).toBeLessThan(wheelLabel(full, 75).length);
+  expect(full).toBe("Mariana Marcial Barbosa de Almeida");
 });
 
 it("zooms late, keeps the pointer fixed and displays the saved name at the end of the spin", () => {
