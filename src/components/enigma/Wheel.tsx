@@ -109,6 +109,23 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
     <div className="wheel-size relative">
       <div className={spin?.zoom ? "absolute inset-0 overflow-hidden" : "absolute inset-0"}>
         <div ref={rimRef} className="wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]">
+          {/* Independent perimeter lights: decorative only, never change the draw. */}
+          <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden="true">
+            {Array.from({ length: 24 }, (_, i) => {
+              const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
+              return (
+                <span
+                  key={i}
+                  className="wheel-bulb absolute rounded-full"
+                  style={{
+                    left: `${50 + 47 * Math.cos(angle)}%`,
+                    top: `${50 + 47 * Math.sin(angle)}%`,
+                    animationDelay: `${-((i % 2) * 0.65)}s`,
+                  }}
+                />
+              );
+            })}
+          </div>
           <div className="relative h-full w-full overflow-hidden rounded-full bg-card">
             <svg
               ref={groupRef}
