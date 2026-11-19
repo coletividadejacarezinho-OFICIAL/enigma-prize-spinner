@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton } from "@/components/enigma/GoldButton";
+import { InstallCard } from "@/components/enigma/InstallCard";
 import { GroupLogo } from "@/components/enigma/Logos";
 import { Switch } from "@/components/ui/switch";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
@@ -14,9 +15,9 @@ export const Route = createFileRoute("/ajustes")({
   head: () => ({
     meta: [
       { title: "Ajustes — Enigma Premiado" },
-      { name: "description", content: "Troque a logo do grupo e ligue ou desligue o som." },
+      { name: "description", content: "Logo do grupo, som da roleta e instalar no celular." },
       { property: "og:title", content: "Ajustes — Enigma Premiado" },
-      { property: "og:description", content: "Troque a logo do grupo e ligue ou desligue o som." },
+      { property: "og:description", content: "Logo do grupo, som da roleta e instalar no celular." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -103,6 +104,8 @@ function Ajustes() {
             />
           </label>
         </section>
+
+        <InstallCard />
 
         <p className="flex items-start gap-2 px-1 text-sm text-muted-foreground">
           <Smartphone className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

@@ -1,6 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Camera, MessageCircle, Plus, Send, Square, Trophy, UserPlus } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  Camera,
+  Maximize2,
+  MessageCircle,
+  Minimize2,
+  Plus,
+  Send,
+  Square,
+  Trophy,
+  UserPlus,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
@@ -20,6 +30,12 @@ import {
   resultMessage,
   targetRotation,
 } from "@/lib/enigma/logic";
+import {
+  exitDeviceFullscreen,
+  requestDeviceFullscreen,
+  setPresentation,
+  usePresentation,
+} from "@/lib/enigma/presentation";
 import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
 import {
   currentDraw,
@@ -63,6 +79,40 @@ function Roleta() {
   const [done, setDone] = useState<{ recording: Recording; drawId: string } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Full screen only changes what is shown around the same wheel, so a spin in progress,
+  // the names and the saved result are untouched when entering or leaving it.
+  const full = usePresentation();
+  const deviceFsRef = useRef(false);
+
+  useEffect(() => {
+    const onChange = () => {
+      // Leaving the device's full screen (back gesture, Esc) also leaves the Roleta's.
+      if (!document.fullscreenElement && deviceFsRef.current) {
+        deviceFsRef.current = false;
+        setPresentation(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      setPresentation(false);
+      deviceFsRef.current = false;
+      void exitDeviceFullscreen();
+    };
+  }, []);
+
+  const enterFull = () => {
+    setPresentation(true);
+    void requestDeviceFullscreen().then((ok) => {
+      deviceFsRef.current = ok;
+    });
+  };
+
+  const exitFull = () => {
+    deviceFsRef.current = false;
+    setPresentation(false);
+    void exitDeviceFullscreen();
+  };
 
   if (!state) return <RoletaSkeleton />;
 
@@ -75,7 +125,7 @@ function Roleta() {
   const canSpin = count >= MIN_NAMES_TO_SPIN;
   const session = state.recording?.drawId === draw.id ? state.recording : undefined;
   const recording = !!session;
-  const showRecordButton = recording || (canSpin && !result);
+  const showRecordButton = recording || (!full && canSpin && !result);
 
   const handleStartRecording = (mode: Parameters<typeof micFor>[0], mic: boolean) => {
     startRecording({ drawId: draw.id, mode, mic: micFor(mode, mic), startedAt: Date.now() });
@@ -109,7 +159,13 @@ function Roleta() {
   const message = showResult ? resultMessage(draw, shop.name, GROUP_NAME) : null;
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    <div
+      className={
+        full
+          ? "flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          : "flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom))] flex-col"
+      }
+    >
       <AppHeader
         logo={state.groupLogo}
         subtitle={`${count} ${count === 1 ? "participante" : "participantes"}`}
@@ -125,18 +181,27 @@ function Roleta() {
         </div>
       </section>
 
-      <p className="mt-2 flex items-center justify-center gap-2 truncate px-4 text-xs text-muted-foreground">
-        <span className="truncate">
-          {APP_NAME} · {formatDateBR(draw.date)}
-        </span>
-        {draw.isSample && (
-          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 font-semibold">
-            Sorteio de teste
-          </span>
+      <div className="mt-1 flex h-9 items-center gap-2 px-4 text-xs text-muted-foreground">
+        <p className={full ? "flex min-w-0 flex-1 items-center justify-center gap-2" : "flex min-w-0 flex-1 items-center gap-2"}>
+          {(full || !draw.isSample) && <span className="truncate">{APP_NAME} ·</span>}
+          <span className="shrink-0 font-semibold">{formatDateBR(draw.date)}</span>
+          {draw.isSample && (
+            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 font-semibold">
+              Sorteio de teste
+            </span>
+          )}
+        </p>
+        {!full && (
+          <button
+            onClick={enterFull}
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
+          >
+            <Maximize2 className="h-4 w-4 text-gold" aria-hidden="true" /> Tela cheia
+          </button>
         )}
-      </p>
+      </div>
 
-      <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-5">
+      <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
         {session && (
           <div className="absolute left-4 top-1 z-20">
             <RecIndicator startedAt={session.startedAt} />
@@ -198,7 +263,12 @@ function Roleta() {
               </button>
             ))}
           {!canSpin && !result ? (
-            <GoldButton onClick={() => navigate({ to: "/nomes" })}>
+            <GoldButton
+              onClick={() => {
+                exitFull();
+                navigate({ to: "/nomes" });
+              }}
+            >
               <UserPlus aria-hidden="true" /> Adicionar nomes
             </GoldButton>
           ) : showResult ? (
@@ -214,7 +284,11 @@ function Roleta() {
             </GoldButton>
           )}
         </div>
-        {recording ? (
+        {full ? (
+          <SecondaryButton onClick={exitFull} className="border border-gold/60">
+            <Minimize2 className="text-gold" aria-hidden="true" /> Sair da tela cheia
+          </SecondaryButton>
+        ) : recording ? (
           <p className="flex h-11 items-center justify-center text-center text-sm font-semibold text-muted-foreground">
             {result
               ? "Ao terminar de falar, toque em Encerrar gravação."
@@ -274,7 +348,7 @@ function Roleta() {
 
 function RoletaSkeleton() {
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col" aria-busy="true">
+    <div className="flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom))] flex-col" aria-busy="true">
       <div className="h-16" />
       <div className="mx-4 h-[4.5rem] rounded-2xl bg-card" />
       <div className="wheel-box flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-5">
