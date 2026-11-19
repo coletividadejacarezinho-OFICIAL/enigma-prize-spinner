@@ -23,7 +23,7 @@ export function BackupCard() {
         <DatabaseBackup className="h-6 w-6 text-gold" aria-hidden="true" /> Cópia de segurança
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Guarda comércios, sorteios, nomes, ganhadores e vídeos num arquivo.
+        Guarda comércios, sorteios, nomes, ganhadores, vídeos e dados dos parceiros num arquivo.
       </p>
       {ready?.ok ? (
         <div className="mt-3 space-y-2" data-testid="backup-ready">

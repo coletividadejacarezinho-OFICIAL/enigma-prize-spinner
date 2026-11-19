@@ -19,6 +19,8 @@ export type BackupManifest = {
   format: typeof BACKUP_FORMAT;
   backupVersion: typeof BACKUP_VERSION;
   exportedAt: string;
+  /** Optional P1 rehearsal data; old backups remain supported. */
+  partners?: import("./partners").PartnerSim;
   /** localStorage key and exact saved text: restore can rebuild the app byte for byte. */
   storageKey: string;
   savedData: string;

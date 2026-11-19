@@ -23,7 +23,7 @@ export function FirstRun() {
       <img src="/icon-192.png" alt="" className="mx-auto h-20 w-20 rounded-2xl" />
       <h1 className="mt-4 text-center text-3xl font-extrabold">Bem-vinda ao Enigma Premiado</h1>
       <p className="mt-2 text-center text-base text-muted-foreground">
-        Ainda não há sorteios neste celular.
+        Prepare uma rodada em Sorteios para começar.
       </p>
       <div className="mt-6 space-y-3">
         <GoldButton onClick={() => navigate({ to: "/sorteios/novo" })}>

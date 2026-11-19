@@ -69,6 +69,7 @@ import {
 } from "@/lib/enigma/recorder";
 import {
   allRoundsDone,
+  minimumNamesForRound,
   drawResultMessage,
   needsRepeatAnswer,
   poolFor,
@@ -199,6 +200,7 @@ function Roleta() {
   const isLast = ri === total - 1;
   const pool = poolFor(draw, ri);
   const count = pool.length;
+  const minimumNames = minimumNamesForRound(ri);
   // Public numbers come from the confirmed list and stay the same on every courtesy.
   const numbered = numberedPool(draw, ri);
   const labels = wheelLabels(numbered);
@@ -210,9 +212,9 @@ function Roleta() {
   // The wheel only uses the confirmed list; a list changed in Nomes must be confirmed again.
   const dirty = needsConfirmation(draw);
   const readyCount = readyEntries(entriesOf(draw)).length;
-  const canSpin = count >= MIN_NAMES_TO_SPIN && !dirty && !result;
+  const canSpin = count >= minimumNames && !dirty && !result;
   const recording = !!rec;
-  const showRecordButton = recording || (!full && !done && !dirty && count >= MIN_NAMES_TO_SPIN);
+  const showRecordButton = recording || (!full && !done && !dirty && count >= minimumNames);
 
   frameRef.current = {
     group: GROUP_NAME,
@@ -356,7 +358,7 @@ function Roleta() {
   const message = drawResultMessage(draw, state.merchants, GROUP_NAME);
 
   const goldButton = (() => {
-    if (!result && (dirty || count < MIN_NAMES_TO_SPIN)) {
+    if (!result && (dirty || count < minimumNames)) {
       if (dirty && readyCount >= MIN_NAMES_TO_SPIN) {
         return (
           <GoldButton

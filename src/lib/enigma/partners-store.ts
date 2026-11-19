@@ -5,11 +5,13 @@ import { emptySim, type PartnerSim } from "./partners";
 export const SIM_KEY = "enigma-premiado:p1-ensaio";
 const subs = new Set<() => void>();
 let cache: PartnerSim | null = null;
+let cachedRaw: string | null | undefined;
 
 function read(): PartnerSim {
-  if (cache) return cache;
   try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SIM_KEY) : null;
+    if (cache && raw === cachedRaw) return cache;
+    cachedRaw = raw;
     cache = raw ? { ...emptySim(), ...(JSON.parse(raw) as PartnerSim) } : emptySim();
   } catch {
     cache = emptySim();
@@ -25,6 +27,7 @@ export function updateSim(fn: (s: PartnerSim) => PartnerSim): boolean {
   } catch {
     return false;
   }
+  cachedRaw = JSON.stringify(next);
   cache = next;
   subs.forEach((f) => f());
   return true;

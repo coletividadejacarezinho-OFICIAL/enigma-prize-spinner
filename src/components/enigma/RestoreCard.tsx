@@ -92,6 +92,7 @@ export function RestoreCard() {
           {plan && preview && (
             <div className="space-y-3 text-sm" data-testid="restore-preview">
               <ul className="space-y-1">
+                {preview.backup.manifest.partners && <li>Convites, ofertas e avisos dos parceiros incluídos</li>}
                 <li>{plural(plan.counts.official, "sorteio oficial", "sorteios oficiais")}</li>
                 <li>{plural(plan.counts.rehearsals, "ensaio", "ensaios")}</li>
                 <li>
