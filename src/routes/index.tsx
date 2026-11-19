@@ -623,7 +623,7 @@ function Roleta() {
               : `${count} nomes nesta rodada.`,
           )
         ) : canSpin ? (
-          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
+          <div className={state.demoTools ? "grid grid-cols-[auto_minmax(0,1fr)] gap-1" : ""}>
             <SecondaryButton
               onClick={() => navigate({ to: "/nomes" })}
               disabled={spinning}
@@ -631,13 +631,15 @@ function Roleta() {
             >
               Editar nomes
             </SecondaryButton>
-            <SecondaryButton
-              onClick={() => setInviteOpen(true)}
-              disabled={spinning}
-              className="whitespace-nowrap px-2 text-[15px]"
-            >
-              <Send aria-hidden="true" /> Convidar para assistir
-            </SecondaryButton>
+            {state.demoTools && (
+              <SecondaryButton
+                onClick={() => setInviteOpen(true)}
+                disabled={spinning}
+                className="whitespace-nowrap px-2 text-[15px]"
+              >
+                <Send aria-hidden="true" /> Convite (demonstração)
+              </SecondaryButton>
+            )}
           </div>
         ) : (
           <div className="h-11" />

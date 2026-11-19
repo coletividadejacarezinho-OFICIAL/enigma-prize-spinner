@@ -3,6 +3,7 @@
  * swapped (local browser storage today, a server database in E03) without touching screens.
  * Every operation takes explicit draw / courtesy ids and returns a typed result.
  */
+import { markDelivered } from "./agenda";
 import { useSyncExternalStore } from "react";
 
 import { MAX_PARTICIPANTS } from "./numbers";
@@ -42,7 +43,7 @@ export type SpinInput = {
   result: DrawResult;
 };
 
-export type Preferences = { sound?: boolean; volume?: number; groupLogo?: string | null };
+export type Preferences = { sound?: boolean; volume?: number; groupLogo?: string | null; demoTools?: boolean };
 
 export interface EnigmaRepo {
   readonly kind: "local";
@@ -69,6 +70,10 @@ export interface EnigmaRepo {
     now: number,
   ): Promise<RepoResult<{ outcome: BotOutcome; matchName?: string }>>;
   addRecording(drawId: string, rec: Recording): Promise<RepoResult>;
+  /** E08 "Lançar rodada": the draft becomes the Roleta's round. */
+  launchDraft(drawId: string): Promise<RepoResult>;
+  /** E08: records one courtesy's delivery time; never touches results. */
+  markDelivered(drawId: string, roundId: string, at: number): Promise<RepoResult>;
   closeLegacyTest(now: number): Promise<RepoResult>;
   /** "Fazer um ensaio": a rehearsal draw, never part of the official history or Listão. */
   startRehearsal(): Promise<RepoResult<{ drawId: string }>>;
@@ -117,7 +122,9 @@ export const localRepo: EnigmaRepo = {
 
   async selectDraw(drawId) {
     return run((s) => {
-      if (!s.draws.some((d) => d.id === drawId)) throw new Conflict();
+      const d = s.draws.find((x) => x.id === drawId);
+      // A draft is never put on the Roleta; it must be launched first.
+      if (!d || d.draft) throw new Conflict();
       return local.switchCurrent(s, drawId);
     });
   },
@@ -197,6 +204,7 @@ export const localRepo: EnigmaRepo = {
     return run((s) => {
       let next: AppState = p.sound === undefined ? s : { ...s, sound: p.sound };
       if (p.volume !== undefined) next = { ...next, volume: Math.min(1, Math.max(0, p.volume)) };
+      if (p.demoTools !== undefined) next = { ...next, demoTools: p.demoTools };
       if (p.groupLogo === null) {
         const { groupLogo: _removed, ...rest } = next;
         next = rest;
@@ -216,6 +224,17 @@ export const localRepo: EnigmaRepo = {
     );
     if (!r.ok) return r;
     return out ? ok(out) : fail("conflict");
+  },
+  async launchDraft(drawId) {
+    return run((s) => {
+      const d = s.draws.find((x) => x.id === drawId);
+      if (!d) throw new Conflict();
+      const { draft: _d, ...launched } = d;
+      return local.switchCurrent(mapDraw(s, drawId, () => launched), drawId);
+    });
+  },
+  async markDelivered(drawId, roundId, at) {
+    return run((s) => mapDraw(s, drawId, (d) => markDelivered(d, roundId, at)));
   },
   async addRecording(drawId, rec) {
     return run((s) =>

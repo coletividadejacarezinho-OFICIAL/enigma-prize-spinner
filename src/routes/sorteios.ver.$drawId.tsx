@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { DeliveryCard, RiddleArtButtons } from "@/components/enigma/RoundExtras";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronLeft,
@@ -11,6 +12,7 @@ import {
   Play,
   Trophy,
   UserRound,
+  CopyPlus,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -168,6 +170,8 @@ function VerSorteio() {
         </>
       )}
 
+      <DeliveryCard draw={draw} merchants={state.merchants} />
+
       <div className="mt-4 space-y-1">
         {message ? (
           <GoldButton onClick={() => setShareOpen(true)}>
@@ -184,6 +188,7 @@ function VerSorteio() {
             <Trophy className="text-gold" aria-hidden="true" /> Compartilhar arte do ganhador
           </SecondaryButton>
         )}
+        <RiddleArtButtons draw={draw} groupLogo={state.groupLogo} />
         <SecondaryButton
           onClick={async () => {
             if (!report(await repo.selectDraw(draw.id))) return;
@@ -201,6 +206,9 @@ function VerSorteio() {
             <Pencil aria-hidden="true" /> Editar sorteio
           </SecondaryButton>
         )}
+        <SecondaryButton onClick={() => navigate({ to: "/sorteios/novo", search: { modelo: draw.id } })}>
+          <CopyPlus aria-hidden="true" /> Usar como modelo
+        </SecondaryButton>
       </div>
 
       {draw.names.length > 0 && (
@@ -224,7 +232,7 @@ function VerSorteio() {
         </details>
       )}
 
-      <WhoWatched />
+      {state.demoTools && <WhoWatched />}
 
       <ResultShareDialog
         text={shareOpen ? message : null}

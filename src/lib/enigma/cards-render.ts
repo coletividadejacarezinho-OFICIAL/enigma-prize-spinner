@@ -14,6 +14,7 @@ import {
   wrapLines,
   type ListCard,
   type ListaoItem,
+  type RiddleCard,
   type SummaryCard,
   type WinnerCard,
 } from "./cards";
@@ -33,7 +34,18 @@ const SANS = '"Nunito", system-ui, sans-serif';
 const DISPLAY = '"Baloo 2", "Nunito", system-ui, sans-serif';
 
 type Ctx = CanvasRenderingContext2D;
-type Palette = { bg: string; card: string; glow: string; gold: string; goldDeep: string; goldGlow: string; ink: string; muted: string; inkDark: string; border: string };
+type Palette = {
+  bg: string;
+  card: string;
+  glow: string;
+  gold: string;
+  goldDeep: string;
+  goldGlow: string;
+  ink: string;
+  muted: string;
+  inkDark: string;
+  border: string;
+};
 
 const FALLBACK: Palette = {
   bg: "#1d0c2e",
@@ -94,7 +106,12 @@ function loadImage(src: string | undefined): Promise<HTMLImageElement | null> {
   });
 }
 
-type Kit = { ctx: Ctx; canvas: HTMLCanvasElement; pal: Palette; groupLogo: HTMLImageElement | null };
+type Kit = {
+  ctx: Ctx;
+  canvas: HTMLCanvasElement;
+  pal: Palette;
+  groupLogo: HTMLImageElement | null;
+};
 
 function newCanvas(groupLogo: HTMLImageElement | null): Kit {
   const canvas = document.createElement("canvas");
@@ -129,7 +146,8 @@ function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
 
 function setFont(ctx: Ctx, weight: number, size: number, family: string, spacing = 0) {
   ctx.font = `${weight} ${size}px ${family}`;
-  if ("letterSpacing" in ctx) (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${spacing}px`;
+  if ("letterSpacing" in ctx)
+    (ctx as Ctx & { letterSpacing: string }).letterSpacing = `${spacing}px`;
 }
 
 function measurer(ctx: Ctx, weight: number, family: string) {
@@ -139,7 +157,14 @@ function measurer(ctx: Ctx, weight: number, family: string) {
   };
 }
 
-function wrap(ctx: Ctx, text: string, width: number, weight: number, size: number, family: string): string[] {
+function wrap(
+  ctx: Ctx,
+  text: string,
+  width: number,
+  weight: number,
+  size: number,
+  family: string,
+): string[] {
   setFont(ctx, weight, size, family);
   return wrapLines(text, width, (t) => ctx.measureText(t).width);
 }
@@ -172,7 +197,14 @@ function sparkle(ctx: Ctx, x: number, y: number, r: number, color: string) {
 }
 
 /** Logo in a rounded tile, or the shop's initials when it has none. */
-function drawLogo(k: Kit, img: HTMLImageElement | null, name: string, x: number, y: number, size: number) {
+function drawLogo(
+  k: Kit,
+  img: HTMLImageElement | null,
+  name: string,
+  x: number,
+  y: number,
+  size: number,
+) {
   const { ctx, pal } = k;
   ctx.save();
   rr(ctx, x, y, size, size, size * 0.22);
@@ -265,7 +297,13 @@ function drawFrame(k: Kit) {
     ctx.clip();
     const img = k.groupLogo;
     const s = Math.max(badge / img.width, badge / img.height);
-    ctx.drawImage(img, bx + (badge - img.width * s) / 2, by + (badge - img.height * s) / 2, img.width * s, img.height * s);
+    ctx.drawImage(
+      img,
+      bx + (badge - img.width * s) / 2,
+      by + (badge - img.height * s) / 2,
+      img.width * s,
+      img.height * s,
+    );
     ctx.restore();
   } else {
     ctx.fillStyle = pal.gold;
@@ -336,7 +374,10 @@ const NAME_LH = 50;
 const ROW_PAD = 14;
 const ROW_GAP = 10;
 
-type CourtesyBlock = { lines: { text: string[]; size: number; lh: number; color: "gold" | "muted" | "label" }[]; height: number };
+type CourtesyBlock = {
+  lines: { text: string[]; size: number; lh: number; color: "gold" | "muted" | "label" }[];
+  height: number;
+};
 
 function measureCourtesies(k: Kit, list: ListCard): CourtesyBlock {
   const { ctx } = k;
@@ -345,10 +386,21 @@ function measureCourtesies(k: Kit, list: ListCard): CourtesyBlock {
   const lines: CourtesyBlock["lines"] = [];
   list.courtesies.forEach((c, i) => {
     if (multi) lines.push({ text: [`PRÊMIO ${i + 1}`], size: 26, lh: 36, color: "label" });
-    lines.push({ text: wrap(ctx, c.prize, inner, 800, 46, DISPLAY), size: 46, lh: 54, color: "gold" });
-    lines.push({ text: wrap(ctx, `Oferecimento: ${c.merchantName}`, inner, 700, 32, SANS), size: 32, lh: 42, color: "muted" });
+    lines.push({
+      text: wrap(ctx, c.prize, inner, 800, 46, DISPLAY),
+      size: 46,
+      lh: 54,
+      color: "gold",
+    });
+    lines.push({
+      text: wrap(ctx, `Oferecimento: ${c.merchantName}`, inner, 700, 32, SANS),
+      size: 32,
+      lh: 42,
+      color: "muted",
+    });
   });
-  const height = 48 + lines.reduce((s, l) => s + l.text.length * l.lh, 0) + (list.courtesies.length - 1) * 22;
+  const height =
+    48 + lines.reduce((s, l) => s + l.text.length * l.lh, 0) + (list.courtesies.length - 1) * 22;
   return { lines, height };
 }
 
@@ -364,7 +416,13 @@ function drawCourtesies(k: Kit, block: CourtesyBlock, y: number, perCourtesy: nu
   block.lines.forEach((l, i) => {
     if (i > 0 && i % perCourtesy === 0) cy += 22;
     ctx.fillStyle = l.color === "gold" ? pal.gold : pal.muted;
-    setFont(ctx, l.color === "gold" ? 800 : l.color === "label" ? 800 : 700, l.size, l.color === "gold" ? DISPLAY : SANS, l.color === "label" ? 4 : 0);
+    setFont(
+      ctx,
+      l.color === "gold" ? 800 : l.color === "label" ? 800 : 700,
+      l.size,
+      l.color === "gold" ? DISPLAY : SANS,
+      l.color === "label" ? 4 : 0,
+    );
     drawLines(ctx, l.text, M + 32, cy, l.lh, l.size);
     cy += l.text.length * l.lh;
   });
@@ -394,7 +452,9 @@ export async function renderListCards(list: ListCard, groupLogoSrc?: string): Pr
 
   // Names keep their size; long ones take a second line instead of shrinking.
   const measureNames = (colW: number) => {
-    const lines = list.names.map((n) => wrap(probe.ctx, n, colW - NUM_W - 24, 800, NAME_SIZE, DISPLAY));
+    const lines = list.names.map((n) =>
+      wrap(probe.ctx, n, colW - NUM_W - 24, 800, NAME_SIZE, DISPLAY),
+    );
     return { lines, heights: lines.map((l) => l.length * NAME_LH + ROW_PAD * 2) };
   };
 
@@ -461,11 +521,16 @@ const LOGO = 150;
 const BLOCK_PAD = 30;
 const BLOCK_GAP = 26;
 
-export async function renderListaoCards(today: string, items: ListaoItem[], groupLogoSrc?: string): Promise<CardImage[]> {
+export async function renderListaoCards(
+  today: string,
+  items: ListaoItem[],
+  groupLogoSrc?: string,
+): Promise<CardImage[]> {
   await loadFonts();
   const groupLogo = await loadImage(groupLogoSrc);
   const logos = new Map<string, HTMLImageElement | null>();
-  for (const it of items) if (it.kind === "shop" && !logos.has(it.id)) logos.set(it.id, await loadImage(it.logo));
+  for (const it of items)
+    if (it.kind === "shop" && !logos.has(it.id)) logos.set(it.id, await loadImage(it.logo));
   const probe = newCanvas(groupLogo);
   const textW = CONTENT_W - 2 * BLOCK_PAD - LOGO - 30;
   const layout = items.map((it) => {
@@ -475,17 +540,24 @@ export async function renderListaoCards(today: string, items: ListaoItem[], grou
     const textH = name.length * 62 + 8 + note.length * 42;
     return { it, name, note, h: Math.max(LOGO, textH) + 2 * BLOCK_PAD };
   });
-  const active = items.filter((i) => i.kind === "shop" && i.note.startsWith("Em divulgação")).length;
+  const active = items.filter(
+    (i) => i.kind === "shop" && i.note.startsWith("Em divulgação"),
+  ).length;
   const subtitle = `${formatDateBR(today)} · ${shopsLabel(active)}`;
   const top = contentTop(probe, "Listão da Alegria", subtitle);
   const cap = FOOTER_TOP - 20 - top;
-  const pages = paginate(layout.map((l) => l.h), () => cap, BLOCK_GAP);
+  const pages = paginate(
+    layout.map((l) => l.h),
+    () => cap,
+    BLOCK_GAP,
+  );
   // A "Agendados" title never ends a picture on its own.
   for (let p = 0; p < pages.length - 1; p++) {
     const page = pages[p] ?? [];
     const last = page[page.length - 1];
     const next = pages[p + 1];
-    if (last !== undefined && next && page.length > 1 && layout[last]?.it.kind === "section") next.unshift(page.pop()!);
+    if (last !== undefined && next && page.length > 1 && layout[last]?.it.kind === "section")
+      next.unshift(page.pop()!);
   }
 
   const out: CardImage[] = [];
@@ -498,7 +570,14 @@ export async function renderListaoCards(today: string, items: ListaoItem[], grou
       ctx.fillStyle = pal.muted;
       ctx.textAlign = "center";
       setFont(ctx, 700, 44, SANS);
-      drawLines(ctx, wrap(ctx, "Nenhum comércio em divulgação hoje", CONTENT_W, 700, 44, SANS), W / 2, y + 120, 56, 44);
+      drawLines(
+        ctx,
+        wrap(ctx, "Nenhum comércio em divulgação hoje", CONTENT_W, 700, 44, SANS),
+        W / 2,
+        y + 120,
+        56,
+        44,
+      );
       ctx.textAlign = "left";
     }
     for (const i of pages[p] ?? []) {
@@ -613,7 +692,10 @@ function divider(k: Kit, y: number, width = 360) {
   ctx.restore();
 }
 
-export async function renderWinnerCard(card: WinnerCard, groupLogoSrc?: string): Promise<CardImage> {
+export async function renderWinnerCard(
+  card: WinnerCard,
+  groupLogoSrc?: string,
+): Promise<CardImage> {
   await loadFonts();
   const k = newCanvas(await loadImage(groupLogoSrc));
   const logo = await loadImage(card.merchantLogo);
@@ -626,19 +708,57 @@ export async function renderWinnerCard(card: WinnerCard, groupLogoSrc?: string):
   // From roomy to compact: the first layout that fits the picture wins, so long names
   // and prizes get smaller instead of running into the signature.
   const layouts = [
-    { trophy: 140, winner: [150, 136, 124, 112, 100, 90, 80, 72], prize: [72, 66, 60, 54, 48], logo: 170, gap: 1 },
-    { trophy: 110, winner: [120, 110, 100, 90, 80, 72, 64], prize: [60, 54, 48, 44, 40], logo: 130, gap: 0.75 },
-    { trophy: 80, winner: [96, 88, 80, 72, 64, 58], prize: [50, 46, 42, 38, 34], logo: 104, gap: 0.5 },
+    {
+      trophy: 140,
+      winner: [150, 136, 124, 112, 100, 90, 80, 72],
+      prize: [72, 66, 60, 54, 48],
+      logo: 170,
+      gap: 1,
+    },
+    {
+      trophy: 110,
+      winner: [120, 110, 100, 90, 80, 72, 64],
+      prize: [60, 54, 48, 44, 40],
+      logo: 130,
+      gap: 0.75,
+    },
+    {
+      trophy: 80,
+      winner: [96, 88, 80, 72, 64, 58],
+      prize: [50, 46, 42, 38, 34],
+      logo: 104,
+      gap: 0.5,
+    },
   ];
   const plan = (l: (typeof layouts)[number]) => {
     const winner = fitText(card.winner, textW, 3, l.winner, measurer(ctx, 800, DISPLAY));
     const prize = fitText(card.prize, textW, 3, l.prize, measurer(ctx, 800, DISPLAY));
-    const shop = fitText(card.merchantName, textW, 2, [52, 46, 42, 38, 34], measurer(ctx, 800, DISPLAY));
+    const shop = fitText(
+      card.merchantName,
+      textW,
+      2,
+      [52, 46, 42, 38, 34],
+      measurer(ctx, 800, DISPLAY),
+    );
     const g = (n: number) => n * l.gap;
     const trophyArea = l.trophy * 1.75; // rays and halo reach above the cup
     const height =
-      trophyArea + g(20) + 46 + 12 + winner.lines.length * winner.size * 1.05 + g(44) + 20 + g(40) +
-      40 + 10 + prize.lines.length * prize.size * 1.15 + g(48) + 40 + 18 + l.logo + 18 +
+      trophyArea +
+      g(20) +
+      46 +
+      12 +
+      winner.lines.length * winner.size * 1.05 +
+      g(44) +
+      20 +
+      g(40) +
+      40 +
+      10 +
+      prize.lines.length * prize.size * 1.15 +
+      g(48) +
+      40 +
+      18 +
+      l.logo +
+      18 +
       shop.lines.length * shop.size * 1.15;
     return { l, winner, prize, shop, g, trophyArea, height };
   };
@@ -685,10 +805,16 @@ export async function renderWinnerCard(card: WinnerCard, groupLogoSrc?: string):
   setFont(ctx, 800, shop.size, DISPLAY);
   drawLines(ctx, shop.lines, W / 2, y, shopLH, shop.size);
   ctx.textAlign = "left";
-  return toFile(k.canvas, cardFileName("ganhador", card.date, 0, 1, card.label ? card.round : undefined));
+  return toFile(
+    k.canvas,
+    cardFileName("ganhador", card.date, 0, 1, card.label ? card.round : undefined),
+  );
 }
 
-export async function renderSummaryCards(card: SummaryCard, groupLogoSrc?: string): Promise<CardImage[]> {
+export async function renderSummaryCards(
+  card: SummaryCard,
+  groupLogoSrc?: string,
+): Promise<CardImage[]> {
   await loadFonts();
   const groupLogo = await loadImage(groupLogoSrc);
   const logos = await Promise.all(card.rows.map((r) => loadImage(r.merchantLogo)));
@@ -696,15 +822,33 @@ export async function renderSummaryCards(card: SummaryCard, groupLogoSrc?: strin
   const L = 110;
   const textW = CONTENT_W - 60 - L - 26;
   const layout = card.rows.map((r) => {
-    const head = wrap(probe.ctx, `${r.label.toUpperCase()} · ${r.merchantName}`, textW, 800, 28, SANS);
+    const head = wrap(
+      probe.ctx,
+      `${r.label.toUpperCase()} · ${r.merchantName}`,
+      textW,
+      800,
+      28,
+      SANS,
+    );
     const prize = wrap(probe.ctx, r.prize, textW, 800, 40, DISPLAY);
-    const winner = wrap(probe.ctx, r.number ? `Nº ${r.number} · ${r.winner}` : r.winner, CONTENT_W - 60 - 72, 800, 60, DISPLAY);
+    const winner = wrap(
+      probe.ctx,
+      r.number ? `Nº ${r.number} · ${r.winner}` : r.winner,
+      CONTENT_W - 60 - 72,
+      800,
+      60,
+      DISPLAY,
+    );
     const topH = Math.max(L, head.length * 38 + 6 + prize.length * 48);
     return { head, prize, winner, topH, h: 30 + topH + 24 + winner.length * 68 + 30 };
   });
   const subtitle = `${formatDateBR(card.date)} · ${card.rows.length} cortesias`;
   const top = contentTop(probe, "Resultado do sorteio", subtitle);
-  const pages = paginate(layout.map((l) => l.h), () => FOOTER_TOP - 20 - top, 24);
+  const pages = paginate(
+    layout.map((l) => l.h),
+    () => FOOTER_TOP - 20 - top,
+    24,
+  );
 
   const out: CardImage[] = [];
   for (let p = 0; p < pages.length; p++) {
@@ -748,6 +892,65 @@ export async function renderSummaryCards(card: SummaryCard, groupLogoSrc?: strin
     out.push(await toFile(k.canvas, cardFileName("resumo", card.date, p, pages.length)));
   }
   return out;
+}
+
+/** E08: the riddle art (no answer) or the answer art (answer in big letters). */
+export async function renderRiddleCard(
+  card: RiddleCard,
+  groupLogoSrc?: string,
+): Promise<CardImage> {
+  await loadFonts();
+  const k = newCanvas(await loadImage(groupLogoSrc));
+  const img = await loadImage(card.image);
+  const { ctx, pal } = k;
+  drawFrame(k);
+  let y = drawHeader(
+    k,
+    card.kind === "enigma" ? "Enigma Premiado" : "Resposta do Enigma",
+    formatDateBR(card.date),
+    null,
+  );
+  const room = FOOTER_TOP - 30 - y;
+  ctx.textAlign = "center";
+  const head = fitText(
+    card.kind === "enigma" ? card.headline.toUpperCase() : card.headline,
+    CONTENT_W - 40,
+    3,
+    card.kind === "enigma" ? [56, 50, 44] : [140, 120, 104, 90, 78, 66],
+    measurer(ctx, 800, DISPLAY),
+  );
+  const body = card.text
+    ? fitText(card.text, CONTENT_W - 40, 8, [64, 58, 52, 46, 40, 36], measurer(ctx, 800, DISPLAY))
+    : null;
+  const headH = head.lines.length * head.size * 1.1;
+  const bodyH = body ? body.lines.length * body.size * 1.2 + 40 : 0;
+  const imgMax = Math.max(0, room - headH - bodyH - 80);
+  let iw = 0;
+  let ih = 0;
+  if (img && imgMax > 120) {
+    const scale = Math.min(CONTENT_W / img.width, imgMax / img.height);
+    iw = img.width * scale;
+    ih = img.height * scale;
+  }
+  y += Math.max(0, (room - headH - bodyH - (ih ? ih + 40 : 0)) / 2);
+  ctx.fillStyle = pal.gold;
+  setFont(ctx, 800, head.size, DISPLAY);
+  drawLines(ctx, head.lines, W / 2, y, head.size * 1.1, head.size);
+  y += headH + 40;
+  if (img && ih) {
+    ctx.drawImage(img, (W - iw) / 2, y, iw, ih);
+    ctx.strokeStyle = pal.gold;
+    ctx.lineWidth = 6;
+    ctx.strokeRect((W - iw) / 2, y, iw, ih);
+    y += ih + 40;
+  }
+  if (body) {
+    ctx.fillStyle = pal.ink;
+    setFont(ctx, 800, body.size, DISPLAY);
+    drawLines(ctx, body.lines, W / 2, y, body.size * 1.2, body.size);
+  }
+  ctx.textAlign = "left";
+  return toFile(k.canvas, cardFileName(card.kind, card.date));
 }
 
 export function releaseCards(cards: CardImage[]) {

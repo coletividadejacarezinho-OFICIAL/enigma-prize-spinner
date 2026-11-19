@@ -6,6 +6,7 @@
 import { cleanName, entriesFromNames, formatDateBR, newId, normalizeForCompare } from "./logic";
 import {
   BOT_CLOSE_TIME,
+  BOT_OPEN_TIME,
   BOT_TIME_ZONE,
   type BotMessage,
   type BotOutcome,
@@ -69,11 +70,16 @@ export function removeEntry(entries: Entry[], id: string): Entry[] {
 }
 
 /** "Confirmar acerto": the entry joins the ready list, optionally with a new display name. */
-export function confirmEntry(entries: Entry[], id: string, name?: string): Entry[] {
+export function confirmEntry(entries: Entry[], id: string, name?: string, checkedAt?: number): Entry[] {
   return entries.map((e) => {
     if (e.id !== id) return e;
     const { reason: _done, ...rest } = e;
-    return { ...rest, status: "ready", ...(name ? { name: cleanName(name) } : {}) };
+    return {
+      ...rest,
+      status: "ready",
+      ...(name ? { name: cleanName(name) } : {}),
+      ...(checkedAt !== undefined ? { checkedAt } : {}),
+    };
   });
 }
 
@@ -142,12 +148,32 @@ export function jacarezinhoTime(now: Date = new Date()): string {
   return `${h}:${m}`;
 }
 
-/** The bot only takes messages that arrive before the close time; 19:30 itself is already late. */
+/** Time-only check kept for older callers; `windowState()` also checks the opening time and weekday. */
 export function botWindowOpen(time: string): boolean {
   return time < BOT_CLOSE_TIME;
 }
 
-export type BotInput = { name: string; senderId: string; time: string; situation: BotSituation };
+export type WindowState = "antes" | "aberta" | "encerrada" | "fora-do-dia";
+
+/** Monday–Friday, 19:00 up to 19:29; 19:30 is already closed. */
+export function windowState(day: string, time: string): WindowState {
+  const d = new Date(`${day}T12:00:00Z`).getUTCDay();
+  if (Number.isNaN(d) || d === 0 || d === 6) return "fora-do-dia";
+  if (time < BOT_OPEN_TIME) return "antes";
+  if (time < BOT_CLOSE_TIME) return "aberta";
+  return "encerrada";
+}
+
+export type BotInput = {
+  name: string;
+  senderId: string;
+  time: string;
+  situation: BotSituation;
+  /** E08: simulated event id; the same event again never adds a spot. */
+  eventId?: string;
+  /** Day it arrived (YYYY-MM-DD); missing = the draw's date. */
+  day?: string;
+};
 
 /**
  * A simulated bot message for one draw. Never touches a spun draw.
@@ -166,15 +192,21 @@ export function receiveBotMessage(
   const time = cleanTime(input.time) ?? input.time;
   const entries = entriesOf(draw);
   if (draw.result) return { draw, outcome: "fora-do-prazo" };
+  const eventId = input.eventId ? cleanName(input.eventId) : "";
+  const day = input.day ?? draw.date;
+  const win = windowState(day, time);
 
   let outcome: BotOutcome;
   let match: Entry | undefined;
   let next = entries;
-  const repeated = entries.find((e) => e.senderIds?.includes(senderId));
-  if (repeated) {
+  const sameEvent = eventId ? (draw.botMessages ?? []).some((m) => m.eventId === eventId) : false;
+  const repeated = sameEvent
+    ? entries.find((e) => e.eventId === eventId)
+    : entries.find((e) => e.senderIds?.includes(senderId));
+  if (sameEvent || repeated) {
     outcome = "repetida";
     match = repeated;
-  } else if (!botWindowOpen(time)) {
+  } else if (win !== "aberta") {
     outcome = "fora-do-prazo";
   } else {
     match = entries.find((e) => similarNames(e.name, name));
@@ -186,6 +218,8 @@ export function receiveBotMessage(
       senderIds: [senderId],
       botTime: time,
       botSituation: input.situation,
+      botDay: day,
+      ...(eventId ? { eventId } : {}),
       addedAt: now,
     };
     if (match) {
@@ -198,7 +232,18 @@ export function receiveBotMessage(
     outcome = entry.status === "ready" ? "entrou" : "revisao";
     next = [...entries, entry];
   }
-  const log: BotMessage = { id: newId(), name, senderId, time, situation: input.situation, outcome, at: now };
+  const log: BotMessage = {
+    id: newId(),
+    name,
+    senderId,
+    time,
+    situation: input.situation,
+    outcome,
+    at: now,
+    day,
+    window: win,
+    ...(eventId ? { eventId } : {}),
+  };
   return {
     draw: { ...draw, entries: next, botMessages: [...(draw.botMessages ?? []), log] },
     outcome,
@@ -255,5 +300,5 @@ export const BOT_OUTCOME_LABEL: Record<BotOutcome, string> = {
   entrou: "Entrou na lista",
   revisao: "Foi para Revisar pendências",
   repetida: "Mensagem repetida: nenhuma vaga nova",
-  "fora-do-prazo": `Chegou às ${BOT_CLOSE_TIME} ou depois: ficou fora da lista`,
+  "fora-do-prazo": "Fora do horário (segunda a sexta, 19h00 às 19h29): ficou fora da lista",
 };

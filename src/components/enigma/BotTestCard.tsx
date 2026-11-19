@@ -21,6 +21,12 @@ import {
   type BotSituation,
 } from "@/lib/enigma/types";
 
+const WINDOW_SHORT = {
+  antes: "antes das 19h",
+  encerrada: "depois das 19h29",
+  "fora-do-dia": "fora de segunda a sexta",
+} as const;
+
 const field =
   "h-12 w-full min-w-0 rounded-xl border-2 border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-hidden";
 
@@ -36,6 +42,8 @@ export function BotTestCard({ state }: { state: AppState }) {
   const [name, setName] = useState("");
   const [senderId, setSenderId] = useState("Teste 001");
   const [time, setTime] = useState("19:29");
+  const [eventId, setEventId] = useState("Evento 001");
+  const [day, setDay] = useState("");
   const [situation, setSituation] = useState<BotSituation>("acertou");
   const [last, setLast] = useState<BotInput | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -75,7 +83,11 @@ export function BotTestCard({ state }: { state: AppState }) {
 
   const submit = async () => {
     if (!canSend || !validTime) return;
-    if (!(await send({ name, senderId, time: validTime, situation }))) return;
+    const d = day || draw.date;
+    if (!(await send({ name, senderId, time: validTime, situation, eventId, day: d }))) return;
+    const ev = /^(.*?)(\d+)$/.exec(cleanName(eventId));
+    if (ev)
+      setEventId(`${ev[1] ?? ""}${String(Number(ev[2]) + 1).padStart(ev[2]?.length ?? 3, "0")}`);
     // Next fictitious sender, so a new message is a new person unless "Repetir" is used.
     const m = /^(.*?)(\d+)$/.exec(cleanName(senderId));
     if (m) setSenderId(`${m[1] ?? ""}${String(Number(m[2]) + 1).padStart(m[2]?.length ?? 3, "0")}`);
@@ -140,15 +152,15 @@ export function BotTestCard({ state }: { state: AppState }) {
         <label className="block text-sm font-bold" htmlFor="bot-time">
           Horário (Jacarezinho)
         </label>
-        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-1">
-          <input
-            id="bot-time"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className={field}
-          />
-          {["19:29", "19:30"].map((t) => (
+        <input
+          id="bot-time"
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className={`${field} mt-1`}
+        />
+        <div className="mt-1 grid grid-cols-5 gap-1">
+          {["18:59", "19:00", "19:29", "19:30"].map((t) => (
             <button
               key={t}
               onClick={() => setTime(t)}
@@ -164,6 +176,27 @@ export function BotTestCard({ state }: { state: AppState }) {
             Agora
           </button>
         </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="block text-sm font-bold">
+          ID do evento
+          <input
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            className={`${field} mt-1`}
+            autoComplete="off"
+          />
+        </label>
+        <label className="block text-sm font-bold">
+          Dia que chegou
+          <input
+            type="date"
+            value={day || draw.date}
+            onChange={(e) => setDay(e.target.value)}
+            className={`${field} mt-1 [color-scheme:dark]`}
+          />
+        </label>
       </div>
 
       <fieldset className="mt-3">
@@ -213,8 +246,9 @@ export function BotTestCard({ state }: { state: AppState }) {
       </p>
 
       <p className="mt-1 text-xs text-muted-foreground">
-        A entrada pelo bot fecha às {BOT_CLOSE_TIME}. O que chegou antes pode ser conferido depois,
-        e você continua podendo digitar quem acertou no prazo, na aba Nomes.
+        Recebe de segunda a sexta, das 19h00 às 19h29; às {BOT_CLOSE_TIME} já está encerrado.
+        Repetir o mesmo ID do evento não cria outra inscrição. O que chegou antes pode ser conferido
+        depois, e você continua podendo digitar quem acertou no prazo, na aba Nomes.
       </p>
 
       {log.length > 0 && (
@@ -226,10 +260,14 @@ export function BotTestCard({ state }: { state: AppState }) {
                 <span className="font-bold">
                   {m.time} · {m.name}
                 </span>{" "}
+                {m.eventId && <span className="text-muted-foreground">[{m.eventId}] </span>}
                 <span className="text-muted-foreground">
                   ({m.senderId}, {m.situation === "acertou" ? "Acertou" : "A conferir"})
                 </span>
-                <span className="block text-muted-foreground">{BOT_OUTCOME_LABEL[m.outcome]}</span>
+                <span className="block text-muted-foreground">
+                  {BOT_OUTCOME_LABEL[m.outcome]}
+                  {m.window && m.window !== "aberta" ? ` · ${WINDOW_SHORT[m.window]}` : ""}
+                </span>
               </li>
             ))}
           </ul>

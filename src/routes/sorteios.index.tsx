@@ -1,7 +1,15 @@
 import type { Draw } from "@/lib/enigma/types";
+import {
+  jacarezinhoNow,
+  roundStage,
+  SCHEDULE_TEXT,
+  STAGE_LABEL,
+  WINDOW_TEXT,
+  windowState,
+} from "@/lib/enigma/agenda";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
-import { ChevronRight, Megaphone, Pencil, Plus, Trophy, Video } from "lucide-react";
+import { ChevronRight, Clock, Megaphone, Pencil, Plus, Trophy, Video } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -56,19 +64,24 @@ function Sorteios() {
   const today = todayISO();
   const listao = buildListao(state, today);
   const count = listao.active.length;
-  const byNewest = [...state.draws].sort((a, b) => b.createdAt - a.createdAt);
+  // Agenda: newest date first; several draws on the same date stay apart.
+  const byNewest = [...state.draws].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  const now = jacarezinhoNow();
+  const win = windowState(now.day, now.time);
   // Rehearsal draws never enter the official history.
   const official = byNewest.filter((d) => !d.isSample);
   const rehearsals = byNewest.filter((d) => d.isSample);
   const renderDraw = (d: Draw) => {
     const isCurrent = d.id === state.currentId;
     const m = merchantOf(state.merchants, d);
+    const st = roundStage(d);
     return (
       <li key={d.id} className={cn("rounded-2xl bg-card", isCurrent && "ring-2 ring-gold")}>
         <div className="flex gap-1">
           <Link
-            to="/sorteios/ver/$drawId"
-            params={{ drawId: d.id }}
+            {...(d.draft
+              ? { to: "/sorteios/editar/$drawId" as const, params: { drawId: d.id } }
+              : { to: "/sorteios/ver/$drawId" as const, params: { drawId: d.id } })}
             className="flex min-w-0 flex-1 gap-3 rounded-2xl p-3 text-left active:bg-secondary"
           >
             <MerchantLogo src={m.logo} className="h-12 w-12" />
@@ -81,11 +94,14 @@ function Sorteios() {
                   <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold">
                     Sorteio de teste
                   </span>
-                ) : d.confirmed ? null : (
+                ) : d.confirmed || d.draft ? null : (
                   <span className="rounded-full border border-gold/70 px-2 py-0.5 text-xs font-semibold text-gold">
-                    Rascunho · aguardando confirmação
+                    Cortesia a confirmar
                   </span>
                 )}
+                <span data-testid="stage" className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold text-gold">
+                  {STAGE_LABEL[st.stage]}
+                </span>
                 {isCurrent && (
                   <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
                     Na roleta agora
@@ -104,6 +120,7 @@ function Sorteios() {
                   )}
                 </div>
               ))}
+              <p className="mt-1 text-sm font-semibold">{st.next}</p>
               {d.result && d.extraPrizes?.length ? null : d.result ? (
                 <p className="mt-1 flex items-center gap-1.5 font-bold text-gold">
                   <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -207,8 +224,16 @@ function Sorteios() {
 
         {tab === "sorteios" ? (
           <div role="tabpanel">
+            <section className="mt-4 rounded-2xl bg-card p-3" data-testid="schedule">
+              <p className="flex items-center gap-2 font-bold">
+                <Clock className="h-4 w-4 text-gold" aria-hidden="true" /> {SCHEDULE_TEXT}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Agora {now.time}: {WINDOW_TEXT[win]}
+              </p>
+            </section>
             <GoldButton onClick={() => navigate({ to: "/sorteios/novo" })} className="mt-4">
-              <Plus aria-hidden="true" /> Novo sorteio
+              <Plus aria-hidden="true" /> Nova rodada
             </GoldButton>
             <ul className="mt-4 space-y-2">{official.map(renderDraw)}</ul>
             {rehearsals.length > 0 && (

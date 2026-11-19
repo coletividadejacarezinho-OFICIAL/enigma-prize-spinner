@@ -1,3 +1,4 @@
+import { jacarezinhoNow, roundStage, STAGE_LABEL, WINDOW_TEXT, windowState } from "@/lib/enigma/agenda";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bot, ClipboardCheck, ClipboardPaste, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -87,6 +88,9 @@ type Diff =
   | { mode: "pending"; matchId: string; pendingId: string; first: string; second: string };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Time the organizer checked an answer, in Jacarezinho. */
+const hhmm = (at: number) => jacarezinhoNow(new Date(at)).time;
 
 function Nomes() {
   const state = useAppState();
@@ -230,7 +234,7 @@ function Nomes() {
     } else {
       if (
         !(await save((list) =>
-          confirmEntry(renameEntry(list, diff.matchId, first), diff.pendingId, second),
+          confirmEntry(renameEntry(list, diff.matchId, first), diff.pendingId, second, Date.now()),
         ))
       )
         return;
@@ -256,7 +260,7 @@ function Nomes() {
       });
       return;
     }
-    if (!(await save((list) => confirmEntry(list, e.id)))) return;
+    if (!(await save((list) => confirmEntry(list, e.id, undefined, Date.now())))) return;
     toast.success(`${e.name} entrou na lista.`);
     if (pending.length <= 1) setReviewOpen(false);
   };
@@ -308,6 +312,8 @@ function Nomes() {
   };
 
   const pastedCount = parsePastedList(pasteText).length;
+  const stage = roundStage(draw);
+  const nowJ = jacarezinhoNow();
   const showShare = locked || draw.names.length > 0 || canConfirm;
   const hint = locked
     ? null
@@ -381,6 +387,13 @@ function Nomes() {
           {locked
             ? `${plural(draw.names.length, "pessoa", "pessoas")} no sorteio`
             : `${plural(ready.length, "pessoa pronta", "pessoas prontas")} para o sorteio`}
+        </p>
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="list-stage">
+          <span className="rounded-full bg-secondary px-2 py-0.5 font-bold text-gold">{STAGE_LABEL[stage.stage]}</span>
+          <span className="text-muted-foreground">{stage.next}</span>
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="window-now">
+          {WINDOW_TEXT[windowState(nowJ.day, nowJ.time)]} Cadastro à mão sempre disponível.
         </p>
 
         {!locked && pending.length > 0 && (
@@ -460,7 +473,8 @@ function Nomes() {
                         {entry.source === "bot" && (
                           <p className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Bot className="h-3.5 w-3.5" aria-hidden="true" /> Pelo bot (teste)
-                            {entry.botTime ? ` · ${entry.botTime}` : ""}
+                            {entry.botTime ? ` · chegou ${entry.botTime}` : ""}
+                            {entry.checkedAt ? ` · conferido ${hhmm(entry.checkedAt)}` : ""}
                           </p>
                         )}
                       </div>

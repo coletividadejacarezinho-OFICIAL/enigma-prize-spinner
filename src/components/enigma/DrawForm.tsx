@@ -15,7 +15,8 @@ import {
 import { createMerchant, newId, normalizeForCompare, todayISO } from "@/lib/enigma/logic";
 import { report } from "@/lib/enigma/feedback";
 import { repo } from "@/lib/enigma/repo";
-import type { Merchant } from "@/lib/enigma/types";
+import type { Merchant, Riddle } from "@/lib/enigma/types";
+import { RiddleFields } from "./RiddleFields";
 import { cn } from "@/lib/utils";
 
 export type PrizeRow = {
@@ -35,6 +36,7 @@ export type DrawFormValues = {
   confirmed: boolean | null;
   /** Only asked with two or more courtesies. */
   repeatWinners: boolean | null;
+  riddle: Riddle;
 };
 
 export const emptyPrize = (): PrizeRow => ({ key: newId(), merchantId: "", prize: "" });
@@ -84,7 +86,7 @@ function Choice<T>({
 
 export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
   const [values, setValues] = useState<DrawFormValues>(
-    initial ?? { date: "", prizes: [emptyPrize()], confirmed: null, repeatWinners: null },
+    initial ?? { date: "", prizes: [emptyPrize()], confirmed: null, repeatWinners: null, riddle: {} },
   );
   const [tried, setTried] = useState(false);
   // Which courtesy is choosing its company, and whether the dialog shows the sign-up form.
@@ -105,11 +107,13 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
   const rowOk = (p: PrizeRow) => merchants.some((m) => m.id === p.merchantId) && !!p.prize.trim();
   const submit = (intent: string) => {
     setTried(true);
+    // A draft only needs the date and the courtesies; the rest can wait.
+    const draft = intent === "draft";
     if (
       !values.date ||
       !values.prizes.every(rowOk) ||
-      values.confirmed === null ||
-      (multi && values.repeatWinners === null)
+      (!draft && values.confirmed === null) ||
+      (!draft && multi && values.repeatWinners === null)
     ) {
       toast.error("Falta preencher alguma coisa. Confira os campos em vermelho.");
       return;
@@ -118,7 +122,7 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
       {
         ...values,
         prizes: values.prizes.map((p) => ({ ...p, prize: p.prize.trim() })),
-        confirmed: values.confirmed,
+        confirmed: values.confirmed ?? false,
       },
       intent,
     );
@@ -165,6 +169,8 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
             className={`${fieldClass} [color-scheme:dark]`}
           />
         </label>
+
+        <RiddleFields value={values.riddle} onChange={(riddle) => set({ riddle })} />
 
         <div className="space-y-3">
           {values.prizes.map((row, i) => {

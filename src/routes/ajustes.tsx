@@ -90,7 +90,29 @@ function Ajustes() {
 
         <SoundCard state={state} />
 
-        <BotTestCard state={state} />
+        <section className="rounded-2xl border-2 border-dashed border-gold/60 p-3" data-testid="demo-tools">
+          <button
+            role="switch"
+            aria-checked={!!state.demoTools}
+            onClick={() => void repo.setPreferences({ demoTools: !state.demoTools }).then((r) => report(r))}
+            className="flex min-h-12 w-full items-center justify-between gap-2 text-left font-bold"
+          >
+            <span>
+              Ferramentas de demonstração
+              <span className="block text-sm font-normal text-muted-foreground">
+                Simulador do bot, convite de exemplo e público fictício. Fora da rotina oficial; nada é enviado.
+              </span>
+            </span>
+            <span className={state.demoTools ? "shrink-0 text-gold" : "shrink-0 text-muted-foreground"}>
+              {state.demoTools ? "Ligadas" : "Desligadas"}
+            </span>
+          </button>
+          {state.demoTools && (
+            <div className="mt-2">
+              <BotTestCard state={state} />
+            </div>
+          )}
+        </section>
 
         <BackupCard />
 

@@ -2,8 +2,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
+import { cleanRiddle } from "@/components/enigma/RiddleFields";
 import { DrawForm } from "@/components/enigma/DrawForm";
-import { GoldButton } from "@/components/enigma/GoldButton";
+import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { newId } from "@/lib/enigma/logic";
 import { applyPrizes, roundsOf } from "@/lib/enigma/rounds";
 import { report } from "@/lib/enigma/feedback";
@@ -42,7 +43,7 @@ function EditarSorteio() {
       >
         <ChevronLeft className="h-5 w-5" aria-hidden="true" /> Voltar
       </Link>
-      <h1 className="mb-4 text-3xl font-extrabold">Editar sorteio</h1>
+      <h1 className="mb-4 text-3xl font-extrabold">{draw?.draft ? "Rascunho da rodada" : "Editar sorteio"}</h1>
       {!draw ? (
         <p className="text-muted-foreground">Esse sorteio não foi encontrado neste aparelho.</p>
       ) : (
@@ -59,8 +60,9 @@ function EditarSorteio() {
             })),
             confirmed: draw.confirmed ?? null,
             repeatWinners: draw.repeatWinners ?? null,
+            riddle: draw.riddle ?? {},
           }}
-          onSubmit={async (v) => {
+          onSubmit={async (v, intent) => {
             const prizes = v.prizes.map((p) => ({
               ...(p.id ? { id: p.id } : {}),
               merchant: state.merchants.find((m) => m.id === p.merchantId),
@@ -73,9 +75,11 @@ function EditarSorteio() {
                 prizes.flatMap((p) => (p.merchant ? [{ ...p, merchant: p.merchant }] : [])),
                 newId,
               );
-              const { repeatWinners: _r, ...rest } = next;
+              const { repeatWinners: _r, riddle: _q, ...rest } = next;
+              const riddle = cleanRiddle(v.riddle);
               return {
                 ...rest,
+                ...(riddle ? { riddle } : {}),
                 date: v.date,
                 confirmed: v.confirmed,
                 // The repeat answer can't change once a round was drawn.
@@ -89,10 +93,27 @@ function EditarSorteio() {
               };
             });
             if (!report(ok)) return;
-            toast.success("Sorteio atualizado.");
+            if (draw.draft && intent === "primary") {
+              if (!report(await repo.launchDraft(draw.id))) return;
+              toast.success("Rodada lançada. Agora é só lançar os nomes.");
+              navigate({ to: "/nomes" });
+              return;
+            }
+            toast.success(draw.draft ? "Rascunho salvo." : "Sorteio atualizado.");
             navigate({ to: "/sorteios" });
           }}
-          actions={() => <GoldButton type="submit">Salvar alterações</GoldButton>}
+          actions={(submit) =>
+            draw.draft ? (
+              <>
+                <GoldButton type="submit">Lançar rodada</GoldButton>
+                <SecondaryButton type="button" onClick={() => submit("draft")}>
+                  Salvar rascunho
+                </SecondaryButton>
+              </>
+            ) : (
+              <GoldButton type="submit">Salvar alterações</GoldButton>
+            )
+          }
         />
       )}
     </div>

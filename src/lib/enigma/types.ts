@@ -65,6 +65,11 @@ export type Entry = {
   /** Bot entries: "HH:MM" in Jacarezinho and what the bot said. */
   botTime?: string;
   botSituation?: BotSituation;
+  /** E08: simulated event id (repeat = same entry) and when the organizer checked the answer. */
+  eventId?: string;
+  /** Day the guess arrived (YYYY-MM-DD, Jacarezinho); its time is `botTime`. */
+  botDay?: string;
+  checkedAt?: number;
   addedAt: number;
 };
 
@@ -79,7 +84,21 @@ export type BotMessage = {
   situation: BotSituation;
   outcome: BotOutcome;
   at: number;
+  eventId?: string;
+  day?: string;
+  window?: "antes" | "aberta" | "encerrada" | "fora-do-dia";
 };
+
+/** E08: the day's riddle. The answer and its image never go into the riddle's own art. */
+export type Riddle = {
+  text?: string;
+  image?: string;
+  answer?: string;
+  answerImage?: string;
+};
+
+/** E08: a courtesy handed to its winner; never changes the result. */
+export type Delivery = { roundId: string; at: number };
 
 /** A courtesy after the first one; the first stays in the draw's own merchant/prize/result fields. */
 export type Prize = {
@@ -119,6 +138,12 @@ export type Draw = {
   /** Round the Roleta shows (0-based); moves on only through "Sortear próxima cortesia". */
   shownRound?: number;
   recordings?: Recording[];
+  /** E08: still being prepared; not on the Roleta until "Lançar rodada". */
+  draft?: true;
+  riddle?: Riddle;
+  deliveries?: Delivery[];
+  /** Draw this one was copied from ("Usar como modelo"). */
+  templateOf?: string;
   createdAt: number;
 };
 
@@ -131,6 +156,8 @@ export type AppState = {
   sound: boolean;
   /** Spin track volume 0..1 (E06); missing = 0.7. */
   volume?: number;
+  /** E08: show the bot simulator, demo invites and fictitious audience (off = official routine only). */
+  demoTools?: boolean;
   /** Test recording in progress, kept so switching tabs doesn't stop it. */
   recording?: RecordingSession;
 };
@@ -140,6 +167,8 @@ export const APP_NAME = "Enigma Premiado";
 export const MIN_NAMES_TO_SPIN = 2;
 /** Bot entries close at this time, Jacarezinho (America/Sao_Paulo) local time. */
 export const BOT_CLOSE_TIME = "19:30";
+/** Enigma Premiado opens at this time, Monday to Friday. */
+export const BOT_OPEN_TIME = "19:00";
 export const BOT_TIME_ZONE = "America/Sao_Paulo";
 /** Days a confirmed courtesy keeps the shop on the Listão, counting the draw day itself. */
 export const LISTAO_DAYS = 30;

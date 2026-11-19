@@ -67,7 +67,11 @@ export function fitText(
  * keeping their order. `capacity(i)` is the room of group i. An item taller than
  * its group still gets a group of its own, so nothing is ever left out.
  */
-export function paginate(heights: number[], capacity: (group: number) => number, gap = 0): number[][] {
+export function paginate(
+  heights: number[],
+  capacity: (group: number) => number,
+  gap = 0,
+): number[][] {
   const groups: number[][] = [];
   let cur: number[] = [];
   let used = 0;
@@ -103,10 +107,16 @@ export function initials(name: string): string {
   return letters.join("").toUpperCase() || "?";
 }
 
-export type CardKind = "lista" | "listao" | "ganhador" | "resumo";
+export type CardKind = "lista" | "listao" | "ganhador" | "resumo" | "enigma" | "resposta";
 
 /** enigma-lista-2026-11-19-parte-1-de-3.png */
-export function cardFileName(kind: CardKind, date: string, part = 0, parts = 1, round?: number): string {
+export function cardFileName(
+  kind: CardKind,
+  date: string,
+  part = 0,
+  parts = 1,
+  round?: number,
+): string {
   const r = round !== undefined ? `-premio-${round + 1}` : "";
   const p = parts > 1 ? `-parte-${part + 1}-de-${parts}` : "";
   return `enigma-${kind}-${date}${r}${p}.png`;
@@ -125,7 +135,10 @@ export type ListCard = {
 export function listCardData(draw: Draw, merchants: Merchant[]): ListCard {
   return {
     date: draw.date,
-    courtesies: roundsOf(draw, merchants).map((r) => ({ prize: r.prize, merchantName: r.merchantName })),
+    courtesies: roundsOf(draw, merchants).map((r) => ({
+      prize: r.prize,
+      merchantName: r.merchantName,
+    })),
     names: [...draw.names],
   };
 }
@@ -149,7 +162,9 @@ export function listaoCardItems(active: ListaoEntry[], scheduled: ScheduledEntry
     ...(m.logo ? { logo: m.logo } : {}),
     note,
   });
-  const items: ListaoItem[] = active.map((e) => shop(e.merchant, `Em divulgação até ${formatDateBR(e.until)}`));
+  const items: ListaoItem[] = active.map((e) =>
+    shop(e.merchant, `Em divulgação até ${formatDateBR(e.until)}`),
+  );
   if (scheduled.length > 0) {
     items.push({ kind: "section", title: "Agendados" });
     for (const e of scheduled) items.push(shop(e.merchant, `Começa em ${formatDateBR(e.starts)}`));
@@ -177,7 +192,11 @@ export type WinnerCard = {
 };
 
 /** The saved winner of one courtesy; null while that courtesy has not been spun. */
-export function winnerCardData(draw: Draw, merchants: Merchant[], index: number): WinnerCard | null {
+export function winnerCardData(
+  draw: Draw,
+  merchants: Merchant[],
+  index: number,
+): WinnerCard | null {
   const rounds = roundsOf(draw, merchants);
   const r = rounds[index];
   if (!r?.result) return null;
@@ -195,7 +214,14 @@ export function winnerCardData(draw: Draw, merchants: Merchant[], index: number)
 
 export type SummaryCard = {
   date: string;
-  rows: { label: string; winner: string; number: number | null; prize: string; merchantName: string; merchantLogo?: string }[];
+  rows: {
+    label: string;
+    winner: string;
+    number: number | null;
+    prize: string;
+    merchantName: string;
+    merchantLogo?: string;
+  }[];
 };
 
 /** All results together, only for draws with several courtesies once every one is spun. */
@@ -218,10 +244,51 @@ export function summaryCardData(draw: Draw, merchants: Merchant[]): SummaryCard 
 export type WinnerChoice = number | "resumo";
 
 /** What "Compartilhar arte do ganhador" can show: each spun courtesy, then the summary. */
-export function winnerChoices(draw: Draw, merchants: Merchant[]): { id: WinnerChoice; label: string }[] {
+export function winnerChoices(
+  draw: Draw,
+  merchants: Merchant[],
+): { id: WinnerChoice; label: string }[] {
   const rounds = roundsOf(draw, merchants);
   const out: { id: WinnerChoice; label: string }[] = [];
   if (summaryCardData(draw, merchants)) out.push({ id: "resumo", label: "Resumo" });
-  for (const r of rounds) if (r.result) out.push({ id: r.index, label: rounds.length > 1 ? `Prêmio ${r.index + 1}` : "Ganhador" });
+  for (const r of rounds)
+    if (r.result)
+      out.push({ id: r.index, label: rounds.length > 1 ? `Prêmio ${r.index + 1}` : "Ganhador" });
   return out;
+}
+
+// ---------- E08: enigma and answer ----------
+
+/**
+ * "enigma": the riddle for the group — never the answer or its picture.
+ * "resposta": a separate art that highlights the answer.
+ */
+export type RiddleCard = {
+  kind: "enigma" | "resposta";
+  date: string;
+  headline: string;
+  text?: string;
+  image?: string;
+};
+
+export function riddleCardData(draw: Draw, kind: "enigma" | "resposta"): RiddleCard | null {
+  const r = draw.riddle;
+  if (!r) return null;
+  if (kind === "enigma") {
+    if (!r.text && !r.image) return null;
+    return {
+      kind,
+      date: draw.date,
+      headline: "Enigma do dia",
+      ...(r.text ? { text: r.text } : {}),
+      ...(r.image ? { image: r.image } : {}),
+    };
+  }
+  if (!r.answer && !r.answerImage) return null;
+  return {
+    kind,
+    date: draw.date,
+    headline: r.answer ?? "Resposta",
+    ...(r.answerImage ? { image: r.answerImage } : {}),
+  };
 }
