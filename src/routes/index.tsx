@@ -85,7 +85,7 @@ import { numberedList, numberedPool, winnerNumber } from "@/lib/enigma/numbers";
 import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
-import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording, type RecordingMode } from "@/lib/enigma/types";
+import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording, type RecordingMode } from "@/lib/enigma/types";
 import { keepRecording } from "@/lib/enigma/recording-save";
 import { videoFileName } from "@/lib/enigma/videos";
 
