@@ -180,6 +180,7 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
                   return (
                     <text
                       key={`t${i}`}
+                      aria-label={name}
                       x={flip ? 12 : 188}
                       y="100"
                       textAnchor={flip ? "start" : "end"}
