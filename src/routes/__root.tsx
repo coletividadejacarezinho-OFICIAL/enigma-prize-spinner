@@ -155,11 +155,25 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <div className="mx-auto min-h-dvh max-w-md">
+      {/* Opened from the installed icon the app draws under the status bar and gesture area,
+          so the frame keeps content inside the phone's safe area (Roleta full screen pads itself). */}
+      <div
+        className={
+          presenting
+            ? "mx-auto min-h-dvh max-w-md"
+            : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+        }
+      >
         <Outlet />
       </div>
       {!isViewerPage && !presenting && <BottomNav />}
-      <Toaster position="top-center" richColors duration={2500} />
+      <Toaster
+        position="top-center"
+        richColors
+        duration={2500}
+        offset={{ top: "calc(env(safe-area-inset-top) + 16px)" }}
+        mobileOffset={{ top: "calc(env(safe-area-inset-top) + 16px)" }}
+      />
     </QueryClientProvider>
   );
 }

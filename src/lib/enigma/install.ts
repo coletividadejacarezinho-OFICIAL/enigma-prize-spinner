@@ -110,11 +110,13 @@ function snapshot(): InstallView {
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
-  const mq = window.matchMedia("(display-mode: standalone)");
-  mq.addEventListener("change", cb);
+  const queries = ["(display-mode: standalone)", "(display-mode: fullscreen)"].map((q) =>
+    window.matchMedia(q),
+  );
+  queries.forEach((mq) => mq.addEventListener("change", cb));
   return () => {
     listeners.delete(cb);
-    mq.removeEventListener("change", cb);
+    queries.forEach((mq) => mq.removeEventListener("change", cb));
   };
 }
 

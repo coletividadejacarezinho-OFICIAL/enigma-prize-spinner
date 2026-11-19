@@ -35,3 +35,13 @@ describe("Instalar no celular", () => {
     expect(isEditorPreviewHost("enigma-prize-spinner.lovable.app", true)).toBe(true);
   });
 });
+
+import manifest from "../../public/manifest.webmanifest?raw";
+
+describe("Abrir pelo ícone instalado", () => {
+  const m = JSON.parse(manifest) as { display: string; display_override?: string[]; start_url: string };
+  it("asks for full screen, falling back to the app window without the browser bars", () => {
+    expect(m.display).toBe("fullscreen");
+    expect(m.display_override?.slice(0, 2)).toEqual(["fullscreen", "standalone"]);
+  });
+});

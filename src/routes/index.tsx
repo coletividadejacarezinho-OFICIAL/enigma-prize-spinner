@@ -334,7 +334,7 @@ function Roleta() {
       className={
         full
           ? "flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-          : "flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom))] flex-col"
+          : "flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col"
       }
     >
       <AppHeader
@@ -562,7 +562,7 @@ function Roleta() {
 
 function RoletaSkeleton() {
   return (
-    <div className="flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom))] flex-col" aria-busy="true">
+    <div className="flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col" aria-busy="true">
       <div className="h-16" />
       <div className="mx-4 h-[4.5rem] rounded-2xl bg-card" />
       <div className="wheel-box flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-5">

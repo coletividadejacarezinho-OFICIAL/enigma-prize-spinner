@@ -433,7 +433,7 @@ function Nomes() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-16 z-30 mx-auto max-w-md bg-linear-to-t from-background via-background to-transparent px-4 pb-3 pt-6">
+      <div className="fixed inset-x-0 bottom-[calc(4rem_+_env(safe-area-inset-bottom))] z-30 mx-auto max-w-md bg-linear-to-t from-background via-background to-transparent px-4 pb-3 pt-6">
         {hint && <p className="mb-2 text-center text-sm font-semibold text-muted-foreground">{hint}</p>}
         <GoldButton onClick={confirmAndOpen} disabled={!locked && !canConfirm}>
           {locked ? "Ver resultado na roleta" : "Usar estes nomes na roleta"}
