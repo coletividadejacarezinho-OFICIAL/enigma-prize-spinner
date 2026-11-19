@@ -81,7 +81,7 @@ import {
 } from "@/lib/enigma/rounds";
 import { playReveal, prefersReducedMotion, startSpinTrack, stopAllSound, unlockSound } from "@/lib/enigma/sound";
 import { clampVolume } from "@/lib/enigma/jingle";
-import { numberedList, numberedPool, wheelLabels, winnerNumber } from "@/lib/enigma/numbers";
+import { numberedList, numberedPool, winnerNumber } from "@/lib/enigma/numbers";
 import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
@@ -118,7 +118,7 @@ const CALM_MS = 700;
 function Roleta() {
   const state = useAppState();
   const navigate = useNavigate();
-  const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number } | null>(null);
+  const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
   const spinFrameRef = useRef<RecFrame["spin"]>(null);
   const frameRef = useRef<RecFrame | null>(null);
@@ -203,7 +203,6 @@ function Roleta() {
   const minimumNames = minimumNamesForRound(ri);
   // Public numbers come from the confirmed list and stay the same on every courtesy.
   const numbered = numberedPool(draw, ri);
-  const labels = wheelLabels(numbered);
   const result = round.result;
   const resultNumber = winnerNumber(draw, result);
   const done = allRoundsDone(draw);
@@ -223,7 +222,6 @@ function Roleta() {
     prize: round.prize,
     merchant: round.merchantName,
     names: pool,
-    labels,
     rotation: result?.rotation ?? 0,
     spin: spinning ? spinFrameRef.current : null,
     winner: showResult && result ? result.winner : null,
@@ -267,10 +265,10 @@ function Roleta() {
         const to = r.value.result.rotation;
         const from = calm ? to - 20 : 0;
         const durationMs = calm ? CALM_MS : SPIN_MS;
-        spinFrameRef.current = { from, to, startedAt: performance.now(), durationMs };
+        spinFrameRef.current = { from, to, startedAt: performance.now(), durationMs, zoom: !calm };
         // The music starts with the animation of the saved result, never before.
         if (state.sound && !calm) startSpinTrack(durationMs, clampVolume(state.volume));
-        setSpin({ from, durationMs, key: Date.now() });
+        setSpin({ from, durationMs, key: Date.now(), zoom: !calm });
       });
   };
 
@@ -526,7 +524,6 @@ function Roleta() {
           names={pool}
           rotation={result?.rotation ?? 0}
           spin={spin}
-          labels={labels}
           onSpinEnd={handleSpinEnd}
         />
         {showResult && result && (

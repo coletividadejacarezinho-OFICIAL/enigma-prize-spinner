@@ -7,7 +7,6 @@ import {
   numberedPool,
   overLimitMessage,
   searchNumbered,
-  wheelLabels,
   winnerNumber,
 } from "@/lib/enigma/numbers";
 import { poolFor } from "@/lib/enigma/rounds";
@@ -42,15 +41,6 @@ describe("E06: 250 participantes", () => {
     expect(searchNumbered(list, "250")[0]!.number).toBe(250);
     expect(searchNumbered(list, "nº 250")[0]!.number).toBe(250);
     expect(searchNumbered(list, "ana souza").map((x) => x.number)).toEqual([1, 2]);
-  });
-  it("big wheels show numbered marks, small ones names", () => {
-    expect(wheelLabels(numberedPool(draw(60), 0))[59]).toBe("Pessoa 60");
-    const big = wheelLabels(numberedPool(draw(250), 0));
-    expect(big[0]).toBe("1");
-    expect(big[249]).toBe("250");
-    expect(big[4]).toBe("");
-    expect(big.filter(Boolean)).toHaveLength(26);
-    expect(wheelLabels(numberedPool(draw(61), 0))[4]).toBe("5");
   });
   it("second courtesy: earlier winner leaves by entry ID, public numbers stay the same", () => {
     const d = draw(250);
