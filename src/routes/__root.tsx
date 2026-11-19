@@ -12,6 +12,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { BackupCard } from "../components/enigma/BackupCard";
 import { BottomNav } from "../components/enigma/BottomNav";
 import { DataRecovery } from "../components/enigma/DataRecovery";
 import { FirstRun, Opening } from "../components/enigma/FirstRun";
@@ -196,10 +197,11 @@ function RootComponent() {
         {recovery === "pending" ? (
           <main className="px-5 py-10">
             <h1 className="text-2xl font-extrabold">Recuperar cópia interrompida</h1>
-            <p className="mt-3">Libere espaço no aparelho e tente novamente para continuar usando o aplicativo.</p>
+            <p className="mt-3">Não foi possível concluir a recuperação. Confira o espaço do aparelho e tente novamente. Você também pode guardar uma cópia dos dados disponíveis.</p>
             <button onClick={() => void recover()} className="mt-5 h-14 w-full rounded-2xl bg-primary font-bold text-primary-foreground">
               Tentar recuperar novamente
             </button>
+            <div className="mt-5"><BackupCard /></div>
           </main>
         ) : recovery === "opening" || store === null ? (
           <Opening />
