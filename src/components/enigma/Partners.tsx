@@ -71,7 +71,7 @@ export function PartnerTools({ state }: { state: AppState }) {
           Cadastrar o Burguer 7 de exemplo (ensaio)
         </button>
       )}
-      {pending.length > 0 && <OffersPanel state={state} pending={pending} />}
+      <OffersPanel state={state} pending={pending} />
     </>
   );
 }
@@ -88,6 +88,10 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   const [drawId, setDrawId] = useState("");
   const [links, setLinks] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const created = state.draws.find((d) => d.id === createdId);
+  const navigate = useNavigate();
   const sel = picked.map((id) => pending.find((o) => o.id === id)).filter((o): o is Offer => !!o);
   const shopOf = (o: Offer) => state.merchants.find((m) => m.id === o.merchantId);
   const draws = openDraws(state.draws).sort((a, b) => b.date.localeCompare(a.date));
@@ -121,12 +125,15 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
   const run = async (fn: () => Promise<boolean>) => {
     if (busy) return;
     setBusy(true);
+    setError("");
     try {
       if (await fn()) {
         setPicked([]);
         setMode(null);
         setLinks({});
       }
+    } catch {
+      setError("Não foi possível concluir. Confira as ofertas e tente novamente.");
     } finally {
       setBusy(false);
     }
@@ -157,8 +164,16 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
       const now = latest();
       if (!now) return false;
       const d = draftFromOffers(sel, now.merchants, date, Date.now());
-      if (!d) return false;
-      if (!report(await repo.createDraw(d, { makeCurrent: false }))) return false;
+      if (!d) {
+        setError("Confira o cadastro dos comércios das ofertas selecionadas antes de criar a rodada.");
+        return false;
+      }
+      const saved = await repo.createDraw(d, { makeCurrent: false });
+      if (!report(saved)) {
+        if (!saved.ok) setError(saved.message);
+        return false;
+      }
+      setCreatedId(d.id);
       if (!finish(sel, {})) return false;
       toast.success(`Rascunho criado com ${sel.length} ${sel.length === 1 ? "prêmio" : "prêmios"}.`);
       return true;
@@ -178,8 +193,32 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
       return true;
     });
 
+  if (pending.length === 0 && !created) return null;
+
   return (
-    <section className="mt-4 space-y-3" aria-labelledby="ofertas">
+    <section className="mt-4 space-y-3" aria-label="Ofertas dos comércios">
+      {created && (
+        <div className="rounded-2xl border-2 border-gold bg-card p-4">
+          <p role="status" className="font-display text-xl font-extrabold">Rascunho criado</p>
+          <p className="mt-1 font-bold">{formatDateBR(created.date)}</p>
+          <ul className="mt-2 space-y-1">
+            {roundsOf(created, state.merchants).map((r) => (
+              <li key={r.index} className="break-words text-sm">
+                {r.merchantName} — {r.prize}
+              </li>
+            ))}
+          </ul>
+          <GoldButton
+            className="mt-3"
+            onClick={() => navigate({ to: "/sorteios/editar/$drawId", params: { drawId: created.id } })}
+          >
+            Abrir rascunho
+          </GoldButton>
+        </div>
+      )}
+      {error && <p role="alert" className="rounded-xl bg-card p-3 font-bold text-destructive">{error}</p>}
+      {pending.length > 0 && (
+      <>
       <h2 id="ofertas" className="font-display text-xl font-extrabold">
         Ofertas recebidas ({pending.length})
       </h2>
@@ -201,7 +240,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
             ))}
           </ol>
           <GoldButton onClick={() => setMode("criar")} className="mt-3">
-            Criar rodada com as ofertas selecionadas
+            Escolher data da rodada
           </GoldButton>
           <SecondaryButton onClick={() => { setMode("adicionar"); setDrawId(draws[0]?.id ?? ""); }} className="mt-1">
             Adicionar a uma rodada existente
@@ -221,7 +260,7 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
 
           {mode === "adicionar" &&
             (draws.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Não há rodada aberta. Use “Criar rodada”.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Não há rodada aberta. Use “Escolher data da rodada”.</p>
             ) : (
               <div className="mt-3 space-y-2">
                 <label className="block">
@@ -264,6 +303,8 @@ function OffersPanel({ state, pending }: { state: AppState; pending: Offer[] }) 
               </div>
             ))}
         </div>
+      )}
+      </>
       )}
     </section>
   );
@@ -411,3 +452,4 @@ export function WinnerToShopCard({ draw, state }: { draw: Draw; state: AppState 
     </section>
   );
 }
+
