@@ -126,6 +126,22 @@ function VerSorteio() {
         )}
       </div>
 
+      {draw.names.length > 0 && (
+        <details className="mt-6 rounded-2xl bg-card p-4">
+          <summary className="cursor-pointer font-display text-xl font-extrabold">
+            {draw.result ? "Lista usada no giro" : "Lista confirmada"} ({draw.names.length})
+          </summary>
+          <ol className="mt-2 space-y-1">
+            {draw.names.map((name, i) => (
+              <li key={`${i}-${name}`} className="flex gap-2 rounded-lg bg-secondary/40 px-3 py-1.5 text-sm">
+                <span className="w-6 shrink-0 text-right font-bold text-muted-foreground">{i + 1}</span>
+                <span className="min-w-0 break-words font-semibold">{name}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
+
       <WhoWatched />
 
       <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />

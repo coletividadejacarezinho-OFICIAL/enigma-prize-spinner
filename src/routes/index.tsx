@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Camera,
+  ClipboardCheck,
   Maximize2,
   MessageCircle,
   Minimize2,
@@ -21,6 +22,7 @@ import { RecordSheet } from "@/components/enigma/RecordSheet";
 import { RecordingDoneDialog } from "@/components/enigma/RecordingDone";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
 import { Wheel } from "@/components/enigma/Wheel";
+import { entriesOf, needsConfirmation, readyEntries } from "@/lib/enigma/entries";
 import {
   formatDateBR,
   merchantOf,
@@ -122,7 +124,10 @@ function Roleta() {
   const result = draw.result;
   const spinning = spin !== null;
   const showResult = !!result && !spinning;
-  const canSpin = count >= MIN_NAMES_TO_SPIN;
+  // The wheel only uses the confirmed list; a list changed in Nomes must be confirmed again.
+  const dirty = needsConfirmation(draw);
+  const readyCount = readyEntries(entriesOf(draw)).length;
+  const canSpin = count >= MIN_NAMES_TO_SPIN && !dirty;
   const session = state.recording?.drawId === draw.id ? state.recording : undefined;
   const recording = !!session;
   const showRecordButton = recording || (!full && canSpin && !result);
@@ -269,7 +274,15 @@ function Roleta() {
                 navigate({ to: "/nomes" });
               }}
             >
-              <UserPlus aria-hidden="true" /> Adicionar nomes
+              {dirty && readyCount >= MIN_NAMES_TO_SPIN ? (
+                <>
+                  <ClipboardCheck aria-hidden="true" /> Confirmar lista nova
+                </>
+              ) : (
+                <>
+                  <UserPlus aria-hidden="true" /> Adicionar nomes
+                </>
+              )}
             </GoldButton>
           ) : showResult ? (
             <GoldButton
@@ -302,6 +315,10 @@ function Roleta() {
           >
             <Plus aria-hidden="true" /> Novo sorteio
           </SecondaryButton>
+        ) : dirty && count > 0 ? (
+          <p className="flex h-11 items-center justify-center text-center text-sm font-semibold text-muted-foreground">
+            A lista mudou em Nomes. Confirme antes de girar.
+          </p>
         ) : canSpin ? (
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
             <SecondaryButton onClick={() => navigate({ to: "/nomes" })} disabled={spinning} className="px-2 text-[15px]">

@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
+import { BotTestCard } from "@/components/enigma/BotTestCard";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { InstallCard } from "@/components/enigma/InstallCard";
 import { GroupLogo } from "@/components/enigma/Logos";
@@ -15,9 +16,9 @@ export const Route = createFileRoute("/ajustes")({
   head: () => ({
     meta: [
       { title: "Ajustes — Enigma Premiado" },
-      { name: "description", content: "Logo do grupo, som da roleta e instalar no celular." },
+      { name: "description", content: "Logo do grupo, som da roleta, teste do bot e instalar no celular." },
       { property: "og:title", content: "Ajustes — Enigma Premiado" },
-      { property: "og:description", content: "Logo do grupo, som da roleta e instalar no celular." },
+      { property: "og:description", content: "Logo do grupo, som da roleta, teste do bot e instalar no celular." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -104,6 +105,8 @@ function Ajustes() {
             />
           </label>
         </section>
+
+        <BotTestCard state={state} />
 
         <InstallCard />
 

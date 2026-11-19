@@ -3,6 +3,7 @@ import {
   RECORDING_MODES,
   type AppState,
   type Draw,
+  type Entry,
   type Merchant,
   type Recording,
   type RecordingSession,
@@ -43,6 +44,7 @@ export function createSampleState(): AppState {
     merchant: "Padaria Pão de Ouro",
     prize: "Uma cesta de café da manhã para 2 pessoas",
     names: [...SAMPLE_NAMES],
+    entries: entriesFromNames(SAMPLE_NAMES, Date.now(), false),
     isSample: true,
     createdAt: Date.now(),
   };
@@ -64,8 +66,27 @@ export function createDraw(input: {
     prize: input.prize.trim(),
     confirmed: input.confirmed,
     names: [],
+    entries: [],
     createdAt: Date.now(),
   };
+}
+
+/**
+ * Entries for a list saved before stage 7. When `flagRepeats` is on, a name that
+ * repeats an earlier one waits in "Revisar pendências" instead of being dropped.
+ */
+export function entriesFromNames(names: string[], now: number, flagRepeats: boolean): Entry[] {
+  const seen = new Map<string, string>();
+  return names.map((name, i) => {
+    const id = `e${now}-${i}`;
+    const key = normalizeForCompare(name);
+    const first = seen.get(key);
+    if (flagRepeats && first) {
+      return { id, name, source: "manual", status: "pending", reason: { kind: "repetido", withId: first }, addedAt: now };
+    }
+    if (!first) seen.set(key, id);
+    return { id, name, source: "manual", status: "ready", addedAt: now };
+  });
 }
 
 export function createMerchant(input: { name: string; logo?: string | undefined }): Merchant {
@@ -91,7 +112,13 @@ export function merchantOf(
 export function migrateState(state: AppState): AppState {
   const merchants: Merchant[] = Array.isArray(state.merchants) ? [...state.merchants] : [];
   let changed = !Array.isArray(state.merchants);
-  const draws = state.draws.map((d) => {
+  const draws = state.draws.map((raw) => {
+    let d = raw;
+    if (!Array.isArray(d.entries)) {
+      // The saved list stays as the confirmed one; a spun draw keeps every name it used.
+      d = { ...d, entries: entriesFromNames(d.names, d.createdAt, !d.result) };
+      changed = true;
+    }
     if (d.merchantId || d.isSample) return d;
     const key = normalizeForCompare(d.merchant);
     let m = merchants.find((x) => normalizeForCompare(x.name) === key);

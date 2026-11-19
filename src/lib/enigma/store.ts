@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
+import { receiveBotMessage, type BotInput } from "./entries";
 import { createSampleState, finishRecording, migrateState } from "./logic";
-import type { AppState, Draw, Merchant, Recording, RecordingSession } from "./types";
+import type { AppState, BotOutcome, Draw, Merchant, Recording, RecordingSession } from "./types";
 
 const KEY = "enigma-premiado:v1";
 const EVENT = "enigma-premiado:change";
@@ -147,4 +148,23 @@ export function endRecording(now: number): Recording | null {
 function switchCurrent(s: AppState, id: string): AppState {
   const base = s.recording && s.recording.drawId !== id ? closeSession(s, Date.now()).state : s;
   return { ...base, currentId: id };
+}
+
+/** Applies a simulated bot message to one draw and reports what happened (demonstration only). */
+export function simulateBotMessage(
+  drawId: string,
+  input: BotInput,
+  now: number,
+): { outcome: BotOutcome; matchName?: string } | null {
+  let out: { outcome: BotOutcome; matchName?: string } | null = null;
+  update((s) => ({
+    ...s,
+    draws: s.draws.map((d) => {
+      if (d.id !== drawId || d.result) return d;
+      const r = receiveBotMessage(d, input, now);
+      out = { outcome: r.outcome, ...(r.match ? { matchName: r.match.name } : {}) };
+      return r.draw;
+    }),
+  }));
+  return out;
 }

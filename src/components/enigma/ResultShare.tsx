@@ -43,9 +43,13 @@ async function copyText(text: string): Promise<boolean> {
 export function ResultShareDialog({
   text,
   onClose,
+  title = "Mandar no WhatsApp",
+  description = "Veja a mensagem. No WhatsApp, escolha o grupo e toque em Enviar.",
 }: {
   text: string | null;
   onClose: () => void;
+  title?: string;
+  description?: string;
 }) {
   const [copy, setCopy] = useState<"idle" | "ok" | "fail">("idle");
   useEffect(() => setCopy("idle"), [text]);
@@ -59,10 +63,8 @@ export function ResultShareDialog({
     <Dialog open={text !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Mandar no WhatsApp</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            Veja a mensagem. No WhatsApp, escolha o grupo e toque em Enviar.
-          </DialogDescription>
+          <DialogTitle className="font-display text-2xl">{title}</DialogTitle>
+          <DialogDescription className="text-muted-foreground">{description}</DialogDescription>
         </DialogHeader>
         <p
           className="select-text whitespace-pre-wrap break-words rounded-2xl border-2 border-gold/60 bg-card p-3 text-[15px] leading-snug"
