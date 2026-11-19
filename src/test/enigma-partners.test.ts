@@ -130,3 +130,13 @@ describe("P1 associações explícitas persistidas", () => {
     expect(() => appendOffers(base, [offer], [padaria])).toThrow();
   });
 });
+
+it("recusa recuperação se o comércio do prêmio foi trocado após salvar", () => {
+  const offer = off("editado", "p", "Pão");
+  const base = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
+  const saved = appendOffers(base, [offer], shops, { editado: base.id });
+  const edited = { ...saved, merchantId: burger.id, merchant: burger.name };
+  expect(() => planOffers([edited], [offer])).toThrow();
+  const draft = draftFromOffers([offer], shops, "2026-11-20", 0)!;
+  expect(() => planOffers([{ ...draft, merchantId: burger.id }], [offer])).toThrow();
+});
