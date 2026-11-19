@@ -122,6 +122,9 @@ export const offerMerchantId = (o: Pick<Offer, "id">) => `mc-${o.id}`;
 /** Where an offer already sits in the saved draws (round id = draw id for the first prize). */
 export function placementOf(draws: Draw[], o: Pick<Offer, "id">): { drawId: string; roundId: string } | undefined {
   for (const d of draws) {
+    const linked = d.offerLinks?.[o.id];
+    if (linked && (linked === d.id || d.extraPrizes?.some((p) => p.id === linked)))
+      return { drawId: d.id, roundId: linked };
     if (d.id === offerDrawId(o)) return { drawId: d.id, roundId: d.id };
     if (d.extraPrizes?.some((p) => p.id === offerRoundId(o))) return { drawId: d.id, roundId: offerRoundId(o) };
   }
@@ -178,12 +181,20 @@ export function appendOffers(
   merchants: Merchant[],
   links: Record<string, string> = {},
 ): Draw {
-  if (draw.result) return draw;
+  if (draw.result) throw new Error("Esta rodada já foi sorteada. Escolha outra rodada.");
   let next = draw;
   for (const o of offers) {
-    if (links[o.id] || placementOf([next], o)) continue;
+    if (placementOf([next], o)) continue;
+    const linked = links[o.id];
+    if (linked) {
+      const round = roundsOf(next, merchants).find((r) => roundIdOf(next, r.index) === linked);
+      if (!round || round.result || !o.merchantId || round.merchantId !== o.merchantId)
+        throw new Error("O prêmio associado mudou. Confira a rodada.");
+      next = { ...next, offerLinks: { ...next.offerLinks, [o.id]: linked } };
+      continue;
+    }
     const m = merchants.find((x) => x.id === o.merchantId);
-    if (!m) continue;
+    if (!m) throw new Error("Confira o cadastro do comércio antes de adicionar a oferta.");
     next = addOfferCourtesy(next, m, o.prize, offerRoundId(o));
   }
   return next;
@@ -218,3 +229,4 @@ export function recoveryMessage(plan: OfferPlan, draws: Draw[], fmtDate: (iso: s
     : "";
   return `Recuperado: ${parts.join("; ")}.${left}`;
 }
+
