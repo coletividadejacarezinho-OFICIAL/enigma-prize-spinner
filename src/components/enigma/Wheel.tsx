@@ -189,7 +189,10 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
                         fill: light ? "var(--wheel-ink-dark)" : "var(--wheel-ink)",
                         fontSize,
                         fontWeight: 800,
-                        fontFamily: "var(--font-display)",
+                        fontFamily: "var(--font-sans)",
+                        paintOrder: "stroke",
+                        stroke: "rgba(0,0,0,0.22)",
+                        strokeWidth: count > 100 ? 0.08 : 0.12,
                       }}
                     >
                       {wheelLabel(name, count)}
