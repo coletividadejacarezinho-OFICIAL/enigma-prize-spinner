@@ -69,7 +69,7 @@ describe("P1 várias ofertas", () => {
   });
   it("adicionar duas vezes não duplica; associação explícita não acrescenta", () => {
     const base = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
-    const os = [off("5", "b7", "X"), off("6", "c", "Y")];
+    const os = [off("5", "b7", "X"), off("6", "p", "Y")];
     const once = appendOffers(base, os, shops, { "6": base.id });
     const twice = appendOffers(once, os, shops, { "6": base.id });
     expect(roundsOf(twice, shops).map((r) => r.prize)).toEqual(["Pão", "X"]);
@@ -107,5 +107,26 @@ describe("P1 recuperação de falha parcial", () => {
     const reloaded = JSON.parse(JSON.stringify(once));
     expect(appendOffers(reloaded, [X], shops).extraPrizes).toHaveLength(1);
     expect(planOffers([reloaded], [X]).recovered).toHaveLength(1);
+  });
+});
+
+
+describe("P1 associações explícitas persistidas", () => {
+  it("reabre a associação e recusa destino inválido ou comércio diferente", () => {
+    const base = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
+    const offer = off("link", "p", "Pão");
+    const saved = appendOffers(base, [offer], shops, { link: base.id });
+    const reloaded = JSON.parse(JSON.stringify(saved));
+    expect(placementOf([reloaded], offer)).toEqual({ drawId: base.id, roundId: base.id });
+    expect(appendOffers(reloaded, [offer], shops).extraPrizes).toBeUndefined();
+    expect(() => appendOffers(base, [offer], shops, { link: "inexistente" })).toThrow();
+    expect(() => appendOffers(base, [off("link", "c", "Café")], shops, { link: base.id })).toThrow();
+  });
+
+  it("recusa adicionar quando a rodada já girou ou o cadastro desapareceu", () => {
+    const base = createDraw({ date: "2026-11-20", merchant: padaria, prize: "Pão", confirmed: true });
+    const offer = off("novo", "c", "Café");
+    expect(() => appendOffers({ ...base, result: { winner: "Ana", index: 0, rotation: 0, at: 1 } }, [offer], shops)).toThrow();
+    expect(() => appendOffers(base, [offer], [padaria])).toThrow();
   });
 });
