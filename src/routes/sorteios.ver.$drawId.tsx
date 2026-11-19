@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Disc3, Hourglass, MessageCircle, Pencil, Trophy } from "lucide-react";
+import { ChevronLeft, Disc3, Eye, ThumbsUp, Hourglass, MessageCircle, Pencil, Play, Trophy, UserRound } from "lucide-react";
 import { useState } from "react";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
@@ -8,6 +8,7 @@ import { ResultShareDialog } from "@/components/enigma/ResultShare";
 import { formatDateBR, merchantOf, resultMessage } from "@/lib/enigma/logic";
 import { setCurrent, useAppState } from "@/lib/enigma/store";
 import { GROUP_NAME } from "@/lib/enigma/types";
+import { DEMO_AUDIENCE, audienceTotals } from "@/lib/enigma/watch";
 
 export const Route = createFileRoute("/sorteios/ver/$drawId")({
   head: () => ({
@@ -125,7 +126,60 @@ function VerSorteio() {
         )}
       </div>
 
+      <WhoWatched />
+
       <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />
     </div>
+  );
+}
+
+/** Audience view for the presenter, made only of clearly marked fictitious examples. */
+function WhoWatched() {
+  const totals = audienceTotals(DEMO_AUDIENCE);
+  const stats = [
+    { label: "Abriu a página", value: totals.opened, icon: Eye },
+    { label: "Iniciou a reprodução", value: totals.played, icon: Play },
+    { label: "Curtiu", value: totals.liked, icon: ThumbsUp },
+  ];
+  return (
+    <section className="mt-6 rounded-2xl bg-card p-4" aria-labelledby="quem-acompanhou">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="quem-acompanhou" className="font-display text-xl font-extrabold">
+          Quem acompanhou
+        </h2>
+        <span className="shrink-0 rounded-full border border-gold px-2 py-0.5 text-[10px] font-bold text-gold">
+          Exemplo fictício
+        </span>
+      </div>
+      <ul className="mt-3 grid grid-cols-3 gap-2">
+        {stats.map(({ label, value, icon: Icon }) => (
+          <li key={label} className="rounded-xl bg-secondary/60 p-2 text-center">
+            <Icon className="mx-auto h-4 w-4 text-gold" aria-hidden="true" />
+            <p className="font-display text-2xl font-extrabold tabular-nums">{value}</p>
+            <p className="text-xs font-semibold leading-tight text-muted-foreground">{label}</p>
+          </li>
+        ))}
+      </ul>
+      <ul className="mt-3 space-y-1">
+        {DEMO_AUDIENCE.map((e, i) => (
+          <li key={i} className="flex items-center gap-2 rounded-xl bg-secondary/40 px-3 py-2">
+            <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+              {e.name}
+              {e.example && <span className="font-normal text-muted-foreground"> (exemplo)</span>}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+              <Eye className="h-4 w-4" aria-label="Abriu a página" />
+              {e.played && <Play className="h-4 w-4 text-gold" aria-label="Iniciou a reprodução" />}
+              {e.liked && <ThumbsUp className="h-4 w-4 fill-gold text-gold" aria-label="Curtiu" />}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Abrir a página não quer dizer que a pessoa assistiu ao vídeo. Os nomes do sorteio não são a
+        lista de quem assistiu.
+      </p>
+    </section>
   );
 }

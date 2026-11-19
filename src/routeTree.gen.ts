@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AjustesRouteImport } from './routes/ajustes'
 import { Route as NomesRouteImport } from './routes/nomes'
+import { Route as AssistirDemoRouteImport } from './routes/assistir.demo'
+import { Route as ConvitePreviaRouteImport } from './routes/convite.previa'
 import { Route as SorteiosIndexRouteImport } from './routes/sorteios.index'
 import { Route as SorteiosListaoRouteImport } from './routes/sorteios.listao'
 import { Route as SorteiosNovoRouteImport } from './routes/sorteios.novo'
@@ -34,6 +36,16 @@ const AjustesRoute = AjustesRouteImport.update({
 const NomesRoute = NomesRouteImport.update({
   id: '/nomes',
   path: '/nomes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistirDemoRoute = AssistirDemoRouteImport.update({
+  id: '/assistir/demo',
+  path: '/assistir/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConvitePreviaRoute = ConvitePreviaRouteImport.update({
+  id: '/convite/previa',
+  path: '/convite/previa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SorteiosIndexRoute = SorteiosIndexRouteImport.update({
@@ -83,6 +95,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/assistir/demo': typeof AssistirDemoRoute
+  '/convite/previa': typeof ConvitePreviaRoute
   '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios/': typeof SorteiosIndexRoute
@@ -96,6 +110,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/assistir/demo': typeof AssistirDemoRoute
+  '/convite/previa': typeof ConvitePreviaRoute
   '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios': typeof SorteiosIndexRoute
@@ -110,6 +126,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ajustes': typeof AjustesRoute
   '/nomes': typeof NomesRoute
+  '/assistir/demo': typeof AssistirDemoRoute
+  '/convite/previa': typeof ConvitePreviaRoute
   '/sorteios/listao': typeof SorteiosListaoRoute
   '/sorteios/novo': typeof SorteiosNovoRoute
   '/sorteios/': typeof SorteiosIndexRoute
@@ -125,6 +143,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/nomes'
+    | '/assistir/demo'
+    | '/convite/previa'
     | '/sorteios/listao'
     | '/sorteios/novo'
     | '/sorteios/'
@@ -138,6 +158,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/nomes'
+    | '/assistir/demo'
+    | '/convite/previa'
     | '/sorteios/listao'
     | '/sorteios/novo'
     | '/sorteios'
@@ -151,6 +173,8 @@ export interface FileRouteTypes {
     | '/'
     | '/ajustes'
     | '/nomes'
+    | '/assistir/demo'
+    | '/convite/previa'
     | '/sorteios/listao'
     | '/sorteios/novo'
     | '/sorteios/'
@@ -165,6 +189,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AjustesRoute: typeof AjustesRoute
   NomesRoute: typeof NomesRoute
+  AssistirDemoRoute: typeof AssistirDemoRoute
+  ConvitePreviaRoute: typeof ConvitePreviaRoute
   SorteiosListaoRoute: typeof SorteiosListaoRoute
   SorteiosNovoRoute: typeof SorteiosNovoRoute
   SorteiosIndexRoute: typeof SorteiosIndexRoute
@@ -196,6 +222,20 @@ declare module '@tanstack/react-router' {
       path: '/nomes'
       fullPath: '/nomes'
       preLoaderRoute: typeof NomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistir/demo': {
+      id: '/assistir/demo'
+      path: '/assistir/demo'
+      fullPath: '/assistir/demo'
+      preLoaderRoute: typeof AssistirDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/convite/previa': {
+      id: '/convite/previa'
+      path: '/convite/previa'
+      fullPath: '/convite/previa'
+      preLoaderRoute: typeof ConvitePreviaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sorteios/': {
@@ -261,6 +301,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AjustesRoute: AjustesRoute,
   NomesRoute: NomesRoute,
+  AssistirDemoRoute: AssistirDemoRoute,
+  ConvitePreviaRoute: ConvitePreviaRoute,
   SorteiosListaoRoute: SorteiosListaoRoute,
   SorteiosNovoRoute: SorteiosNovoRoute,
   SorteiosIndexRoute: SorteiosIndexRoute,

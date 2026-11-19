@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
@@ -135,6 +136,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  // The viewer page shows only audience controls, so the presenter's tabs stay hidden there.
+  const isViewerPage = useRouterState({
+    select: (s) => s.location.pathname.startsWith("/assistir"),
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -142,7 +147,7 @@ function RootComponent() {
       <div className="mx-auto min-h-dvh max-w-md">
         <Outlet />
       </div>
-      <BottomNav />
+      {!isViewerPage && <BottomNav />}
       <Toaster position="top-center" richColors duration={2500} />
     </QueryClientProvider>
   );

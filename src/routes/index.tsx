@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Camera, MessageCircle, Pencil, Plus, Square, Trophy, UserPlus } from "lucide-react";
+import { Camera, MessageCircle, Plus, Send, Square, Trophy, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
+import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { MerchantLogo } from "@/components/enigma/Logos";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
 import { RecordSheet } from "@/components/enigma/RecordSheet";
@@ -61,6 +62,7 @@ function Roleta() {
   const [recordOpen, setRecordOpen] = useState(false);
   const [done, setDone] = useState<{ recording: Recording; drawId: string } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   if (!state) return <RoletaSkeleton />;
 
@@ -227,14 +229,30 @@ function Roleta() {
             <Plus aria-hidden="true" /> Novo sorteio
           </SecondaryButton>
         ) : canSpin ? (
-          <SecondaryButton onClick={() => navigate({ to: "/nomes" })} disabled={spinning}>
-            <Pencil aria-hidden="true" /> Editar nomes
-          </SecondaryButton>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
+            <SecondaryButton onClick={() => navigate({ to: "/nomes" })} disabled={spinning} className="px-2 text-[15px]">
+              Editar nomes
+            </SecondaryButton>
+            <SecondaryButton onClick={() => setInviteOpen(true)} disabled={spinning} className="whitespace-nowrap px-2 text-[15px]">
+              <Send aria-hidden="true" /> Convidar para assistir
+            </SecondaryButton>
+          </div>
         ) : (
           <div className="h-11" />
         )}
       </div>
 
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        date={draw.date}
+        shopName={shop.name}
+        prize={draw.prize}
+        onPreview={() => {
+          setInviteOpen(false);
+          navigate({ to: "/convite/previa", search: { estado: "aguardando" } });
+        }}
+      />
       <ResultShareDialog text={shareOpen ? message : null} onClose={() => setShareOpen(false)} />
       <RecordSheet open={recordOpen} onOpenChange={setRecordOpen} onStart={handleStartRecording} />
       <RecordingDoneDialog
