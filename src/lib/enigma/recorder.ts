@@ -569,6 +569,23 @@ function paintWheel(
   ctx.beginPath();
   ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
   ctx.fill();
+  // Keep the same alternating rim lights in the recorded canvas video.
+  const lightPhase = Math.floor(performance.now() / 650) % 2;
+  for (let i = 0; i < 24; i++) {
+    const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
+    const on = (i + lightPhase) % 2 === 0;
+    const x = cx + Math.cos(angle) * (r + 11);
+    const y = cy + Math.sin(angle) * (r + 11);
+    ctx.beginPath();
+    ctx.arc(x, y, 4.8, 0, Math.PI * 2);
+    ctx.fillStyle = on ? "#fffaf0" : "#d99517";
+    if (on) {
+      ctx.shadowColor = "#fff5b8";
+      ctx.shadowBlur = 10;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
   const seg = count > 0 ? 360 / count : 360;
   const rad = (d: number) => (d * Math.PI) / 180;
   if (count === 0) {
