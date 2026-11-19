@@ -6,6 +6,10 @@
  */
 import { useSyncExternalStore } from "react";
 
+import { pickType, recordedMusicLevel, type Needs } from "./capture";
+import { audioContext, setRecordTap } from "./sound";
+import type { RecordingMode } from "./types";
+
 export type CameraProblem = "denied" | "missing" | "busy" | "unsupported" | "other";
 
 export const CAMERA_PROBLEM_TEXT: Record<CameraProblem, string> = {
@@ -18,28 +22,48 @@ export const CAMERA_PROBLEM_TEXT: Record<CameraProblem, string> = {
   other: "A câmera não abriu desta vez. Tente de novo.",
 };
 
-export async function openCamera(): Promise<{ ok: true; stream: MediaStream } | { ok: false; problem: CameraProblem }> {
-  if (
-    typeof navigator === "undefined" ||
-    !navigator.mediaDevices?.getUserMedia ||
-    typeof MediaRecorder === "undefined" ||
-    typeof HTMLCanvasElement.prototype.captureStream !== "function"
-  ) {
-    return { ok: false, problem: "unsupported" };
-  }
+export type MediaResult =
+  { ok: true; stream: MediaStream | null } | { ok: false; problem: CameraProblem };
+
+export function canRecord(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof MediaRecorder !== "undefined" &&
+    typeof HTMLCanvasElement !== "undefined" &&
+    typeof HTMLCanvasElement.prototype.captureStream === "function"
+  );
+}
+
+/** E07: asks only for what the mode needs (`needsFor`); nothing when neither is needed. */
+export async function openMedia(needs: Needs): Promise<MediaResult> {
+  if (!canRecord()) return { ok: false, problem: "unsupported" };
+  if (!needs.camera && !needs.mic) return { ok: true, stream: null };
+  if (!navigator.mediaDevices?.getUserMedia) return { ok: false, problem: "unsupported" };
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 720 } },
-      audio: { echoCancellation: true, noiseSuppression: true },
+      video: needs.camera
+        ? { facingMode: "user", width: { ideal: 720 }, height: { ideal: 720 } }
+        : false,
+      audio: needs.mic ? { echoCancellation: true, noiseSuppression: true } : false,
     });
     return { ok: true, stream };
   } catch (e) {
     const name = e instanceof DOMException ? e.name : "";
-    if (name === "NotAllowedError" || name === "SecurityError") return { ok: false, problem: "denied" };
-    if (name === "NotFoundError" || name === "OverconstrainedError") return { ok: false, problem: "missing" };
+    if (name === "NotAllowedError" || name === "SecurityError")
+      return { ok: false, problem: "denied" };
+    if (name === "NotFoundError" || name === "OverconstrainedError")
+      return { ok: false, problem: "missing" };
     if (name === "NotReadableError" || name === "AbortError") return { ok: false, problem: "busy" };
     return { ok: false, problem: "other" };
   }
+}
+
+/** Kept for older callers: front camera and microphone. */
+export async function openCamera(): Promise<
+  { ok: true; stream: MediaStream } | { ok: false; problem: CameraProblem }
+> {
+  const r = await openMedia({ camera: true, mic: true });
+  return r.ok ? { ok: true, stream: r.stream! } : r;
 }
 
 export function stopStream(stream: MediaStream | null | undefined) {
@@ -70,26 +94,32 @@ const W = 720;
 const H = 1280;
 
 type Session = {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  video: HTMLVideoElement;
-  stream: MediaStream;
+  mode: RecordingMode;
+  mic: boolean;
+  canvas: HTMLCanvasElement | null;
+  ctx: CanvasRenderingContext2D | null;
+  video: HTMLVideoElement | null;
+  stream: MediaStream | null;
   recorder: MediaRecorder;
   chunks: Blob[];
   mimeType: string;
   startedAt: number;
   drawId: string;
-  timer: ReturnType<typeof setInterval>;
+  timer: ReturnType<typeof setInterval> | null;
   frame: RecFrame;
   colors: Palette;
+  /** Mix of microphone + spin music; disconnected at the end. */
+  mixEnd: () => void;
 };
 
+export type RecSnapshot = { drawId: string; startedAt: number; mode: RecordingMode; mic: boolean };
+
 let session: Session | null = null;
-let snapshot: { drawId: string; startedAt: number } | null = null;
+let snapshot: RecSnapshot | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-export function useRecorder(): { drawId: string; startedAt: number } | null {
+export function useRecorder(): RecSnapshot | null {
   return useSyncExternalStore(
     (cb) => {
       listeners.add(cb);
@@ -100,21 +130,16 @@ export function useRecorder(): { drawId: string; startedAt: number } | null {
   );
 }
 
-function pickMime(): string {
-  // H.264 first: it plays everywhere, WhatsApp included.
-  const options = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-    "video/mp4;codecs=avc1,mp4a",
-    "video/mp4;codecs=avc1,opus",
-    "video/mp4",
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm",
-  ];
-  return options.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-}
-
-type Palette = { bg: string; card: string; gold: string; goldDeep: string; ink: string; inkDark: string; muted: string; wheel: string[] };
+type Palette = {
+  bg: string;
+  card: string;
+  gold: string;
+  goldDeep: string;
+  ink: string;
+  inkDark: string;
+  muted: string;
+  wheel: string[];
+};
 
 const FALLBACK: Palette = {
   bg: "#1f0b33",
@@ -149,57 +174,136 @@ function readPalette(ctx: CanvasRenderingContext2D): Palette {
   };
 }
 
-export function startRecording(stream: MediaStream, drawId: string, frame: RecFrame): boolean {
+/**
+ * One audio track for the file: the microphone (when on) plus the spin music sent
+ * straight in at `recordedMusicLevel`. Falls back to the raw microphone track.
+ */
+function buildAudio(
+  stream: MediaStream | null,
+  musicLevel: number,
+): { tracks: MediaStreamTrack[]; end: () => void } {
+  const micTracks = stream?.getAudioTracks() ?? [];
+  const a = audioContext();
+  if (!a || typeof a.createMediaStreamDestination !== "function")
+    return { tracks: micTracks, end: () => undefined };
+  try {
+    const dest = a.createMediaStreamDestination();
+    const src =
+      micTracks.length && stream ? a.createMediaStreamSource(new MediaStream(micTracks)) : null;
+    src?.connect(dest);
+    setRecordTap(dest, musicLevel);
+    return {
+      tracks: dest.stream.getAudioTracks(),
+      end: () => {
+        setRecordTap(null);
+        src?.disconnect();
+        dest.stream.getTracks().forEach((t) => t.stop());
+      },
+    };
+  } catch {
+    return { tracks: micTracks, end: () => undefined };
+  }
+}
+
+export type StartOptions = {
+  mode: RecordingMode;
+  mic: boolean;
+  stream: MediaStream | null;
+  drawId: string;
+  frame: RecFrame;
+  sound: boolean;
+  volume: number;
+};
+
+export function startRecording(o: StartOptions): boolean {
   if (session) return false;
-  const mimeType = pickMime();
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return false;
+  const audioOnly = o.mode === "voz";
+  const mimeType = pickType(audioOnly, (t) => MediaRecorder.isTypeSupported(t));
+  const mix = buildAudio(
+    o.mic ? o.stream : null,
+    audioOnly ? 0 : recordedMusicLevel(o.sound, o.volume, o.mic),
+  );
 
-  // The face preview has to be in the page for some phones to keep decoding it.
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.setAttribute("playsinline", "");
-  video.srcObject = stream;
-  Object.assign(video.style, { position: "fixed", width: "2px", height: "2px", opacity: "0", pointerEvents: "none", left: "0", top: "0" });
-  document.body.appendChild(video);
-  void video.play().catch(() => undefined);
-
-  const out = canvas.captureStream(30);
-  stream.getAudioTracks().forEach((t) => out.addTrack(t));
+  let canvas: HTMLCanvasElement | null = null;
+  let ctx: CanvasRenderingContext2D | null = null;
+  let video: HTMLVideoElement | null = null;
+  let out: MediaStream;
+  if (audioOnly) {
+    out = new MediaStream(mix.tracks);
+  } else {
+    canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    ctx = canvas.getContext("2d");
+    if (!ctx) {
+      mix.end();
+      return false;
+    }
+    if (o.mode === "roleta-camera" && o.stream?.getVideoTracks().length) {
+      // The face preview has to be in the page for some phones to keep decoding it.
+      video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute("playsinline", "");
+      video.srcObject = o.stream;
+      Object.assign(video.style, {
+        position: "fixed",
+        width: "2px",
+        height: "2px",
+        opacity: "0",
+        pointerEvents: "none",
+        left: "0",
+        top: "0",
+      });
+      document.body.appendChild(video);
+      void video.play().catch(() => undefined);
+    }
+    out = canvas.captureStream(30);
+    mix.tracks.forEach((t) => out.addTrack(t));
+  }
   let recorder: MediaRecorder;
   try {
-    recorder = new MediaRecorder(out, mimeType ? { mimeType, videoBitsPerSecond: 2_500_000 } : undefined);
+    const opts: MediaRecorderOptions = mimeType ? { mimeType } : {};
+    if (!audioOnly) opts.videoBitsPerSecond = 2_500_000;
+    recorder = new MediaRecorder(out, opts);
   } catch {
-    video.remove();
+    video?.remove();
+    mix.end();
     return false;
   }
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
   };
-  const colors = readPalette(ctx);
   const s: Session = {
+    mode: o.mode,
+    mic: o.mic,
     canvas,
     ctx,
     video,
-    stream,
+    stream: o.stream,
     recorder,
     chunks,
-    mimeType: recorder.mimeType || mimeType || "video/webm",
+    mimeType: recorder.mimeType || mimeType || (audioOnly ? "audio/webm" : "video/webm"),
     startedAt: Date.now(),
-    drawId,
-    frame,
-    colors,
-    timer: setInterval(() => paint(s), 1000 / 30),
+    drawId: o.drawId,
+    frame: o.frame,
+    colors: ctx ? readPalette(ctx) : FALLBACK,
+    timer: null,
+    mixEnd: mix.end,
   };
+  if (ctx) {
+    s.timer = setInterval(() => paint(s), 1000 / 30);
+    paint(s);
+  }
+  try {
+    recorder.start(1000);
+  } catch {
+    release(s);
+    return false;
+  }
   session = s;
-  paint(s);
-  recorder.start(1000);
-  snapshot = { drawId, startedAt: s.startedAt };
+  snapshot = { drawId: o.drawId, startedAt: s.startedAt, mode: o.mode, mic: o.mic };
   emit();
   return true;
 }
@@ -212,19 +316,44 @@ export function isRecording(): boolean {
   return session !== null;
 }
 
-export function stopRecording(): Promise<{ blob: Blob; mimeType: string; startedAt: number; durationMs: number } | null> {
+/** Frees the camera and microphone, the hidden face video and the audio mix. */
+function release(s: Session) {
+  if (s.timer) clearInterval(s.timer);
+  stopStream(s.stream);
+  s.video?.remove();
+  s.mixEnd();
+}
+
+export type Finished = {
+  blob: Blob;
+  mimeType: string;
+  startedAt: number;
+  durationMs: number;
+  mode: RecordingMode;
+  mic: boolean;
+};
+
+export function stopRecording(): Promise<Finished | null> {
   const s = session;
   if (!s) return Promise.resolve(null);
   session = null;
   snapshot = null;
   emit();
   return new Promise((resolve) => {
+    let done = false;
     const finish = () => {
-      clearInterval(s.timer);
-      stopStream(s.stream);
-      s.video.remove();
+      if (done) return;
+      done = true;
+      release(s);
       const type = s.mimeType.split(";")[0] ?? "video/webm";
-      resolve({ blob: new Blob(s.chunks, { type }), mimeType: type, startedAt: s.startedAt, durationMs: Date.now() - s.startedAt });
+      resolve({
+        blob: new Blob(s.chunks, { type }),
+        mimeType: type,
+        startedAt: s.startedAt,
+        durationMs: Date.now() - s.startedAt,
+        mode: s.mode,
+        mic: s.mic,
+      });
     };
     s.recorder.onstop = finish;
     try {
@@ -236,6 +365,22 @@ export function stopRecording(): Promise<{ blob: Blob; mimeType: string; started
       finish();
     }
   });
+}
+
+/** "Cancelar gravação": stops and throws the file away; the draw is untouched. */
+export function cancelRecording() {
+  const s = session;
+  if (!s) return;
+  session = null;
+  snapshot = null;
+  emit();
+  s.recorder.onstop = null;
+  try {
+    s.recorder.stop();
+  } catch {
+    /* already stopped */
+  }
+  release(s);
 }
 
 /* ---------- painting ---------- */
@@ -254,7 +399,14 @@ function colorIndex(i: number, count: number) {
   return c;
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -265,7 +417,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** Splits text into at most `maxLines` lines that fit `width`. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, width: number, maxLines: number): string[] {
+function wrap(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  width: number,
+  maxLines: number,
+): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -293,6 +450,7 @@ const DISPLAY = '"Baloo 2", "Nunito", system-ui, sans-serif';
 
 function paint(s: Session) {
   const { ctx, frame: f, colors: c } = s;
+  if (!ctx) return;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = c.bg;
   ctx.fillRect(0, 0, W, H);
@@ -343,7 +501,11 @@ function paint(s: Session) {
     ctx.stroke();
     ctx.fillStyle = c.gold;
     ctx.font = `800 28px ${SANS}`;
-    ctx.fillText(f.winnerNumber ? `🏆 GANHADOR(A) · Nº ${f.winnerNumber}` : "🏆 GANHADOR(A)", 255, 1050);
+    ctx.fillText(
+      f.winnerNumber ? `🏆 GANHADOR(A) · Nº ${f.winnerNumber}` : "🏆 GANHADOR(A)",
+      255,
+      1050,
+    );
     ctx.fillStyle = c.ink;
     ctx.font = `800 46px ${DISPLAY}`;
     const lines = wrap(ctx, f.winner, 410, 3);
@@ -357,13 +519,25 @@ function paint(s: Session) {
     ctx.font = `800 32px ${DISPLAY}`;
     ctx.fillText(f.spin ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", 255, 1110);
     ctx.font = `700 24px ${SANS}`;
-    ctx.fillText(`${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`, 255, 1155);
+    ctx.fillText(
+      `${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`,
+      255,
+      1155,
+    );
   }
 
-  paintFace(s, 600, 1120, 100);
+  if (s.video) paintFace(s, s.video, ctx, 600, 1120, 100);
 }
 
-function paintWheel(ctx: CanvasRenderingContext2D, c: Palette, names: string[], rotation: number, cx: number, cy: number, r: number) {
+function paintWheel(
+  ctx: CanvasRenderingContext2D,
+  c: Palette,
+  names: string[],
+  rotation: number,
+  cx: number,
+  cy: number,
+  r: number,
+) {
   const count = names.length;
   ctx.save();
   ctx.fillStyle = c.goldDeep;
@@ -398,7 +572,19 @@ function paintWheel(ctx: CanvasRenderingContext2D, c: Palette, names: string[], 
     }
   }
   if (count > 0) {
-    const size = (count > 60 ? 7 : count <= 6 ? 9 : count <= 10 ? 7.5 : count <= 16 ? 6 : count <= 30 ? 4.5 : 3.2) * (r / 100);
+    const size =
+      (count > 60
+        ? 7
+        : count <= 6
+          ? 9
+          : count <= 10
+            ? 7.5
+            : count <= 16
+              ? 6
+              : count <= 30
+                ? 4.5
+                : 3.2) *
+      (r / 100);
     const maxChars = count <= 10 ? 14 : 18;
     ctx.font = `800 ${size}px ${DISPLAY}`;
     ctx.textBaseline = "middle";
@@ -446,7 +632,11 @@ function paintWheel(ctx: CanvasRenderingContext2D, c: Palette, names: string[], 
   ctx.restore();
 }
 
-function paintSummary(ctx: CanvasRenderingContext2D, c: Palette, rows: { prize: string; merchant: string; winner: string }[]) {
+function paintSummary(
+  ctx: CanvasRenderingContext2D,
+  c: Palette,
+  rows: { prize: string; merchant: string; winner: string }[],
+) {
   ctx.fillStyle = c.card;
   roundRect(ctx, 30, 340, W - 60, 630, 28);
   ctx.fill();
@@ -460,15 +650,26 @@ function paintSummary(ctx: CanvasRenderingContext2D, c: Palette, rows: { prize: 
     const y = 430 + i * rowH;
     ctx.fillStyle = c.muted;
     ctx.font = `700 ${Math.min(24, rowH / 5)}px ${SANS}`;
-    ctx.fillText(wrap(ctx, `Prêmio ${i + 1}: ${row.prize} · ${row.merchant}`, W - 120, 1)[0] ?? "", 60, y + rowH * 0.3);
+    ctx.fillText(
+      wrap(ctx, `Prêmio ${i + 1}: ${row.prize} · ${row.merchant}`, W - 120, 1)[0] ?? "",
+      60,
+      y + rowH * 0.3,
+    );
     ctx.fillStyle = c.ink;
     ctx.font = `800 ${Math.min(40, rowH / 3)}px ${DISPLAY}`;
     ctx.fillText(wrap(ctx, `🎉 ${row.winner}`, W - 120, 1)[0] ?? "", 60, y + rowH * 0.7);
   });
 }
 
-function paintFace(s: Session, cx: number, cy: number, r: number) {
-  const { ctx, video, colors: c } = s;
+function paintFace(
+  s: Session,
+  video: HTMLVideoElement,
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+) {
+  const c = s.colors;
   ctx.save();
   ctx.fillStyle = c.card;
   ctx.beginPath();

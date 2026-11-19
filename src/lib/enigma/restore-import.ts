@@ -103,7 +103,9 @@ export async function applyRestore(p: Extract<Preview, { ok: true }>): Promise<A
   const written: string[] = [];
   try {
     for (const [id, path] of plan.writeVideos) {
-      await putVideoOrThrow(id, await zip.file(path)!.async("blob"));
+      const raw = await zip.file(path)!.async("blob");
+      const mime = p.backup.manifest.videos.find((v) => v.recordingId === id)?.mimeType;
+      await putVideoOrThrow(id, mime ? new Blob([raw], { type: mime }) : raw);
       written.push(id);
     }
   } catch {

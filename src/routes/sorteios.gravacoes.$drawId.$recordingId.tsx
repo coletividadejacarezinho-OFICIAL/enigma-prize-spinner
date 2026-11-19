@@ -13,6 +13,7 @@ import { formatDateBR, formatDuration, merchantOf } from "@/lib/enigma/logic";
 import { report } from "@/lib/enigma/feedback";
 import { repo, useAppState } from "@/lib/enigma/repo";
 import { RECORDING_MODES, type Recording } from "@/lib/enigma/types";
+import { isAudioOnly } from "@/lib/enigma/capture";
 import { loadVideo, videoFileName } from "@/lib/enigma/videos";
 
 export const Route = createFileRoute("/sorteios/gravacoes/$drawId/$recordingId")({
@@ -182,11 +183,13 @@ function RealRecording({
       <div className="flex items-center gap-2">
         <h1 className="text-3xl font-extrabold">Gravação</h1>
         <span className="rounded-full border border-gold px-2 py-0.5 text-xs font-bold text-gold">
-          Vídeo
+          {isAudioOnly(rec.mimeType) ? "Áudio" : "Vídeo"}
         </span>
       </div>
       <p className="text-sm text-muted-foreground">
-        {formatDateBR(date)} · {formatDuration(rec.durationMs)}
+        {formatDateBR(date)} · {formatDuration(rec.durationMs)} ·{" "}
+        {RECORDING_MODES.find((m) => m.id === rec.mode)?.label}
+        {rec.mode !== "voz" ? (rec.mic ? " · com microfone" : " · sem microfone") : ""}
       </p>
       {(rec.rounds ?? []).length > 0 ? (
         <ul className="mt-3 space-y-1">
@@ -206,12 +209,12 @@ function RealRecording({
       )}
       <div className="mt-4">
         {blob === undefined ? (
-          <p className="text-center text-sm text-muted-foreground">Abrindo o vídeo…</p>
+          <p className="text-center text-sm text-muted-foreground">Abrindo a gravação…</p>
         ) : blob ? (
           <VideoActions blob={blob} filename={videoFileName(date, rec.mimeType ?? blob.type)} />
         ) : (
           <p className="rounded-2xl border-2 border-dashed border-border p-4 text-center text-muted-foreground">
-            O vídeo não está mais guardado neste aparelho.
+            A gravação não está mais guardada neste aparelho.
           </p>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { mediaExtension } from "./capture";
 /**
  * Recorded videos stay on this phone, in the browser's IndexedDB (localStorage is far too
  * small for video). Browser-only: call from effects or event handlers.
@@ -48,7 +49,7 @@ export async function loadVideo(id: string): Promise<Blob | null> {
 }
 
 export function videoFileName(date: string, mimeType: string, index = 0): string {
-  const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+  const ext = mediaExtension(mimeType);
   const [y, m, d] = date.split("-");
   return `enigma-premiado-${d}-${m}-${y}${index > 0 ? `-${index + 1}` : ""}.${ext}`;
 }

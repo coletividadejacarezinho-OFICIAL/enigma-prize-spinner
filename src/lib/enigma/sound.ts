@@ -58,10 +58,30 @@ export function stopAllSound() {
   for (const s of [...active]) s();
 }
 
+/**
+ * E07: while a recording runs, the music is also sent straight into the file at its own
+ * level (`recordedMusicLevel`), so it never depends on the microphone hearing the speaker.
+ */
+let tap: { node: AudioNode; level: number } | null = null;
+
+export function audioContext(): AudioContext | null {
+  return audio();
+}
+
+export function setRecordTap(node: AudioNode | null, level = 0) {
+  tap = node && level > 0 ? { node, level } : null;
+}
+
 function master(a: AudioContext, volume: number) {
   const g = a.createGain();
   g.gain.value = volume;
   g.connect(a.destination);
+  if (tap && volume > 0) {
+    // The file gets the recording level whatever the loudspeaker volume is.
+    const r = a.createGain();
+    r.gain.value = tap.level / volume;
+    g.connect(r).connect(tap.node);
+  }
   let stopped = false;
   const stop = () => {
     if (stopped) return;

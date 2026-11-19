@@ -145,7 +145,7 @@ export const BOT_TIME_ZONE = "America/Sao_Paulo";
 export const LISTAO_DAYS = 30;
 
 export const RECORDING_MODES: { id: RecordingMode; label: string; video: boolean }[] = [
-  { id: "roleta-voz", label: "Roleta com minha voz", video: true },
-  { id: "roleta-camera", label: "Roleta com minha câmera", video: true },
+  { id: "roleta-voz", label: "Só a roleta", video: true },
+  { id: "roleta-camera", label: "Roleta com meu rosto", video: true },
   { id: "voz", label: "Só minha voz", video: false },
 ];

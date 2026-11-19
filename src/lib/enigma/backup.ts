@@ -1,3 +1,4 @@
+import { mediaExtension } from "./capture";
 import { roundsOf } from "./rounds";
 import type { AppState } from "./types";
 
@@ -37,7 +38,7 @@ export type BackupManifest = {
 };
 
 export function videoPath(recordingId: string, mimeType?: string): string {
-  return `videos/${recordingId}.${mimeType?.includes("mp4") ? "mp4" : "webm"}`;
+  return `videos/${recordingId}.${mediaExtension(mimeType)}`;
 }
 
 /** Every real recording the state points to. */

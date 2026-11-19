@@ -62,6 +62,8 @@ import {
   startRecording,
   stopRecording,
   stopStream,
+  isRecording,
+  cancelRecording,
   useRecorder,
   type RecFrame,
 } from "@/lib/enigma/recorder";
@@ -82,8 +84,9 @@ import { numberedList, numberedPool, wheelLabels, winnerNumber } from "@/lib/eni
 import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
-import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
-import { saveVideo, videoFileName } from "@/lib/enigma/videos";
+import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording, type RecordingMode } from "@/lib/enigma/types";
+import { keepRecording } from "@/lib/enigma/recording-save";
+import { videoFileName } from "@/lib/enigma/videos";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -129,6 +132,14 @@ function Roleta() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const rec = useRecorder();
+  const endRef = useRef<((leaving?: boolean) => Promise<void>) | null>(null);
+  // Leaving the Roleta ends the recording, keeps the file and frees camera and microphone.
+  useEffect(
+    () => () => {
+      if (isRecording()) void endRef.current?.(true);
+    },
+    [],
+  );
   // Full screen only changes what is shown around the same wheel, so a spin in progress,
   // the names and the saved result are untouched when entering or leaving it.
   const full = usePresentation();
@@ -284,27 +295,39 @@ function Roleta() {
     if (multi && isLast) setSummaryOpen(true);
   };
 
-  const handleStartRecording = (stream: MediaStream) => {
+  const handleStartRecording = (choice: { mode: RecordingMode; mic: boolean }, stream: MediaStream | null) => {
     setCameraOpen(false);
-    if (!frameRef.current || !startRecording(stream, draw.id, frameRef.current)) {
+    const started =
+      !!frameRef.current &&
+      startRecording({
+        mode: choice.mode,
+        mic: choice.mic,
+        stream,
+        drawId: draw.id,
+        frame: frameRef.current,
+        sound: state.sound,
+        volume: clampVolume(state.volume),
+      });
+    if (!started) {
       stopStream(stream);
-      toast.error("Este celular não conseguiu começar a gravação.");
+      toast.error("Este celular não conseguiu começar a gravação. Você pode girar sem gravar.");
     }
   };
 
-  const handleEndRecording = async () => {
-    if (stopping) return;
+  const handleEndRecording = async (leaving = false) => {
+    if (stopping && !leaving) return;
     setStopping(true);
     const out = await stopRecording();
     setStopping(false);
     if (!out) return;
+    // Winners come from the saved results, never from the recording.
     const decided = rounds
       .filter((r) => r.result && r.result.at >= out.startedAt)
       .map((r) => ({ prize: r.prize, merchant: r.merchantName, winner: r.result?.winner ?? "" }));
     const recording: Recording = {
       id: newId(),
-      mode: "roleta-camera",
-      mic: true,
+      mode: out.mode,
+      mic: out.mode === "voz" ? true : out.mic,
       startedAt: out.startedAt,
       durationMs: out.durationMs,
       real: true,
@@ -313,16 +336,21 @@ function Roleta() {
       rounds: decided,
       ...(decided[0] ? { winner: decided[0].winner } : {}),
     };
-    const saved =
-      (await saveVideo(recording.id, out.blob)) &&
-      report(await repo.addRecording(draw.id, recording));
+    const saved = await keepRecording(draw.id, recording, out.blob);
+    if (leaving) {
+      if (saved) toast.success("Gravação guardada em Sorteios.");
+      else toast.error("A gravação não foi guardada. Abra a Roleta de novo antes de gravar outra.");
+      return;
+    }
     setVideoDone({
       blob: out.blob,
       filename: videoFileName(draw.date, out.mimeType, draw.recordings?.length ?? 0),
       recording,
       saved,
+      drawId: draw.id,
     });
   };
+  endRef.current = handleEndRecording;
 
   // Built from the saved results of the round on the wheel, never from a new spin.
   const message = drawResultMessage(draw, state.merchants, GROUP_NAME);
@@ -470,7 +498,25 @@ function Roleta() {
       <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
         {rec && (
           <div className="absolute left-4 top-1 z-20">
-            <RecIndicator startedAt={rec.startedAt} />
+            <div className="flex items-center gap-1.5">
+              <RecIndicator startedAt={rec.startedAt} />
+              <span className="rounded-full bg-nav/90 px-2 py-1 text-xs font-bold">
+                {rec.mode === "voz" ? "Só voz" : rec.mode === "roleta-camera" ? "Com rosto" : "Só roleta"}
+                {rec.mode !== "voz" && !rec.mic ? " · sem micro" : ""}
+              </span>
+              <button
+                onClick={() => {
+                  if (window.confirm("Cancelar a gravação? O vídeo será descartado. O resultado do sorteio continua salvo.")) {
+                    cancelRecording();
+                    toast("Gravação cancelada.");
+                  }
+                }}
+                disabled={spinning || stopping}
+                className="rounded-full bg-nav/90 px-2 py-1 text-xs font-bold text-muted-foreground underline disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         )}
         <Wheel
