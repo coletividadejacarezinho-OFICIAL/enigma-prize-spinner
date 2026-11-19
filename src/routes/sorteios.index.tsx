@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
-import { ChevronRight, Megaphone, Pencil, Plus, Trophy } from "lucide-react";
+import { ChevronRight, Megaphone, Pencil, Plus, Trophy, Video } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -8,7 +8,13 @@ import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { ListaoShareDialog } from "@/components/enigma/ListaoShare";
 import { MerchantLogo } from "@/components/enigma/Logos";
-import { buildListao, formatDateBR, merchantOf, todayISO } from "@/lib/enigma/logic";
+import {
+  buildListao,
+  formatDateBR,
+  formatDuration,
+  merchantOf,
+  todayISO,
+} from "@/lib/enigma/logic";
 import { setCurrent, useAppState } from "@/lib/enigma/store";
 import { cn } from "@/lib/utils";
 
@@ -108,63 +114,96 @@ function Sorteios() {
                   return (
                     <li
                       key={d.id}
-                      className={cn(
-                        "flex gap-1 rounded-2xl bg-card",
-                        isCurrent && "ring-2 ring-gold",
-                      )}
+                      className={cn("rounded-2xl bg-card", isCurrent && "ring-2 ring-gold")}
                     >
-                      <button
-                        onClick={() => {
-                          setCurrent(d.id);
-                          navigate({ to: "/" });
-                        }}
-                        className="flex min-w-0 flex-1 gap-3 rounded-2xl p-3 text-left active:bg-secondary"
-                      >
-                        <MerchantLogo src={m.logo} className="h-12 w-12" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-sm font-bold text-muted-foreground">
-                              {formatDateBR(d.date)}
-                            </span>
-                            {d.isSample ? (
-                              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold">
-                                Sorteio de teste
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setCurrent(d.id);
+                            navigate({ to: "/" });
+                          }}
+                          className="flex min-w-0 flex-1 gap-3 rounded-2xl p-3 text-left active:bg-secondary"
+                        >
+                          <MerchantLogo src={m.logo} className="h-12 w-12" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-sm font-bold text-muted-foreground">
+                                {formatDateBR(d.date)}
                               </span>
-                            ) : d.confirmed ? null : (
-                              <span className="rounded-full border border-gold/70 px-2 py-0.5 text-xs font-semibold text-gold">
-                                Rascunho · aguardando confirmação
-                              </span>
-                            )}
-                            {isCurrent && (
-                              <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                                Na roleta agora
-                              </span>
+                              {d.isSample ? (
+                                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold">
+                                  Sorteio de teste
+                                </span>
+                              ) : d.confirmed ? null : (
+                                <span className="rounded-full border border-gold/70 px-2 py-0.5 text-xs font-semibold text-gold">
+                                  Rascunho · aguardando confirmação
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                                  Na roleta agora
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 font-bold">{m.name}</p>
+                            <p className="text-sm text-muted-foreground">{d.prize}</p>
+                            {d.result ? (
+                              <p className="mt-1 flex items-center gap-1.5 font-bold text-gold">
+                                <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span className="truncate">Ganhador(a): {d.result.winner}</span>
+                              </p>
+                            ) : (
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                Ainda não girou · {d.names.length}{" "}
+                                {d.names.length === 1 ? "nome" : "nomes"}
+                              </p>
                             )}
                           </div>
-                          <p className="mt-0.5 font-bold">{m.name}</p>
-                          <p className="text-sm text-muted-foreground">{d.prize}</p>
-                          {d.result ? (
-                            <p className="mt-1 flex items-center gap-1.5 font-bold text-gold">
-                              <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
-                              <span className="truncate">Ganhador(a): {d.result.winner}</span>
-                            </p>
-                          ) : (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              Ainda não girou · {d.names.length}{" "}
-                              {d.names.length === 1 ? "nome" : "nomes"}
-                            </p>
-                          )}
+                        </button>
+                        {!d.isSample && (
+                          <Link
+                            to="/sorteios/editar/$drawId"
+                            params={{ drawId: d.id }}
+                            aria-label={`Editar sorteio de ${m.name}`}
+                            className="flex w-12 shrink-0 items-center justify-center rounded-2xl text-muted-foreground active:bg-secondary"
+                          >
+                            <Pencil className="h-5 w-5" aria-hidden="true" />
+                          </Link>
+                        )}
+                      </div>
+                      {d.recordings && d.recordings.length > 0 && (
+                        <div className="border-t border-border px-3 pb-3 pt-2">
+                          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                            Gravações
+                          </p>
+                          <ul className="space-y-1">
+                            {[...d.recordings].reverse().map((r) => (
+                              <li key={r.id}>
+                                <Link
+                                  to="/sorteios/gravacoes/$drawId/$recordingId"
+                                  params={{ drawId: d.id, recordingId: r.id }}
+                                  className="flex min-h-11 items-center gap-2 rounded-xl bg-secondary/60 px-3 py-2 active:bg-secondary"
+                                >
+                                  <Video
+                                    className="h-4 w-4 shrink-0 text-gold"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                                    {r.winner
+                                      ? `Ganhador(a): ${r.winner}`
+                                      : "Sem sorteio realizado"}
+                                  </span>
+                                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                    {formatDuration(r.durationMs)}
+                                  </span>
+                                  <span className="shrink-0 rounded-full border border-gold/70 px-1.5 py-0.5 text-[10px] font-bold text-gold">
+                                    Simulação
+                                  </span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      </button>
-                      {!d.isSample && (
-                        <Link
-                          to="/sorteios/editar/$drawId"
-                          params={{ drawId: d.id }}
-                          aria-label={`Editar sorteio de ${m.name}`}
-                          className="flex w-12 shrink-0 items-center justify-center rounded-2xl text-muted-foreground active:bg-secondary"
-                        >
-                          <Pencil className="h-5 w-5" aria-hidden="true" />
-                        </Link>
                       )}
                     </li>
                   );
@@ -173,7 +212,10 @@ function Sorteios() {
           </div>
         ) : (
           <div role="tabpanel">
-            <GoldButton onClick={() => navigate({ to: "/sorteios/comercios/novo" })} className="mt-4">
+            <GoldButton
+              onClick={() => navigate({ to: "/sorteios/comercios/novo" })}
+              className="mt-4"
+            >
               <Plus aria-hidden="true" /> Cadastrar comércio
             </GoldButton>
             {state.merchants.length === 0 ? (
@@ -202,7 +244,10 @@ function Sorteios() {
                               </p>
                             )}
                           </div>
-                          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <ChevronRight
+                            className="h-5 w-5 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
                         </Link>
                       </li>
                     );

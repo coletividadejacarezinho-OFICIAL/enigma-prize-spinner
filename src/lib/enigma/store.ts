@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { createSampleState, migrateState } from "./logic";
-import type { AppState, Draw, Merchant } from "./types";
+import { createSampleState, finishRecording, migrateState } from "./logic";
+import type { AppState, Draw, Merchant, Recording, RecordingSession } from "./types";
 
 const KEY = "enigma-premiado:v1";
 const EVENT = "enigma-premiado:change";
@@ -86,11 +86,11 @@ export function updateDraw(id: string, fn: (draw: Draw) => Draw): boolean {
 }
 
 export function addDraw(draw: Draw): boolean {
-  return update((s) => ({ ...s, draws: [...s.draws, draw], currentId: draw.id }));
+  return update((s) => switchCurrent({ ...s, draws: [...s.draws, draw] }, draw.id));
 }
 
 export function setCurrent(id: string): boolean {
-  return update((s) => ({ ...s, currentId: id }));
+  return update((s) => switchCurrent(s, id));
 }
 
 export function saveMerchant(merchant: Merchant): boolean {
@@ -108,4 +108,43 @@ export function saveMerchant(merchant: Merchant): boolean {
 /** Adds a draft or ready round without putting it on the wheel. */
 export function saveDraw(draw: Draw): boolean {
   return update((s) => ({ ...s, draws: [...s.draws, draw] }));
+}
+
+export function startRecording(session: RecordingSession): boolean {
+  return update((s) => ({ ...s, recording: session }));
+}
+
+/** Removes the running test from the state and files it under its draw's "Gravações". */
+function closeSession(s: AppState, now: number): { state: AppState; saved: Recording | null } {
+  const session = s.recording;
+  const { recording: _ended, ...rest } = s;
+  if (!session) return { state: s, saved: null };
+  const draw = s.draws.find((d) => d.id === session.drawId);
+  if (!draw) return { state: rest, saved: null };
+  const rec = finishRecording(session, draw, now);
+  return {
+    saved: rec,
+    state: {
+      ...rest,
+      draws: s.draws.map((d) =>
+        d.id === draw.id ? { ...d, recordings: [...(d.recordings ?? []), rec] } : d,
+      ),
+    },
+  };
+}
+
+export function endRecording(now: number): Recording | null {
+  let saved: Recording | null = null;
+  update((s) => {
+    const r = closeSession(s, now);
+    saved = r.saved;
+    return r.state;
+  });
+  return saved;
+}
+
+/** Putting another round on the wheel ends a test recording of the previous one. */
+function switchCurrent(s: AppState, id: string): AppState {
+  const base = s.recording && s.recording.drawId !== id ? closeSession(s, Date.now()).state : s;
+  return { ...base, currentId: id };
 }

@@ -40,3 +40,4 @@ use the editor.
 - Partner shops are records in `state.merchants`; a draw links one by `merchantId` and keeps its own date and courtesy. Always show a draw's shop through `merchantOf()` so renamed shops and new logos reach the wheel; `migrateState()` upgrades older saved data on read.
 - The Listão da Alegria is computed only by `buildListao()` (confirmed, non-test draws; LISTAO_DAYS inclusive from the latest arrived date; future dates scheduled), and both the Sorteios card count and the list use that same result so they can never disagree.
 - The "Cadastrar agora" dialog sits outside the draw `<form>`: React submit events bubble through portals.
+- Test recordings are simulated: `state.recording` holds the running session so tab switches keep the timer, and `endRecording()` files it under the draw's `recordings`. Never call getUserMedia or offer a download until real recording is requested; switching the current round ends a running test.

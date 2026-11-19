@@ -18,6 +18,7 @@ import { Route as SorteiosNovoRouteImport } from './routes/sorteios.novo'
 import { Route as SorteiosComerciosMerchantIdRouteImport } from './routes/sorteios.comercios.$merchantId'
 import { Route as SorteiosComerciosNovoRouteImport } from './routes/sorteios.comercios.novo'
 import { Route as SorteiosEditarDrawIdRouteImport } from './routes/sorteios.editar.$drawId'
+import { Route as SorteiosGravacoesDrawIdRecordingIdRouteImport } from './routes/sorteios.gravacoes.$drawId.$recordingId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -65,6 +66,12 @@ const SorteiosEditarDrawIdRoute = SorteiosEditarDrawIdRouteImport.update({
   path: '/sorteios/editar/$drawId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SorteiosGravacoesDrawIdRecordingIdRoute =
+  SorteiosGravacoesDrawIdRecordingIdRouteImport.update({
+    id: '/sorteios/gravacoes/$drawId/$recordingId',
+    path: '/sorteios/gravacoes/$drawId/$recordingId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -76,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
   '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
   '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
+  '/sorteios/gravacoes/$drawId/$recordingId': typeof SorteiosGravacoesDrawIdRecordingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -87,6 +95,7 @@ export interface FileRoutesByTo {
   '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
   '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
   '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
+  '/sorteios/gravacoes/$drawId/$recordingId': typeof SorteiosGravacoesDrawIdRecordingIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -99,6 +108,7 @@ export interface FileRoutesById {
   '/sorteios/comercios/$merchantId': typeof SorteiosComerciosMerchantIdRoute
   '/sorteios/comercios/novo': typeof SorteiosComerciosNovoRoute
   '/sorteios/editar/$drawId': typeof SorteiosEditarDrawIdRoute
+  '/sorteios/gravacoes/$drawId/$recordingId': typeof SorteiosGravacoesDrawIdRecordingIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -112,6 +122,7 @@ export interface FileRouteTypes {
     | '/sorteios/comercios/$merchantId'
     | '/sorteios/comercios/novo'
     | '/sorteios/editar/$drawId'
+    | '/sorteios/gravacoes/$drawId/$recordingId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -123,6 +134,7 @@ export interface FileRouteTypes {
     | '/sorteios/comercios/$merchantId'
     | '/sorteios/comercios/novo'
     | '/sorteios/editar/$drawId'
+    | '/sorteios/gravacoes/$drawId/$recordingId'
   id:
     | '__root__'
     | '/'
@@ -134,6 +146,7 @@ export interface FileRouteTypes {
     | '/sorteios/comercios/$merchantId'
     | '/sorteios/comercios/novo'
     | '/sorteios/editar/$drawId'
+    | '/sorteios/gravacoes/$drawId/$recordingId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -146,6 +159,7 @@ export interface RootRouteChildren {
   SorteiosComerciosMerchantIdRoute: typeof SorteiosComerciosMerchantIdRoute
   SorteiosComerciosNovoRoute: typeof SorteiosComerciosNovoRoute
   SorteiosEditarDrawIdRoute: typeof SorteiosEditarDrawIdRoute
+  SorteiosGravacoesDrawIdRecordingIdRoute: typeof SorteiosGravacoesDrawIdRecordingIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -213,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SorteiosEditarDrawIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sorteios/gravacoes/$drawId/$recordingId': {
+      id: '/sorteios/gravacoes/$drawId/$recordingId'
+      path: '/sorteios/gravacoes/$drawId/$recordingId'
+      fullPath: '/sorteios/gravacoes/$drawId/$recordingId'
+      preLoaderRoute: typeof SorteiosGravacoesDrawIdRecordingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -226,6 +247,8 @@ const rootRouteChildren: RootRouteChildren = {
   SorteiosComerciosMerchantIdRoute: SorteiosComerciosMerchantIdRoute,
   SorteiosComerciosNovoRoute: SorteiosComerciosNovoRoute,
   SorteiosEditarDrawIdRoute: SorteiosEditarDrawIdRoute,
+  SorteiosGravacoesDrawIdRecordingIdRoute:
+    SorteiosGravacoesDrawIdRecordingIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

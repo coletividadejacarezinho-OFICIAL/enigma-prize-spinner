@@ -74,6 +74,7 @@
   --color-gold: var(--gold);
   --color-gold-deep: var(--gold-deep);
   --color-nav: var(--nav);
+  --color-rec: var(--rec);
   --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Baloo 2", "Nunito", ui-rounded, system-ui, sans-serif;
 }
@@ -104,6 +105,7 @@
   --gold: oklch(0.84 0.165 85);
   --gold-deep: oklch(0.66 0.14 70);
   --nav: oklch(0.16 0.065 300);
+  --rec: oklch(0.63 0.24 25);
   --gradient-gold: linear-gradient(180deg, var(--primary-glow), var(--primary) 55%, var(--gold-deep));
   --gradient-rim: conic-gradient(from 0deg, var(--primary-glow), var(--gold-deep), var(--primary), var(--gold-deep), var(--primary-glow));
   --gradient-page: radial-gradient(120% 60% at 50% 0%, oklch(0.32 0.14 300) 0%, var(--background) 60%);

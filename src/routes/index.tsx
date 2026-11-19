@@ -1,23 +1,33 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Pencil, Plus, Share2, Trophy, UserPlus } from "lucide-react";
+import { Camera, Pencil, Plus, Share2, Square, Trophy, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { MerchantLogo } from "@/components/enigma/Logos";
+import { RecIndicator } from "@/components/enigma/RecIndicator";
+import { RecordSheet } from "@/components/enigma/RecordSheet";
+import { RecordingDoneDialog } from "@/components/enigma/RecordingDone";
 import { Wheel } from "@/components/enigma/Wheel";
 import {
   formatDateBR,
   merchantOf,
+  micFor,
   pickWinnerIndex,
   secureRandom,
   shareText,
   targetRotation,
 } from "@/lib/enigma/logic";
 import { playTick, playWin, unlockSound } from "@/lib/enigma/sound";
-import { currentDraw, updateDraw, useAppState } from "@/lib/enigma/store";
-import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN } from "@/lib/enigma/types";
+import {
+  currentDraw,
+  endRecording,
+  startRecording,
+  updateDraw,
+  useAppState,
+} from "@/lib/enigma/store";
+import { APP_NAME, GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording } from "@/lib/enigma/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,12 +35,14 @@ export const Route = createFileRoute("/")({
       { title: "Roleta — Enigma Premiado" },
       {
         name: "description",
-        content: "Gire a roleta do Enigma Premiado da Coletividade Jacarezinho PR e veja o ganhador.",
+        content:
+          "Gire a roleta do Enigma Premiado da Coletividade Jacarezinho PR e veja o ganhador.",
       },
       { property: "og:title", content: "Roleta — Enigma Premiado" },
       {
         property: "og:description",
-        content: "Gire a roleta do Enigma Premiado da Coletividade Jacarezinho PR e veja o ganhador.",
+        content:
+          "Gire a roleta do Enigma Premiado da Coletividade Jacarezinho PR e veja o ganhador.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -46,6 +58,8 @@ function Roleta() {
   const navigate = useNavigate();
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number } | null>(null);
   const spinningRef = useRef(false);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [done, setDone] = useState<{ recording: Recording; drawId: string } | null>(null);
 
   if (!state) return <RoletaSkeleton />;
 
@@ -56,6 +70,19 @@ function Roleta() {
   const spinning = spin !== null;
   const showResult = !!result && !spinning;
   const canSpin = count >= MIN_NAMES_TO_SPIN;
+  const session = state.recording?.drawId === draw.id ? state.recording : undefined;
+  const recording = !!session;
+  const showRecordButton = recording || (canSpin && !result);
+
+  const handleStartRecording = (mode: Parameters<typeof micFor>[0], mic: boolean) => {
+    startRecording({ drawId: draw.id, mode, mic: micFor(mode, mic), startedAt: Date.now() });
+    setRecordOpen(false);
+  };
+
+  const handleEndRecording = () => {
+    const rec = endRecording(Date.now());
+    if (rec) setDone({ recording: rec, drawId: draw.id });
+  };
 
   const handleSpin = () => {
     if (spinningRef.current || draw.result || !canSpin) return;
@@ -122,6 +149,11 @@ function Roleta() {
       </p>
 
       <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-5">
+        {session && (
+          <div className="absolute left-4 top-1 z-20">
+            <RecIndicator startedAt={session.startedAt} />
+          </div>
+        )}
         <Wheel
           names={draw.names}
           rotation={result?.rotation ?? 0}
@@ -149,20 +181,55 @@ function Roleta() {
       </div>
 
       <div className="space-y-1 px-4 pb-2">
-        {!canSpin && !result ? (
-          <GoldButton onClick={() => navigate({ to: "/nomes" })}>
-            <UserPlus aria-hidden="true" /> Adicionar nomes
-          </GoldButton>
-        ) : showResult ? (
-          <GoldButton onClick={handleShare}>
-            <Share2 aria-hidden="true" /> Compartilhar resultado
-          </GoldButton>
-        ) : (
-          <GoldButton onClick={handleSpin} disabled={spinning}>
-            {spinning ? "Girando…" : "Girar roleta"}
-          </GoldButton>
-        )}
-        {result ? (
+        <div
+          className={
+            showRecordButton
+              ? recording
+                ? "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2"
+                : "grid grid-cols-[auto_minmax(0,1fr)] gap-2"
+              : ""
+          }
+        >
+          {showRecordButton &&
+            (recording ? (
+              <button
+                onClick={handleEndRecording}
+                disabled={spinning}
+                className="flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-rec bg-card px-2 text-base font-extrabold leading-tight disabled:opacity-50"
+              >
+                <Square className="h-4 w-4 shrink-0 fill-rec text-rec" aria-hidden="true" />
+                <span>Encerrar gravação</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setRecordOpen(true)}
+                disabled={spinning}
+                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-4 text-lg font-extrabold active:bg-accent disabled:opacity-50"
+              >
+                <Camera className="h-6 w-6 shrink-0 text-gold" aria-hidden="true" /> Gravar
+              </button>
+            ))}
+          {!canSpin && !result ? (
+            <GoldButton onClick={() => navigate({ to: "/nomes" })}>
+              <UserPlus aria-hidden="true" /> Adicionar nomes
+            </GoldButton>
+          ) : showResult ? (
+            <GoldButton onClick={handleShare} className={recording ? "text-lg" : ""}>
+              <Share2 aria-hidden="true" /> {recording ? "Compartilhar" : "Compartilhar resultado"}
+            </GoldButton>
+          ) : (
+            <GoldButton onClick={handleSpin} disabled={spinning}>
+              {spinning ? "Girando…" : "Girar roleta"}
+            </GoldButton>
+          )}
+        </div>
+        {recording ? (
+          <p className="flex h-11 items-center justify-center text-center text-sm font-semibold text-muted-foreground">
+            {result
+              ? "Ao terminar de falar, toque em Encerrar gravação."
+              : "Apresente a cortesia e toque em Girar roleta."}
+          </p>
+        ) : result ? (
           <SecondaryButton
             onClick={() => navigate({ to: "/sorteios/novo" })}
             disabled={spinning}
@@ -178,6 +245,21 @@ function Roleta() {
           <div className="h-11" />
         )}
       </div>
+
+      <RecordSheet open={recordOpen} onOpenChange={setRecordOpen} onStart={handleStartRecording} />
+      <RecordingDoneDialog
+        recording={done?.recording ?? null}
+        date={draw.date}
+        merchant={shop.name}
+        prize={draw.prize}
+        onClose={() => setDone(null)}
+        onPreview={() => {
+          if (!done) return;
+          const params = { drawId: done.drawId, recordingId: done.recording.id };
+          setDone(null);
+          navigate({ to: "/sorteios/gravacoes/$drawId/$recordingId", params });
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Draw, Merchant } from "@/lib/enigma/types";
 import {
+  finishRecording,
+  formatDuration,
+  micFor,
   addDaysISO,
   buildListao,
   createDraw,
@@ -147,5 +150,39 @@ describe("Listão da Alegria", () => {
     const next = migrateState(old);
     expect(next.merchants.map((m) => m.name)).toEqual(["Mercado Bom Preço"]);
     expect(next.draws[0]?.merchantId).toBe(next.merchants[0]?.id);
+  });
+});
+
+describe("Test recording", () => {
+  const base: Draw = {
+    id: "d1",
+    date: "2026-11-19",
+    merchant: "Burguer 7",
+    prize: "Um hambúrguer com batata",
+    names: ["Ana", "Bia"],
+    createdAt: 0,
+  };
+  const session = { drawId: "d1", mode: "roleta-voz" as const, mic: true, startedAt: 1000 };
+
+  it("saves the winner when the wheel was spun during the test", () => {
+    const draw = { ...base, result: { winner: "Bia", index: 1, rotation: 0, at: 5000 } };
+    const rec = finishRecording(session, draw, 65000);
+    expect(rec.winner).toBe("Bia");
+    expect(rec.durationMs).toBe(64000);
+  });
+
+  it("has no winner when ended before spinning", () => {
+    expect(finishRecording(session, base, 9000).winner).toBeUndefined();
+  });
+
+  it("lets only the video modes turn the microphone off", () => {
+    expect(micFor("roleta-voz", false)).toBe(false);
+    expect(micFor("roleta-camera", false)).toBe(false);
+    expect(micFor("voz", false)).toBe(true);
+  });
+
+  it("shows durations as mm:ss", () => {
+    expect(formatDuration(64000)).toBe("01:04");
+    expect(formatDuration(3725000)).toBe("1:02:05");
   });
 });

@@ -1,4 +1,12 @@
-import { LISTAO_DAYS, type AppState, type Draw, type Merchant } from "./types";
+import {
+  LISTAO_DAYS,
+  RECORDING_MODES,
+  type AppState,
+  type Draw,
+  type Merchant,
+  type Recording,
+  type RecordingSession,
+} from "./types";
 
 export const SAMPLE_NAMES = [
   "Ana Souza",
@@ -256,4 +264,32 @@ export function shareText(draw: Draw, merchantName: string, groupName: string): 
     `Oferecimento: ${merchantName}`,
   ];
   return lines.join("\n");
+}
+
+/** mm:ss, or h:mm:ss past an hour. */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${String(m).padStart(2, "0")}:${sec}`;
+}
+
+/** Video modes may turn the microphone off; "Só minha voz" always keeps it on. */
+export function micFor(mode: RecordingSession["mode"], mic: boolean): boolean {
+  const video = RECORDING_MODES.find((m) => m.id === mode)?.video ?? false;
+  return video ? mic : true;
+}
+
+/** Closes a test recording; the winner counts only if the wheel was spun after it started. */
+export function finishRecording(session: RecordingSession, draw: Draw, now: number): Recording {
+  const rec: Recording = {
+    id: newId(),
+    mode: session.mode,
+    mic: micFor(session.mode, session.mic),
+    startedAt: session.startedAt,
+    durationMs: Math.max(0, now - session.startedAt),
+  };
+  if (draw.result && draw.result.at >= session.startedAt) rec.winner = draw.result.winner;
+  return rec;
 }
