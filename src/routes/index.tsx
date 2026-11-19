@@ -120,6 +120,8 @@ function Roleta() {
   const navigate = useNavigate();
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
+  const [slowMotion, setSlowMotion] = useState(true);
+  const idleRotationRef = useRef(0);
   const spinFrameRef = useRef<RecFrame["spin"]>(null);
   const frameRef = useRef<RecFrame | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -263,7 +265,7 @@ function Roleta() {
         }
         const calm = prefersReducedMotion();
         const to = r.value.result.rotation;
-        const from = calm ? to - 20 : 0;
+        const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
         spinFrameRef.current = { from, to, startedAt: performance.now(), durationMs, zoom: !calm };
         // The music starts with the animation of the saved result, never before.
@@ -477,6 +479,18 @@ function Roleta() {
             </span>
           )}
         </p>
+        {count > 0 && !result && (
+          <button
+            type="button"
+            aria-pressed={slowMotion}
+            onClick={() => setSlowMotion((enabled) => !enabled)}
+            disabled={spinning}
+            className="flex h-9 shrink-0 items-center rounded-full bg-secondary px-2 text-xs font-bold text-foreground disabled:opacity-50"
+            title="Movimento lento enquanto aguarda o sorteio"
+          >
+            {slowMotion ? "Lento: ligado" : "Lento: desligado"}
+          </button>
+        )}
         {count > 0 && (
           <button
             onClick={() => setListOpen(true)}
@@ -524,6 +538,8 @@ function Roleta() {
           names={pool}
           rotation={result?.rotation ?? 0}
           spin={spin}
+          idle={slowMotion && !spinning && !result}
+          onIdleRotation={(angle) => { idleRotationRef.current = angle; }}
           onSpinEnd={handleSpinEnd}
         />
         {showResult && result && (
