@@ -130,7 +130,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, win
       const t = Math.max(0, Math.min(1, elapsed / spin.durationMs));
       const r = from + total * wheelEase(t);
       const landedMs = Math.max(0, elapsed - spin.durationMs);
-      const zoom = wheelZoom(t, spin.zoom, landedMs);
+      const zoom = wheelZoom(t, spin.zoom, landedMs, holdMs);
       el.style.transform = `rotate(${r}deg)`;
       lightRim(r);
       rim.style.transform = zoom > 1 ? `scale(${zoom})` : "";

@@ -125,7 +125,10 @@ it("keeps the gold rim visible and the zoom focus clear of the wheel hub", () =>
   expect(focus?.classList.contains("z-20")).toBe(true);
 });
 
-it("zooms late, keeps the pointer fixed and displays the saved name at the end of the spin", () => {
+it.each([
+  { holdMs: undefined, endsAt: 6000 },
+  { holdMs: 3000, endsAt: 4000 },
+])("zooms late and reveals the saved name by $endsAt ms", ({ holdMs, endsAt }) => {
   let frame: FrameRequestCallback = () => {};
   vi.spyOn(performance, "now").mockReturnValue(0);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -139,7 +142,7 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
     <Wheel
       names={names}
       rotation={rotation}
-      spin={{ from: 0, durationMs: 1000, key: 1, zoom: true }}
+      spin={{ from: 0, durationMs: 1000, key: 1, zoom: true, ...(holdMs === undefined ? {} : { holdMs }) }}
       onSpinEnd={onSpinEnd}
     />,
   );
@@ -155,15 +158,15 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
   expect(focus.hidden).toBe(false);
   expect(focus.textContent).toBe("Pessoa 250");
   expect(onSpinEnd).not.toHaveBeenCalled();
-  act(() => frame(5200));
+  act(() => frame(endsAt - 800));
   expect(rim.style.transform).toBe("scale(1.9)");
-  act(() => frame(5600));
+  act(() => frame(endsAt - 400));
   expect(rim.style.transform).toBe("scale(1.45)");
-  act(() => frame(5999));
+  act(() => frame(endsAt - 1));
   expect(focus.textContent).toBe("Pessoa 250");
   expect(focus.hidden).toBe(false);
   expect(onSpinEnd).not.toHaveBeenCalled();
-  act(() => frame(6000));
+  act(() => frame(endsAt));
   expect(onSpinEnd).toHaveBeenCalledTimes(1);
   expect(rim.style.transform).toBe("");
   expect(focus.hidden).toBe(true);
