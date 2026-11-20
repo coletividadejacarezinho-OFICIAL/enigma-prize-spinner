@@ -597,6 +597,11 @@
   flex: 1 1 0%;
 }
 
+@keyframes enigma-hold-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 .enigma-recording-dock {
   display: flex;
   flex: 0 0 auto;

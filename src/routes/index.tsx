@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
+import { HoldToSpinButton } from "@/components/enigma/HoldToSpinButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { SponsorCard } from "@/components/enigma/SponsorCard";
 import { WinnerAnnouncement } from "@/components/enigma/WinnerAnnouncement";
@@ -447,10 +448,16 @@ function Roleta() {
         </GoldButton>
       );
     }
-    return (
-      <GoldButton onClick={handleSpin} disabled={spinning}>
-        {spinning ? "Girando…" : "Girar roleta"}
-      </GoldButton>
+    return spinning ? (
+      <GoldButton disabled>Girando…</GoldButton>
+    ) : (
+      <HoldToSpinButton
+        key={roundIdOf(draw, ri)}
+        onPress={() => {
+          if (state.sound) unlockSound();
+        }}
+        onStart={handleSpin}
+      />
     );
   })();
 
@@ -635,7 +642,7 @@ function Roleta() {
               ? isLast
                 ? "Ao terminar de falar, toque em Encerrar gravação."
                 : "Quando quiser, toque em Sortear próxima cortesia."
-              : "Fale com o público e toque em Girar roleta.",
+              : "Fale com o público e segure o botão para iniciar.",
           )
         ) : done ? (
           <SecondaryButton
