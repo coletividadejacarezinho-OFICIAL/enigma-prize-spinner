@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Camera,
+  CalendarDays,
   ClipboardCheck,
   ListChecks,
   ListOrdered,
+  Gauge,
   Maximize2,
   MessageCircle,
   Minimize2,
@@ -456,8 +458,9 @@ function Roleta() {
         roundTotal={total}
       />
 
-      <div className="mt-1 flex min-h-9 flex-wrap items-center justify-end gap-1.5 px-4 text-xs text-muted-foreground">
-        <p className="mr-auto flex min-h-9 min-w-0 items-center gap-1.5">
+      <div className="enigma-roleta-toolbar mt-1 flex min-h-9 flex-wrap items-center justify-end gap-1.5 px-4 text-xs text-muted-foreground" role="group" aria-label="Controles da roleta">
+        <p className="enigma-toolbar-date mr-auto flex min-h-9 min-w-0 items-center gap-1.5">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0 text-gold" aria-hidden="true" />
           <span className="shrink-0 font-semibold">{formatDateBR(draw.date)}</span>
           {draw.isSample && (
             <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold">
@@ -471,16 +474,17 @@ function Roleta() {
             aria-pressed={slowMotion}
             onClick={() => setSlowMotion((enabled) => !enabled)}
             disabled={spinning}
-            className="flex h-9 shrink-0 items-center rounded-full bg-secondary px-2 text-xs font-bold text-foreground disabled:opacity-50"
+            className={`enigma-toolbar-chip flex h-9 shrink-0 items-center gap-1 rounded-full bg-secondary px-2 text-xs font-bold text-foreground disabled:opacity-50${slowMotion ? " enigma-toolbar-chip--on" : ""}`}
             title="Movimento lento enquanto aguarda o sorteio"
           >
+            <Gauge className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />
             {slowMotion ? "Lento: ligado" : "Lento: desligado"}
           </button>
         )}
         {count > 0 && (
           <button
             onClick={() => setListOpen(true)}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
+            className="enigma-toolbar-chip flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
           >
             <ListOrdered className="h-4 w-4 text-gold" aria-hidden="true" /> Lista
           </button>
@@ -488,7 +492,7 @@ function Roleta() {
         {!full && (
           <button
             onClick={enterFull}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
+            className="enigma-toolbar-chip flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-bold text-foreground active:bg-accent"
           >
             <Maximize2 className="h-4 w-4 text-gold" aria-hidden="true" /> Tela cheia
           </button>
@@ -557,7 +561,7 @@ function Roleta() {
         )}
       </div>
 
-      <div className="space-y-1 px-4 pb-2">
+      <div className="enigma-roleta-actions space-y-1 px-4 pb-2">
         <div
           className={
             showRecordButton
@@ -572,7 +576,7 @@ function Roleta() {
               <button
                 onClick={() => void handleEndRecording()}
                 disabled={spinning || stopping}
-                className="flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-rec bg-card px-2 text-base font-extrabold leading-tight disabled:opacity-50"
+                className="enigma-record-button enigma-record-button--active flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-rec bg-card px-2 text-base font-extrabold leading-tight disabled:opacity-50"
               >
                 <Square className="h-4 w-4 shrink-0 fill-rec text-rec" aria-hidden="true" />
                 <span>{stopping ? "Encerrando…" : "Encerrar gravação"}</span>
@@ -581,7 +585,7 @@ function Roleta() {
               <button
                 onClick={() => setCameraOpen(true)}
                 disabled={spinning}
-                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-3 text-base font-extrabold leading-tight active:bg-accent disabled:opacity-50"
+                className="enigma-record-button flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-3 text-base font-extrabold leading-tight active:bg-accent disabled:opacity-50"
               >
                 <Camera className="h-6 w-6 shrink-0 text-gold" aria-hidden="true" /> Gravar comigo
               </button>
@@ -589,7 +593,7 @@ function Roleta() {
           {goldButton}
         </div>
         {full ? (
-          <SecondaryButton onClick={exitFull} className="border border-gold/60">
+          <SecondaryButton onClick={exitFull} className="enigma-secondary-action border border-gold/60">
             <Minimize2 className="text-gold" aria-hidden="true" /> Sair da tela cheia
           </SecondaryButton>
         ) : recording ? (
@@ -604,7 +608,7 @@ function Roleta() {
           <SecondaryButton
             onClick={() => navigate({ to: "/sorteios/novo" })}
             disabled={spinning}
-            className={spinning ? "invisible" : ""}
+            className={spinning ? "enigma-secondary-action invisible" : "enigma-secondary-action"}
           >
             <Plus aria-hidden="true" /> Novo sorteio
           </SecondaryButton>
@@ -612,7 +616,7 @@ function Roleta() {
           spinning ? (
             hint("")
           ) : (
-            <SecondaryButton onClick={() => setArt(ri)}>
+            <SecondaryButton onClick={() => setArt(ri)} className="enigma-secondary-action">
               <Trophy className="text-gold" aria-hidden="true" /> Compartilhar arte do ganhador
             </SecondaryButton>
           )
@@ -629,7 +633,7 @@ function Roleta() {
             <SecondaryButton
               onClick={() => navigate({ to: "/nomes" })}
               disabled={spinning}
-              className="px-2 text-[15px]"
+              className="enigma-secondary-action px-2 text-[15px]"
             >
               Editar nomes
             </SecondaryButton>
@@ -637,7 +641,7 @@ function Roleta() {
               <SecondaryButton
                 onClick={() => setInviteOpen(true)}
                 disabled={spinning}
-                className="whitespace-nowrap px-2 text-[15px]"
+                className="enigma-secondary-action whitespace-nowrap px-2 text-[15px]"
               >
                 <Send aria-hidden="true" /> Convite (demonstração)
               </SecondaryButton>

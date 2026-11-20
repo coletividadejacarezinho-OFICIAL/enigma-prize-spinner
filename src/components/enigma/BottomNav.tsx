@@ -11,7 +11,7 @@ const tabs = [
 export function BottomNav() {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-nav pb-[env(safe-area-inset-bottom)]"
+      className="enigma-bottom-nav fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-border bg-nav pb-[env(safe-area-inset-bottom)]"
       aria-label="Menu principal"
     >
       <ul className="grid h-16 grid-cols-4">
@@ -20,12 +20,12 @@ export function BottomNav() {
             <Link
               to={to}
               activeOptions={{ exact }}
-              className="group flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold text-muted-foreground data-[status=active]:text-gold"
+              className="enigma-bottom-item group flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold text-muted-foreground data-[status=active]:text-gold"
             >
-              <span className="flex h-7 w-12 items-center justify-center rounded-full group-data-[status=active]:bg-secondary">
+              <span className="enigma-bottom-icon flex h-7 w-12 items-center justify-center rounded-full group-data-[status=active]:bg-secondary">
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
-              {label}
+              <span className="enigma-bottom-label">{label}</span>
             </Link>
           </li>
         ))}
