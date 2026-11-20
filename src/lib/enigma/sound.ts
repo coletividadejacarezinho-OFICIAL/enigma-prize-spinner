@@ -1,5 +1,5 @@
 /** Browser-only sound. Every function is safe when the device blocks audio: it just stays silent. */
-import { BASS, MELODY, REVEAL, noteCount, spinNoteTimes } from "./jingle";
+import { BASS, MELODY, REVEAL, spinBeatTimes, type CountdownStep } from "./jingle";
 
 let ctx: AudioContext | null = null;
 
@@ -100,27 +100,40 @@ function master(a: AudioContext, volume: number) {
 
 /** The spin part: starts with the saved result's animation; returns stop(). */
 export function startSpinTrack(durationMs: number, volume: number): () => void {
-  const a = audio();
-  if (!a || volume <= 0) return () => undefined;
+  const a = volume > 0 && durationMs > 0 ? audio() : null;
+  if (!a) return () => undefined;
   const { g, stop } = master(a, volume);
-  const t0 = a.currentTime + 0.02;
-  spinNoteTimes(durationMs, noteCount(durationMs)).forEach((t, i) => {
-    note(a, g, MELODY[i % MELODY.length]!, t0 + t, 0.16, 0.16, "triangle");
-    if (i % 4 === 0) note(a, g, BASS[(i / 4) % BASS.length]!, t0 + t, 0.3, 0.22, "sine");
+  const t0 = a.currentTime;
+  const seconds = durationMs / 1000;
+  spinBeatTimes(durationMs).forEach((t, i) => {
+    const intensity = 1 - 0.72 * (t / seconds);
+    note(a, g, MELODY[i % MELODY.length]!, t0 + t, Math.min(0.16, seconds - t), 0.19 * intensity, "triangle");
+    if (i % 4 === 0 && t < seconds * 0.58)
+      note(a, g, BASS[(i / 4) % BASS.length]!, t0 + t, 0.3, 0.22 * intensity, "sine");
   });
   return stop;
 }
 
-/** The reveal: played when the wheel stops on the saved result. */
+/** Each countdown beat uses the same mix as the wheel music. */
+export function playCountdownCue(step: CountdownStep, volume: number): () => void {
+  const a = volume > 0 ? audio() : null;
+  if (!a) return () => undefined;
+  const { g, stop } = master(a, volume);
+  const frequency = step === "VALENDO!" ? 880 : [659.25, 587.33, 523.25][step - 1]!;
+  note(a, g, frequency, a.currentTime + 0.01, 0.19, 0.2, "triangle");
+  return stop;
+}
+
+/** The short celebration plays when the result card appears. */
 export function playReveal(volume: number): () => void {
   const a = audio();
   if (!a || volume <= 0) return () => undefined;
   const { g, stop } = master(a, volume);
   const t0 = a.currentTime + 0.01;
-  REVEAL.forEach((f, i) => note(a, g, f, t0 + i * 0.11, 0.5, 0.2, "triangle"));
-  note(a, g, 1046.5, t0 + 0.5, 0.9, 0.18, "triangle");
-  note(a, g, 130.81, t0 + 0.5, 0.9, 0.25, "sine");
-  setTimeout(stop, 1800);
+  REVEAL.forEach((f, i) => note(a, g, f, t0 + i * 0.095, 0.32, 0.14, "triangle"));
+  note(a, g, 783.99, t0 + 0.285, 0.5, 0.09, "sine");
+  note(a, g, 261.63, t0 + 0.285, 0.48, 0.12, "sine");
+  setTimeout(stop, 950);
   return stop;
 }
 

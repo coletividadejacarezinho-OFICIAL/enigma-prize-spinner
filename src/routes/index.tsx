@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { AppHeader } from "@/components/enigma/AppHeader";
 import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
+import { SpinCountdown } from "@/components/enigma/SpinCountdown";
+import { HoldToSpinButton } from "@/components/enigma/HoldToSpinButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { SponsorCard } from "@/components/enigma/SponsorCard";
 import { SummaryResultsDialog } from "@/components/enigma/SummaryResultsDialog";
@@ -78,7 +80,7 @@ import {
   withRoundResult,
 } from "@/lib/enigma/rounds";
 import { playReveal, prefersReducedMotion, startSpinTrack, stopAllSound, unlockSound } from "@/lib/enigma/sound";
-import { clampVolume } from "@/lib/enigma/jingle";
+import { clampVolume, type CountdownStep } from "@/lib/enigma/jingle";
 import { numberedList, numberedPool, winnerNumber } from "@/lib/enigma/numbers";
 import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
@@ -127,6 +129,16 @@ function Roleta() {
   }, []);
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
+  const [preparingSpin, setPreparingSpin] = useState(false);
+  const [spinLanded, setSpinLanded] = useState(false);
+  const [celebration, setCelebration] = useState<{ roundId: string; at: number } | null>(null);
+  const countdownCancelPressed = useRef(false);
+  const [countdown, setCountdown] = useState<{
+    roundId: string | undefined;
+    step: CountdownStep;
+    startedAt: number;
+    repeat?: boolean | undefined;
+  } | null>(null);
   const [slowMotion, setSlowMotion] = useState(true);
   const idleRotationRef = useRef(0);
   const frameRef = useRef<RecFrame | null>(null);
@@ -216,12 +228,18 @@ function Roleta() {
   const result = round.result;
   const resultNumber = winnerNumber(draw, result);
   const done = allRoundsDone(draw);
-  const spinning = spin !== null;
+  const spinning = spin !== null || preparingSpin;
+  const idleRotation = slowMotion ? idleRotationRef.current : 0;
+  const visibleRotation = preparingSpin ? idleRotation : result?.rotation ?? 0;
   const showResult = !!result && !spinning;
   // The wheel only uses the confirmed list; a list changed in Nomes must be confirmed again.
   const dirty = needsConfirmation(draw);
   const readyCount = readyEntries(entriesOf(draw)).length;
   const canSpin = count >= minimumNames && !dirty && !result;
+  const activeRoundId = roundIdOf(draw, ri);
+  const celebrationAt = celebration?.roundId === activeRoundId ? celebration?.at : undefined;
+  const activeCountdown = countdown?.roundId === activeRoundId && canSpin ? countdown : null;
+  if (countdown && !activeCountdown) setCountdown(null);
   const recording = !!rec;
   const videoRecording = recording && rec.mode !== "voz";
   const whatsapp = sponsor?.whatsapp ? cleanWhatsapp(sponsor.whatsapp) : null;
@@ -237,9 +255,12 @@ function Roleta() {
     address: sponsor?.address?.trim(),
     phone: whatsapp ? formatWhatsapp(whatsapp) : undefined,
     names: pool,
-    rotation: spin?.from ?? result?.rotation ?? (slowMotion ? idleRotationRef.current : 0),
+    rotation: spin?.from ?? (preparingSpin || result ? visibleRotation : idleRotation),
     spinning,
+    countdown: activeCountdown,
     winner: showResult && result ? result.winner : null,
+    winnerIndex: result?.index,
+    celebrationAt,
     winnerNumber: showResult ? resultNumber : null,
     summary:
       summaryOpen && done
@@ -259,6 +280,7 @@ function Roleta() {
   const doSpin = (repeat?: boolean) => {
     if (spinningRef.current || result || !canSpin) return;
     spinningRef.current = true;
+    setPreparingSpin(true);
     if (state.sound) unlockSound();
     const wheelNames =
       repeat === undefined ? pool : poolFor({ ...draw, repeatWinners: repeat }, ri);
@@ -276,7 +298,8 @@ function Roleta() {
         result: { winner, index, rotation, at: Date.now() },
       })
       .then((r) => {
-        if (!report(r, () => doSpin(repeat)) || r.value.status !== "saved") {
+        setPreparingSpin(false);
+        if (!report(r, () => beginCountdown(repeat)) || r.value.status !== "saved") {
           // A result already saved for this courtesy is shown as it is; nothing turns.
           spinningRef.current = false;
           return;
@@ -285,29 +308,50 @@ function Roleta() {
         const to = r.value.result.rotation;
         const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
-        // The music starts with the animation of the saved result, never before.
-        if (state.sound && !calm) startSpinTrack(durationMs, clampVolume(state.volume));
+        setSpinLanded(false);
         setSpin({ from, durationMs, key: Date.now(), zoom: !calm });
       });
   };
 
+  const beginCountdown = (repeat?: boolean) => {
+    if (spinningRef.current || !canSpin) return;
+    if (state.sound) unlockSound();
+    const next = { roundId: activeRoundId, step: 3 as const, startedAt: performance.now(), repeat };
+    countdownCancelPressed.current = false;
+    setCountdown((current) => current ?? next);
+  };
+
   const handleSpin = () => {
+    if (activeCountdown || spinningRef.current || !canSpin) return;
     if (needsRepeatAnswer(draw)) {
       setRepeatAsk(true);
       return;
     }
-    doSpin();
+    beginCountdown();
   };
 
   const answerRepeat = (yes: boolean) => {
-    // The answer is saved together with the first result, so a refused save can be tried again.
     setRepeatAsk(false);
-    doSpin(yes);
+    beginCountdown(yes);
+  };
+
+  const advanceCountdown = () => {
+    if (!activeCountdown) return;
+    const { step, repeat } = activeCountdown;
+    if (step === "VALENDO!") {
+      setCountdown(null);
+      doSpin(repeat);
+      return;
+    }
+    const next = step === 3 ? 2 : step === 2 ? 1 : "VALENDO!";
+    setCountdown({ ...activeCountdown, step: next, startedAt: performance.now() });
   };
 
   const handleSpinEnd = () => {
     spinningRef.current = false;
     setSpin(null);
+    setSpinLanded(false);
+    if (activeRoundId && result) setCelebration({ roundId: activeRoundId, at: performance.now() });
     stopAllSound();
     if (state.sound) playReveal(clampVolume(state.volume));
     if (multi && isLast && !videoRecording) setSummaryOpen(true);
@@ -432,7 +476,7 @@ function Roleta() {
           onClick={() => setSummaryOpen((open) => videoRecording ? !open : true)}
           className={recording ? "px-2 text-lg" : ""}
         >
-          <ListChecks className="shrink-0" aria-hidden="true" /> {videoRecording && summaryOpen ? "Ver roleta" : "Ver resumo"}
+          <ListChecks className="shrink-0" aria-hidden="true" /> {videoRecording ? (summaryOpen ? "Voltar ao resultado" : "Mostrar resumo") : "Ver resumo"}
         </GoldButton>
       );
     }
@@ -446,10 +490,36 @@ function Roleta() {
         </GoldButton>
       );
     }
-    return (
-      <GoldButton onClick={handleSpin} disabled={spinning}>
-        {spinning ? "Girando…" : "Girar roleta"}
-      </GoldButton>
+    if (activeCountdown) {
+      return (
+        <SecondaryButton
+          className="h-14 bg-secondary px-1 text-sm"
+          onPointerDown={(event) => {
+            countdownCancelPressed.current = event.isPrimary && event.button === 0;
+          }}
+          onPointerCancel={() => {
+            countdownCancelPressed.current = false;
+          }}
+          onClick={(event) => {
+            // The release of the start hold can land on this newly mounted button.
+            if (event.detail === 0 || countdownCancelPressed.current) setCountdown(null);
+            countdownCancelPressed.current = false;
+          }}
+        >
+          Cancelar início
+        </SecondaryButton>
+      );
+    }
+    return spinning ? (
+      <GoldButton disabled>{spinLanded ? "Resultado" : "Girando…"}</GoldButton>
+    ) : (
+      <HoldToSpinButton
+        key={roundIdOf(draw, ri)}
+        onPress={() => {
+          if (state.sound) unlockSound();
+        }}
+        onStart={handleSpin}
+      />
     );
   })();
 
@@ -468,6 +538,14 @@ function Roleta() {
           : "enigma-roleta-screen flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col"
       }
     >
+      {activeCountdown && (
+        <SpinCountdown
+          step={activeCountdown.step}
+          volume={state.sound ? clampVolume(state.volume) : 0}
+          onAdvance={advanceCountdown}
+          onCancel={() => setCountdown(null)}
+        />
+      )}
       <AppHeader
         logo={state.groupLogo}
         subtitle={`${count} ${count === 1 ? "participante" : "participantes"}`}
@@ -544,7 +622,7 @@ function Roleta() {
                   toast("Gravação cancelada.");
                 }
               }}
-              disabled={spinning || stopping}
+              disabled={spinning || !!activeCountdown || stopping}
               className="ml-auto min-h-11 shrink-0 px-1 text-xs font-bold text-muted-foreground underline underline-offset-2 disabled:opacity-50"
             >
               Cancelar
@@ -557,9 +635,11 @@ function Roleta() {
         className="enigma-recording-preview"
         hidden={!videoRecording}
         role="img"
-        aria-label={showResult && result
-          ? `Resultado do sorteio: ${result.winner}`
-          : `Prévia da gravação: ${round.prize} de ${round.merchantName}${sponsor?.address ? `, ${sponsor.address}` : ""}`}
+        aria-label={summaryOpen && done && videoRecording
+          ? `Resumo do sorteio: ${total} cortesias sorteadas`
+          : showResult && result
+            ? `Resultado do sorteio: ${result.winner}`
+            : `Prévia da gravação: ${round.prize} de ${round.merchantName}${sponsor?.address ? `, ${sponsor.address}` : ""}`}
       />
       <div
         className={videoRecording
@@ -570,17 +650,29 @@ function Roleta() {
         <Wheel
           key={`${draw.id}-${ri}`}
           names={pool}
-          rotation={result?.rotation ?? 0}
+          rotation={visibleRotation}
           spin={spin}
           winner={showResult}
+          winnerIndex={result?.index}
+          celebrationAt={videoRecording ? undefined : celebrationAt}
           idle={slowMotion && !spinning && !result}
           onIdleRotation={(angle) => {
             idleRotationRef.current = angle;
             if (videoRecording) setRecIdleRotation(angle);
           }}
           {...(videoRecording ? { onSpinFrame: setRecMotion } : {})}
+          onSpinStart={(durationMs) => {
+            if (state.sound && spin?.zoom) return startSpinTrack(durationMs, clampVolume(state.volume));
+            return undefined;
+          }}
+          onSpinLand={() => setSpinLanded(true)}
           onSpinEnd={handleSpinEnd}
         />
+        {activeCountdown && !videoRecording && (
+          <div key={activeCountdown.step} className="enigma-countdown-badge" aria-hidden="true">
+            {activeCountdown.step}
+          </div>
+        )}
         {showResult && result && (
           <WinnerAnnouncement
             winner={result.winner}
@@ -607,7 +699,7 @@ function Roleta() {
             (recording ? (
               <button
                 onClick={() => void handleEndRecording()}
-                disabled={spinning || stopping}
+                disabled={spinning || !!activeCountdown || stopping}
                 className="enigma-record-button enigma-record-button--active flex h-14 items-center justify-center gap-1 rounded-2xl border-2 border-rec bg-card px-1 font-extrabold leading-tight disabled:opacity-50"
               >
                 <Square className="h-3.5 w-3.5 shrink-0 fill-rec text-rec" aria-hidden="true" />
@@ -616,7 +708,7 @@ function Roleta() {
             ) : (
               <button
                 onClick={() => setCameraOpen(true)}
-                disabled={spinning}
+                disabled={spinning || !!activeCountdown}
                 className="enigma-record-button flex h-14 items-center justify-center gap-2 rounded-2xl bg-secondary px-3 text-base font-extrabold leading-tight active:bg-accent disabled:opacity-50"
               >
                 <Camera className="h-6 w-6 shrink-0 text-gold" aria-hidden="true" /> Gravar comigo
@@ -634,7 +726,9 @@ function Roleta() {
               ? isLast
                 ? "Ao terminar de falar, toque em Encerrar gravação."
                 : "Quando quiser, toque em Sortear próxima cortesia."
-              : "Fale com o público e toque em Girar roleta.",
+              : activeCountdown
+                ? "A roleta vai girar ao fim da contagem."
+                : "Fale com o público e segure o botão para iniciar.",
           )
         ) : done ? (
           <SecondaryButton

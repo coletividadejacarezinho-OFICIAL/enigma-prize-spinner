@@ -220,9 +220,58 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
   expect(screen.getByText("Rua Dois, 20")).toBeTruthy();
   expect(screen.getByText("(43) 3333-0000")).toBeTruthy();
   expect(screen.queryByText("Rua Um, 100")).toBeNull();
-  expect(screen.getByText("Girar roleta")).toBeTruthy();
-  fireEvent.click(screen.getByText("Girar roleta"));
-  await waitFor(() => expect(currentDraw(saved()).extraPrizes?.[0]?.result?.winner).toBe("Bia"));
+  const startButton = () => screen.getByRole("button", { name: "Segure para iniciar" });
+  const button = startButton();
+  function pointerEvent(type: string) {
+    fireEvent(startButton(), Object.assign(new MouseEvent(type, { bubbles: true, button: 0 }), {
+      isPrimary: true,
+      pointerId: 1,
+    }));
+  }
+
+  vi.useFakeTimers();
+  try {
+    pointerEvent("pointerdown");
+    act(() => vi.advanceTimersByTime(1499));
+    pointerEvent("pointerup");
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.click(button, { detail: 2 });
+    act(() => vi.advanceTimersByTime(1500));
+    expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+
+    pointerEvent("pointerdown");
+    pointerEvent("pointercancel");
+    act(() => vi.advanceTimersByTime(1500));
+    expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+
+    pointerEvent("pointerdown");
+    act(() => vi.advanceTimersByTime(1500));
+    expect(screen.getByRole("status")).toHaveTextContent("3");
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole("status")).toHaveTextContent("2");
+    const cancel = screen.getByRole("button", { name: "Cancelar início" });
+    fireEvent.click(cancel, { detail: 1 });
+    expect(screen.getByRole("status")).toHaveTextContent("2");
+    fireEvent(cancel, Object.assign(new MouseEvent("pointerdown", { bubbles: true, button: 0 }), {
+      isPrimary: true,
+      pointerId: 2,
+    }));
+    fireEvent.click(cancel, { detail: 1 });
+    act(() => vi.advanceTimersByTime(4000));
+    expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+
+    pointerEvent("pointerdown");
+    act(() => vi.advanceTimersByTime(1500));
+    for (const step of ["2", "1", "VALENDO!"]) {
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByRole("status")).toHaveTextContent(step);
+      expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+    }
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(currentDraw(saved()).extraPrizes?.[0]?.result?.winner).toBe("Bia");
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("desfaz as duas gravações se o armazenamento recusar os sorteios durante a restauração", async () => {

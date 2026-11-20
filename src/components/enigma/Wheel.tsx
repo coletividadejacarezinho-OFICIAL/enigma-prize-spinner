@@ -1,7 +1,19 @@
 import { useEffect, useId, useRef } from "react";
+import { WinnerConfetti } from "@/components/enigma/WinnerConfetti";
 import { wheelEase } from "@/lib/enigma/jingle";
 import { segmentAtPointer } from "@/lib/enigma/logic";
-import { wheelFontSize, wheelLabel, wheelZoom } from "@/lib/enigma/wheel-visual";
+import {
+  pointerClickTilt,
+  rimLampIsLit,
+  rimLightIndex,
+  RIM_LAMP_COUNT,
+  WHEEL_CLOSEUP_MS,
+  wheelFocusOpacity,
+  wheelFontSize,
+  wheelLabel,
+  wheelZoom,
+  type WheelMotion,
+} from "@/lib/enigma/wheel-visual";
 
 const COLORS = 8;
 // Segments whose color is light enough to need dark letters.
@@ -19,6 +31,12 @@ function colorIndex(i: number, count: number) {
   return c;
 }
 
+function slicePath(index: number, degrees: number, radius: number): string {
+  const start = point(index * degrees, radius);
+  const end = point((index + 1) * degrees, radius);
+  return `M100 100 L${start.x} ${start.y} A${radius} ${radius} 0 ${degrees > 180 ? 1 : 0} 1 ${end.x} ${end.y} Z`;
+}
+
 type Props = {
   names: string[];
   rotation: number;
@@ -26,13 +44,17 @@ type Props = {
   spin?: { from: number; durationMs: number; key: number; zoom: boolean } | null;
   idle?: boolean;
   winner?: boolean;
+  winnerIndex?: number | undefined;
+  celebrationAt?: number | undefined;
   onIdleRotation?: (rotation: number) => void;
-  onSpinFrame?: (motion: { rotation: number; zoom: number; progress: number }) => void;
+  onSpinFrame?: (motion: WheelMotion) => void;
+  onSpinStart?: (durationMs: number) => (() => void) | undefined;
+  onSpinLand?: () => void;
   onTick?: () => void;
   onSpinEnd?: () => void;
 };
 
-export function Wheel({ names, rotation, spin, idle = false, winner = false, onIdleRotation, onSpinFrame, onTick, onSpinEnd }: Props) {
+export function Wheel({ names, rotation, spin, idle = false, winner = false, winnerIndex, celebrationAt, onIdleRotation, onSpinFrame, onSpinStart, onSpinLand, onTick, onSpinEnd }: Props) {
   // The whole <svg> turns (its centre is symmetric), so the browser can move it as one layer.
   const groupRef = useRef<SVGSVGElement>(null);
   const rimRef = useRef<HTMLDivElement>(null);
@@ -46,7 +68,11 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
   const onEndRef = useRef(onSpinEnd);
   const onIdleRef = useRef(onIdleRotation);
   const onSpinFrameRef = useRef(onSpinFrame);
+  const onSpinStartRef = useRef(onSpinStart);
+  const onSpinLandRef = useRef(onSpinLand);
   onSpinFrameRef.current = onSpinFrame;
+  onSpinStartRef.current = onSpinStart;
+  onSpinLandRef.current = onSpinLand;
   onTickRef.current = onTick;
   onEndRef.current = onSpinEnd;
   onIdleRef.current = onIdleRotation;
@@ -56,8 +82,17 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
     const rim = rimRef.current;
     const focus = focusRef.current;
     if (!el || !rim || !focus) return;
+    const lamps = rim.querySelectorAll<HTMLElement>(".wheel-bulb");
+    let firstLamp = -1;
+    function lightRim(angle: number) {
+      const first = rimLightIndex(angle);
+      if (first === firstLamp) return;
+      firstLamp = first;
+      lamps.forEach((lamp, i) => lamp.toggleAttribute("data-lit", rimLampIsLit(i, first)));
+    }
     focus.hidden = true;
     rim.style.transform = "";
+    lightRim(spin?.from ?? rotation);
     pointerRef.current?.classList.remove("wheel-pointer--landed");
     if (!spin) {
       if (!idle || count === 0) {
@@ -70,6 +105,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
       const frame = (now: number) => {
         const angle = ((now - start) * 360 / 90000) % 360;
         el.style.transform = `rotate(${angle}deg)`;
+        lightRim(angle);
         onIdleRef.current?.(angle);
         raf = requestAnimationFrame(frame);
       };
@@ -77,79 +113,86 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
       return () => cancelAnimationFrame(raf);
     }
     const start = performance.now();
+    const stopTrack = onSpinStartRef.current?.(spin.durationMs);
     const from = spin.from;
     const total = rotation - from;
+    const tip = pointerTipRef.current;
     let lastSeg = Math.floor(from / seg);
     let lastFocus = -1;
     let lastPointerTick = -Infinity;
-    let pointerAnimation: Animation | null = null;
+    let landed = false;
+    let pointerAngle = 0;
     const animatePointer = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     const frame = (now: number) => {
-      const t = Math.max(0, Math.min(1, (now - start) / spin.durationMs));
+      const elapsed = now - start;
+      const t = Math.max(0, Math.min(1, elapsed / spin.durationMs));
       const r = from + total * wheelEase(t);
+      const landedMs = Math.max(0, elapsed - spin.durationMs);
+      const zoom = wheelZoom(t, spin.zoom, landedMs);
       el.style.transform = `rotate(${r}deg)`;
-      const zoom = wheelZoom(t, spin.zoom);
-      onSpinFrameRef.current?.({ rotation: r, zoom, progress: t });
+      lightRim(r);
+      rim.style.transform = zoom > 1 ? `scale(${zoom})` : "";
       if (zoom > 1) {
-        rim.style.transform = `scale(${zoom})`;
         const index = segmentAtPointer(r, count);
         if (index !== lastFocus) {
           focus.textContent = names[index] ?? "";
           focus.hidden = !names[index];
           lastFocus = index;
         }
+        focus.style.opacity = String(wheelFocusOpacity(zoom));
+      } else {
+        focus.hidden = true;
+        lastFocus = -1;
       }
-      const s = Math.floor(r / seg);
-      if (t < 1 && s !== lastSeg) {
-        lastSeg = s;
+
+      const slice = Math.floor(r / seg);
+      if (t < 1 && slice !== lastSeg) {
+        lastSeg = slice;
         onTickRef.current?.();
-        // A brief mechanical click, capped at eight per second on dense wheels.
-        if (count > 1 && animatePointer && now - lastPointerTick >= 125) {
-          const tip = pointerTipRef.current;
-          if (tip?.animate) {
-            pointerAnimation?.cancel();
-            pointerAnimation = tip.animate(
-              [
-                { transform: "rotate(0deg)", offset: 0 },
-                { transform: "rotate(-6deg)", offset: 0.32 },
-                { transform: "rotate(2deg)", offset: 0.68 },
-                { transform: "rotate(0deg)", offset: 1 },
-              ],
-              { duration: 170, easing: "ease-out", iterations: 1 },
-            );
-            lastPointerTick = now;
-          }
-        }
+        if (count > 1 && animatePointer && now - lastPointerTick >= 125) lastPointerTick = now;
       }
-      if (t >= 1) pointerRef.current?.classList.add("wheel-pointer--landed");
-      // Hold the finished close-up for five seconds so the audience can read it.
-      if (t < 1 || (spin.zoom && now - start < spin.durationMs + 5000))
-        raf = requestAnimationFrame(frame);
+      const tilt = t < 1 ? pointerClickTilt(now - lastPointerTick) : 0;
+      if (tip && tilt !== pointerAngle) {
+        tip.style.transform = tilt ? `rotate(${tilt}deg)` : "";
+        pointerAngle = tilt;
+      }
+      onSpinFrameRef.current?.({ rotation: r, zoom, progress: t, pointerTilt: tilt });
+      if (t === 1 && !landed) {
+        landed = true;
+        rim.setAttribute("data-landed", "");
+        pointerRef.current?.classList.add("wheel-pointer--landed");
+        stopTrack?.();
+        onSpinLandRef.current?.();
+      }
+      if (t < 1 || (spin.zoom && landedMs < WHEEL_CLOSEUP_MS)) raf = requestAnimationFrame(frame);
       else onEndRef.current?.();
     };
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
-      pointerAnimation?.cancel();
+      if (!landed) stopTrack?.();
+      if (tip) tip.style.transform = "";
+      rim.removeAttribute("data-landed");
       pointerRef.current?.classList.remove("wheel-pointer--landed");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spin?.key, rotation, idle, count]);
 
   const fontSize = wheelFontSize(count);
+  const hasWinningSlice = winnerIndex !== undefined && winnerIndex >= 0 && winnerIndex < count;
 
   return (
     <div className="wheel-size relative isolate">
       <div className="wheel-stage-halo pointer-events-none absolute -inset-[6%] rounded-full" aria-hidden="true" />
       <div className={spin?.zoom ? "absolute inset-0 overflow-hidden" : "absolute inset-0"}>
-        <div ref={rimRef} className={`wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]${spin ? " wheel-rim--spinning" : ""}`}>
+        <div ref={rimRef} data-winner={winner || undefined} className="wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]">
           {/* Fine gold bezel between the disk and its fixed 24 decorative lamps. */}
           <div className="wheel-bezel-line pointer-events-none absolute inset-[2%] z-[1] rounded-full" aria-hidden="true" />
           {/* Independent perimeter lights: decorative only, never change the draw. */}
           <div className="wheel-bulb-track pointer-events-none absolute inset-0 z-[2] rounded-full" aria-hidden="true">
-            {Array.from({ length: 24 }, (_, i) => {
-              const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
+            {Array.from({ length: RIM_LAMP_COUNT }, (_, i) => {
+              const angle = (i * Math.PI * 2) / RIM_LAMP_COUNT - Math.PI / 2;
               return (
                 <span
                   key={i}
@@ -157,8 +200,6 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
                   style={{
                     left: `${50 + 48.15 * Math.cos(angle)}%`,
                     top: `${50 + 48.15 * Math.sin(angle)}%`,
-                    // Stagger all 24 bulbs so the illuminated group travels clockwise.
-                    animationDelay: `${-((24 - i) * (spin ? 0.05 : 0.1))}s`,
                   }}
                 />
               );
@@ -191,24 +232,26 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
                   <circle cx="100" cy="100" r="100" style={{ fill: "var(--wheel-1)" }} />
                 )}
                 {count > 1 &&
-                  names.map((_, i) => {
-                    const a0 = i * seg;
-                    const a1 = (i + 1) * seg;
-                    const p0 = point(a0, 100);
-                    const p1 = point(a1, 100);
-                    const large = seg > 180 ? 1 : 0;
-                    return (
-                      <path
-                        key={i}
-                        d={`M100 100 L${p0.x} ${p0.y} A100 100 0 ${large} 1 ${p1.x} ${p1.y} Z`}
-                        style={{
-                          fill: `var(--wheel-${colorIndex(i, count) + 1})`,
-                          stroke: "var(--background)",
-                          strokeWidth: count > 100 ? 0.12 : count > 40 ? 0.2 : 0.6,
-                        }}
+                  names.map((_, i) => (
+                    <path
+                      key={i}
+                      d={slicePath(i, seg, 100)}
+                      style={{
+                        fill: `var(--wheel-${colorIndex(i, count) + 1})`,
+                        stroke: "var(--background)",
+                        strokeWidth: count > 100 ? 0.12 : count > 40 ? 0.2 : 0.6,
+                      }}
+                    />
+                  ))}
+                {hasWinningSlice && (
+                  count === 1
+                    ? <circle cx="100" cy="100" r="97" className="wheel-winning-slice" />
+                    : <path
+                        d={slicePath(winnerIndex, seg, 97)}
+                        className="wheel-winning-slice"
+                        strokeWidth={count > 100 ? 0.9 : 1.8}
                       />
-                    );
-                  })}
+                )}
                 {names.map((name, i) => {
                   if (!name) return null;
                   const center = count === 1 ? 0 : (i + 0.5) * seg;
@@ -247,6 +290,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
           </div>
         </div>
       </div>
+      {celebrationAt !== undefined && <WinnerConfetti startedAt={celebrationAt} />}
       <div className="wheel-pointer-aura pointer-events-none absolute -top-[5%] left-1/2 z-[3] h-[15%] w-[19%] -translate-x-1/2 rounded-full" aria-hidden="true" />
       {/* The fixed pointer is decorative and does not affect the selected winner. */}
       <svg
