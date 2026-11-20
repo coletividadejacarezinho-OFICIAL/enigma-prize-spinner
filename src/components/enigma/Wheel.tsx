@@ -140,6 +140,8 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
       <div className="wheel-stage-halo pointer-events-none absolute -inset-[6%] rounded-full" aria-hidden="true" />
       <div className={spin?.zoom ? "absolute inset-0 overflow-hidden" : "absolute inset-0"}>
         <div ref={rimRef} className={`wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]${spin ? " wheel-rim--spinning" : ""}`}>
+          {/* Fine gold bezel between the disk and its fixed 24 decorative lamps. */}
+          <div className="wheel-bezel-line pointer-events-none absolute inset-[2%] z-[1] rounded-full" aria-hidden="true" />
           {/* Independent perimeter lights: decorative only, never change the draw. */}
           <div className="wheel-bulb-track pointer-events-none absolute inset-0 z-[2] rounded-full" aria-hidden="true">
             {Array.from({ length: 24 }, (_, i) => {
@@ -149,8 +151,8 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
                   key={i}
                   className="wheel-bulb absolute rounded-full"
                   style={{
-                    left: `${50 + 47 * Math.cos(angle)}%`,
-                    top: `${50 + 47 * Math.sin(angle)}%`,
+                    left: `${50 + 48.15 * Math.cos(angle)}%`,
+                    top: `${50 + 48.15 * Math.sin(angle)}%`,
                     // Stagger all 24 bulbs so the illuminated group travels clockwise.
                     animationDelay: `${-((24 - i) * (spin ? 0.05 : 0.1))}s`,
                   }}

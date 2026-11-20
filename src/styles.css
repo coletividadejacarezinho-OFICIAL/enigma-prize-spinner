@@ -185,8 +185,8 @@
 
 /* Premium miniature perimeter lamps: the 24 lights and their chase timing stay unchanged. */
 .wheel-bulb {
-  width: 2.15%;
-  height: 2.15%;
+  width: 1.8%;
+  height: 1.8%;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 227, 153, 0.83);
   background: radial-gradient(circle at 36% 28%, #ffe8ac 0%, #dfa32b 52%, #945313 100%);
@@ -780,5 +780,41 @@
 @media (prefers-reduced-motion: reduce) {
   .enigma-camera-dialog .enigma-capture-option {
     transition: none;
+  }
+}
+
+
+/* Etapa 4G — place miniature bulbs on a narrow bezel outside the colored slices.
+   The 24 bulbs, animation cadence, wheel segments and spin algorithm are unchanged. */
+.wheel-bezel-line {
+  border: 1px solid color-mix(in oklab, var(--gold) 76%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--gold-deep) 24%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--background) 28%, transparent);
+}
+
+.wheel-bulb-track {
+  overflow: visible;
+}
+
+/* All three mode buttons have a matching visual rhythm; taller text can still wrap. */
+.enigma-camera-dialog .enigma-capture-option {
+  display: flex;
+  min-height: 4.625rem;
+  align-items: center;
+}
+
+.enigma-camera-dialog .enigma-capture-option > span {
+  width: 100%;
+}
+
+@media (max-width: 360px) {
+  .enigma-camera-dialog .enigma-capture-option {
+    min-height: 4.5rem;
+  }
+
+  .enigma-camera-dialog .enigma-capture-icon {
+    width: 2rem;
+    height: 2rem;
   }
 }

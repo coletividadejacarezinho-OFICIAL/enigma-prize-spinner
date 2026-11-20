@@ -59,6 +59,29 @@ it("uses 24 sequential lights without changing names or wheel segments", () => {
   expect(Array.from(wheel.querySelectorAll("text"), (label) => label.textContent)).toEqual(original);
 });
 
+it("keeps all 24 lamps on the outer bezel, clear of the wheel slices", () => {
+  for (const size of [75, 250]) {
+    const { container, unmount } = render(<Wheel names={names.slice(0, size)} rotation={0} />);
+    const rim = container.querySelector(".wheel-rim");
+    const bezel = rim?.querySelector(".wheel-bezel-line");
+    const lights = Array.from(rim?.querySelectorAll<HTMLElement>(".wheel-bulb") ?? []);
+    const disc = container.querySelector('svg[aria-label="Roleta"]');
+    expect(bezel?.getAttribute("aria-hidden")).toBe("true");
+    expect(lights).toHaveLength(24);
+    expect(disc?.querySelectorAll("path")).toHaveLength(size);
+
+    // Disc ends at 46.5% of the rim diameter; lamp centers must lie beyond it.
+    for (const lamp of lights) {
+      const x = Number.parseFloat(lamp.style.left);
+      const y = Number.parseFloat(lamp.style.top);
+      const distance = Math.hypot(x - 50, y - 50);
+      expect(distance).toBeGreaterThan(48);
+      expect(distance).toBeLessThan(48.3);
+    }
+    unmount();
+  }
+});
+
 it("shows longer names where the wheel has space, without changing the original", () => {
   const full = "Mariana Marcial Barbosa de Almeida";
   expect(wheelLabel("  Rosa  Maria  ", 75)).toBe("Rosa Maria");
