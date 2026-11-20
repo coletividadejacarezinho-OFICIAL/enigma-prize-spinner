@@ -460,3 +460,19 @@
     transition: none;
   }
 }
+
+
+/* Avoid a needless extra toolbar row on narrow phones. */
+@media (max-width: 420px) {
+  .enigma-roleta-toolbar {
+    column-gap: 0.375rem;
+  }
+
+  .enigma-roleta-toolbar .enigma-toolbar-chip {
+    padding-inline: 0.5rem;
+  }
+
+  .enigma-roleta-toolbar .enigma-toolbar-chip[aria-pressed] svg {
+    display: none;
+  }
+}
