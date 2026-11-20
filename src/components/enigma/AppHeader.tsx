@@ -26,6 +26,7 @@ export function AppHeader({
     >
       <GroupLogo
         src={logo}
+        contain={premium}
         className={premium ? "enigma-brand-logo h-12 w-12 text-base" : "h-10 w-10 text-sm"}
       />
       <div className="min-w-0 flex-1">
