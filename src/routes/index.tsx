@@ -531,6 +531,7 @@ function Roleta() {
           names={pool}
           rotation={result?.rotation ?? 0}
           spin={spin}
+          winner={showResult}
           idle={slowMotion && !spinning && !result}
           onIdleRotation={(angle) => { idleRotationRef.current = angle; }}
           onSpinEnd={handleSpinEnd}
