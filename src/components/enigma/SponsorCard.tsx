@@ -1,4 +1,5 @@
 import { ChevronRight, MapPin, Phone } from "lucide-react";
+import { useState, type CSSProperties } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,32 @@ import {
 } from "@/components/ui/dialog";
 import { cleanWhatsapp, formatWhatsapp } from "@/lib/enigma/partners";
 import { MerchantLogo } from "./Logos";
+
+function SponsorLogo({ src }: { src?: string | undefined }) {
+  const [ratio, setRatio] = useState(1);
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <MerchantLogo className="enigma-sponsor-logo h-14 w-14 rounded-xl" />;
+  }
+  return (
+    <div
+      className="enigma-sponsor-logo enigma-sponsor-logo--adaptive shrink-0"
+      style={{ "--sponsor-logo-ratio": ratio } as CSSProperties}
+    >
+      <img
+        src={src}
+        alt="Logo do comércio"
+        className="object-contain"
+        onLoad={({ currentTarget: img }) => {
+          if (img.naturalWidth && img.naturalHeight) {
+            setRatio(img.naturalWidth / img.naturalHeight);
+          }
+        }}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
 
 type Props = {
   logo?: string | undefined;
@@ -35,43 +62,39 @@ export function SponsorCard({
   const hasContact = !!(phone || location);
   const roundLabel = roundTotal > 1 ? `Prêmio ${roundIndex + 1} de ${roundTotal}` : "";
 
-  if (hasContact) {
-    return (
-      <Dialog>
-        <section
-          className="enigma-sponsor-card enigma-sponsor-card--contact relative mx-4 flex min-w-0 items-center gap-2.5 rounded-[1.35rem] px-3 sm:gap-3 sm:px-4"
-          aria-label="Cortesia do Enigma Premiado"
-        >
-          <MerchantLogo
-            src={logo}
-            contain
-            className="enigma-sponsor-logo h-16 w-16 shrink-0 rounded-2xl sm:h-[4.5rem] sm:w-[4.5rem]"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <p className="min-w-0 truncate text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">
-                Oferecimento
-              </p>
-              {roundLabel && (
-                <span className="enigma-round-pill ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-extrabold leading-4 text-gold">
-                  {roundLabel}
-                </span>
-              )}
-              <ChevronRight
-                className={`h-3.5 w-3.5 shrink-0 text-gold${roundLabel ? "" : " ml-auto"}`}
-                aria-hidden="true"
-              />
-            </div>
-            <p className="truncate text-sm font-extrabold leading-[1.15rem] text-foreground">
-              {merchantName}
+  return (
+    <Dialog>
+      <section
+        className={`enigma-sponsor-card enigma-sponsor-card--polished relative mx-4 flex min-w-0 items-center gap-2.5 rounded-[1.35rem] px-3 py-2 sm:gap-3 sm:px-4${hasContact ? " enigma-sponsor-card--contact" : ""}`}
+        aria-label="Cortesia do Enigma Premiado"
+      >
+        <SponsorLogo key={logo ?? "no-logo"} src={logo} />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="min-w-0 truncate text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">
+              Oferecimento
             </p>
-            <p
-              className="truncate font-display text-base font-extrabold leading-5 text-gold"
-              data-testid="prize-label"
-            >
-              {prize}
-            </p>
-            <div className="mt-0.5 grid gap-px text-xs font-semibold leading-4 text-muted-foreground">
+            {roundLabel && (
+              <span className="enigma-round-pill ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-extrabold leading-3 text-gold">
+                {roundLabel}
+              </span>
+            )}
+            <ChevronRight
+              className={`h-3.5 w-3.5 shrink-0 text-gold${roundLabel ? "" : " ml-auto"}`}
+              aria-hidden="true"
+            />
+          </div>
+          <p className="truncate text-sm font-extrabold leading-4 text-foreground">
+            {merchantName}
+          </p>
+          <p
+            className="line-clamp-2 font-display text-[0.95rem] font-extrabold leading-4 text-gold [overflow-wrap:anywhere]"
+            data-testid="prize-label"
+          >
+            {prize}
+          </p>
+          {hasContact && (
+            <div className="mt-0.5 grid gap-px text-xs font-semibold leading-[0.875rem] text-muted-foreground">
               {phone && (
                 <p className="flex min-w-0 items-center gap-1.5">
                   <Phone className="h-3 w-3 shrink-0 text-gold" aria-hidden="true" />
@@ -85,21 +108,23 @@ export function SponsorCard({
                 </p>
               )}
             </div>
-          </div>
-          <DialogTrigger asChild>
-            <button
-              type="button"
-              aria-label="Ver detalhes do oferecimento"
-              className="absolute inset-0 rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
-            />
-          </DialogTrigger>
-        </section>
-        <DialogContent className="max-h-[80dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl [overflow-wrap:anywhere]">
-          <DialogTitle className="break-words pr-5 leading-tight">{merchantName}</DialogTitle>
-          <DialogDescription className="whitespace-pre-wrap break-words">
-            {roundLabel && <span className="mb-1 block font-bold text-gold">{roundLabel}</span>}
-            {prize}
-          </DialogDescription>
+          )}
+        </div>
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            aria-label="Ver detalhes do oferecimento"
+            className="absolute inset-0 rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
+          />
+        </DialogTrigger>
+      </section>
+      <DialogContent className="max-h-[80dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl [overflow-wrap:anywhere]">
+        <DialogTitle className="break-words pr-5 leading-tight">{merchantName}</DialogTitle>
+        <DialogDescription className="whitespace-pre-wrap break-words">
+          {roundLabel && <span className="mb-1 block font-bold text-gold">{roundLabel}</span>}
+          {prize}
+        </DialogDescription>
+        {hasContact && (
           <dl className="grid gap-3 break-words text-sm">
             {phone && (
               <div>
@@ -114,40 +139,8 @@ export function SponsorCard({
               </div>
             )}
           </dl>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  return (
-    <section
-      className="enigma-sponsor-card mx-4 flex min-w-0 items-center gap-2.5 rounded-[1.35rem] px-3 py-2.5 sm:gap-3 sm:px-4"
-      aria-label="Cortesia do Enigma Premiado"
-    >
-      <MerchantLogo
-        src={logo}
-        contain
-        className="enigma-sponsor-logo h-16 w-16 rounded-2xl sm:h-[4.5rem] sm:w-[4.5rem]"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
-          Oferecimento
-        </p>
-        <p className="mt-0.5 break-words text-[0.95rem] font-extrabold leading-snug text-foreground sm:text-base">
-          {merchantName}
-        </p>
-        {roundLabel && (
-          <span className="enigma-round-pill mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold text-gold">
-            {roundLabel}
-          </span>
         )}
-        <p
-          className="mt-0.5 break-words font-display text-[1.05rem] font-extrabold leading-tight text-gold sm:text-lg"
-          data-testid="prize-label"
-        >
-          {prize}
-        </p>
-      </div>
-    </section>
+      </DialogContent>
+    </Dialog>
   );
 }
