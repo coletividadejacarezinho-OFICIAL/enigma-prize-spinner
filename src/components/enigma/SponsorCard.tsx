@@ -17,6 +17,7 @@ export function SponsorCard({ logo, merchantName, prize, roundIndex, roundTotal 
     >
       <MerchantLogo
         src={logo}
+        contain
         className="enigma-sponsor-logo h-[4.25rem] w-[4.25rem] rounded-2xl sm:h-[4.75rem] sm:w-[4.75rem]"
       />
       <div className="min-w-0 flex-1">
