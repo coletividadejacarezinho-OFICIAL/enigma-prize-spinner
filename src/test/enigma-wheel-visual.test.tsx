@@ -22,6 +22,22 @@ it.each([75, 101, 250])("renders names and slices for %i participants", (count) 
   );
 });
 
+it.each([75, 150, 250])("keeps %i original names in order with readable edge labels", (count) => {
+  const original = names.slice(0, count);
+  const { container } = render(<Wheel names={original} rotation={0} />);
+  const labels = Array.from(container.querySelectorAll<SVGTextElement>('svg[aria-label="Roleta"] text[aria-label]'));
+
+  expect(labels).toHaveLength(count);
+  expect(labels.map((label) => label.getAttribute("aria-label"))).toEqual(original);
+  expect(labels[0]?.getAttribute("x")).toBe("190");
+  expect(labels[count - 1]?.getAttribute("x")).toBe("10");
+
+  // Bright slices use dark letters with a light border; dark slices use the reverse.
+  expect(labels[0]?.style.stroke).not.toBe(labels[1]?.style.stroke);
+  expect(labels[0]?.style.paintOrder).toBe("stroke");
+  expect(labels[1]?.style.paintOrder).toBe("stroke");
+});
+
 it("shows longer names where the wheel has space, without changing the original", () => {
   const full = "Mariana Marcial Barbosa de Almeida";
   expect(wheelLabel("  Rosa  Maria  ", 75)).toBe("Rosa Maria");
