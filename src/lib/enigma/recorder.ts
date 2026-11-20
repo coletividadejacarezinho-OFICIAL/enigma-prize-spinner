@@ -11,7 +11,7 @@ import { wheelEase } from "./jingle";
 import { segmentAtPointer } from "./logic";
 import { audioContext, setRecordTap } from "./sound";
 import type { RecordingMode } from "./types";
-import { wheelFontSize, wheelLabel, wheelZoom } from "./wheel-visual";
+import { pointerNudge, wheelFontSize, wheelLabel, wheelZoom } from "./wheel-visual";
 
 export type CameraProblem = "denied" | "missing" | "busy" | "unsupported" | "other";
 
@@ -487,7 +487,7 @@ function paint(s: Session) {
       : 0;
     const rotation = spin ? spin.from + (spin.to - spin.from) * wheelEase(progress) : f.rotation;
     const zoom = wheelZoom(progress, spin?.zoom ?? false);
-    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, !!spin);
+    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, !!spin, !!spin && progress < 1, !!f.winner || (!!spin && progress >= 1));
     const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
     if (focus) {
       ctx.fillStyle = c.bg;
@@ -550,6 +550,8 @@ function paintWheel(
   r: number,
   zoom: number,
   spinning: boolean,
+  pointerMoving: boolean,
+  pointerHighlighted: boolean,
 ) {
   const count = names.length;
   ctx.save();
@@ -646,17 +648,38 @@ function paintWheel(
   ctx.arc(cx, cy, r * 0.1, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+
+  // Same stationary marker as the app: metallic finish, short click and final glow.
   ctx.save();
-  ctx.fillStyle = c.gold;
+  ctx.translate(cx, cy - r - 22);
+  ctx.rotate((pointerNudge(rotation, count, pointerMoving) * Math.PI) / 180);
+  const gold = ctx.createLinearGradient(-26, -26, 26, 56);
+  gold.addColorStop(0, "#fff5bf");
+  gold.addColorStop(0.48, "#ffd452");
+  gold.addColorStop(1, "#b87910");
+  ctx.fillStyle = gold;
   ctx.strokeStyle = c.goldDeep;
   ctx.lineWidth = 3;
+  if (pointerHighlighted) {
+    ctx.shadowColor = "#fff0a1";
+    ctx.shadowBlur = 18;
+  }
   ctx.beginPath();
-  ctx.moveTo(cx, cy - r + 34);
-  ctx.lineTo(cx - 26, cy - r - 22);
-  ctx.arc(cx, cy - r - 22, 26, Math.PI, 0);
+  ctx.moveTo(0, 56);
+  ctx.lineTo(-26, 0);
+  ctx.arc(0, 0, 26, Math.PI, 0);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = c.bg;
+  ctx.beginPath();
+  ctx.arc(0, -7, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fff6bb";
+  ctx.beginPath();
+  ctx.arc(-2, -9, 2, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
