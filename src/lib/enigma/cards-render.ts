@@ -861,25 +861,17 @@ export async function renderSummaryCards(
   const L = 110;
   const textW = CONTENT_W - 60 - L - 26;
   const layout = card.rows.map((r) => {
-    const head = wrap(
-      probe.ctx,
-      `${r.label.toUpperCase()} · ${r.merchantName}`,
-      textW,
-      800,
-      28,
-      SANS,
-    );
+    const label = wrap(probe.ctx, r.label.toUpperCase(), textW, 800, 28, SANS);
+    const merchant = wrap(probe.ctx, r.merchantName, textW, 800, 28, SANS);
     const prize = wrap(probe.ctx, r.prize, textW, 800, 40, DISPLAY);
-    const winner = wrap(
-      probe.ctx,
-      r.number ? `Nº ${r.number} · ${r.winner}` : r.winner,
-      CONTENT_W - 60 - 72,
-      800,
-      60,
-      DISPLAY,
-    );
-    const topH = Math.max(L, head.length * 38 + 6 + prize.length * 48);
-    return { head, prize, winner, topH, h: 30 + topH + 24 + winner.length * 68 + 30 };
+    const winner = wrap(probe.ctx, r.winner, CONTENT_W - 60 - 72, 800, 60, DISPLAY);
+    const topTextH = label.length * 34 + merchant.length * 38 + 8 + prize.length * 48;
+    const topH = Math.max(L, topTextH);
+    const badgeH = r.number !== null ? 50 : 0;
+    return {
+      label, merchant, prize, winner, topH, topTextH, badgeH,
+      h: 30 + topH + 24 + badgeH + winner.length * 68 + 30,
+    };
   });
   const subtitle = `${formatDateBR(card.date)} · ${card.rows.length} cortesias`;
   const top = contentTop(probe, "Resultado do sorteio", subtitle);
@@ -907,11 +899,15 @@ export async function renderSummaryCards(
       ctx.stroke();
       const x = M + 30;
       drawLogo(k, logos[i] ?? null, r.merchantName, x, y + 30, L, "contain");
-      let ty = y + 30 + (l.topH - (l.head.length * 38 + 6 + l.prize.length * 48)) / 2;
-      ctx.fillStyle = pal.muted;
+      let ty = y + 30 + (l.topH - l.topTextH) / 2;
+      ctx.fillStyle = pal.gold;
       setFont(ctx, 800, 28, SANS, 2);
-      drawLines(ctx, l.head, x + L + 26, ty, 38, 28);
-      ty += l.head.length * 38 + 6;
+      drawLines(ctx, l.label, x + L + 26, ty, 34, 28);
+      ty += l.label.length * 34;
+      ctx.fillStyle = pal.muted;
+      setFont(ctx, 800, 28, SANS);
+      drawLines(ctx, l.merchant, x + L + 26, ty, 38, 28);
+      ty += l.merchant.length * 38 + 8;
       ctx.fillStyle = pal.gold;
       setFont(ctx, 800, 40, DISPLAY);
       drawLines(ctx, l.prize, x + L + 26, ty, 48, 40);
@@ -922,10 +918,23 @@ export async function renderSummaryCards(
       ctx.moveTo(x, wy - 12);
       ctx.lineTo(W - M - 30, wy - 12);
       ctx.stroke();
-      drawTrophy(k, x + 28, wy + 14, 40);
+      if (r.number !== null) {
+        const badgeText = `Nº ${r.number}`;
+        setFont(ctx, 800, 28, SANS);
+        const bw = Math.max(118, ctx.measureText(badgeText).width + 38);
+        rr(ctx, x + 72, wy, bw, 42, 21);
+        ctx.fillStyle = pal.bg;
+        ctx.fill();
+        ctx.strokeStyle = pal.goldDeep;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = pal.gold;
+        ctx.fillText(badgeText, x + 91, wy + 30);
+      }
+      drawTrophy(k, x + 28, wy + l.badgeH + 14, 40);
       ctx.fillStyle = pal.ink;
       setFont(ctx, 800, 60, DISPLAY);
-      drawLines(ctx, l.winner, x + 72, wy, 68, 60);
+      drawLines(ctx, l.winner, x + 72, wy + l.badgeH, 68, 60);
       y += l.h + 24;
     }
     out.push(await toFile(k.canvas, cardFileName("resumo", card.date, p, pages.length)));
