@@ -740,13 +740,15 @@ function Roleta() {
           </SecondaryButton>
         ) : recording ? (
           hint(
-            result
-              ? isLast
-                ? "Ao terminar de falar, toque em Encerrar gravação."
-                : "Quando quiser, toque em Sortear próxima cortesia."
-              : activeCountdown
-                ? "A roleta vai girar ao fim da contagem."
-                : "Fale com o público. Pressione e segure para iniciar.",
+            spinning
+              ? ""
+              : showResult
+                ? isLast
+                  ? "Ao terminar de falar, toque em Encerrar gravação."
+                  : "Quando quiser, toque em Sortear próxima cortesia."
+                : activeCountdown
+                  ? "A roleta vai girar ao fim da contagem."
+                  : "Fale com o público. Pressione e segure para iniciar.",
           )
         ) : done ? (
           <SecondaryButton

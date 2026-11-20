@@ -118,7 +118,7 @@ type Session = {
   mic: boolean;
   canvas: HTMLCanvasElement | null;
   canvasTracks: MediaStreamTrack[];
-  ctx: CanvasRenderingContext2D | null;
+  picture: { stage: CanvasRenderingContext2D; output: CanvasRenderingContext2D } | null;
   video: HTMLVideoElement | null;
   stream: MediaStream | null;
   recorder: MediaRecorder;
@@ -253,7 +253,7 @@ export function startRecording(o: StartOptions): boolean {
   );
 
   let canvas: HTMLCanvasElement | null = null;
-  let ctx: CanvasRenderingContext2D | null = null;
+  let picture: Session["picture"] = null;
   let video: HTMLVideoElement | null = null;
   let out: MediaStream;
   if (audioOnly) {
@@ -263,11 +263,18 @@ export function startRecording(o: StartOptions): boolean {
     canvas.width = W;
     canvas.height = H;
     canvas.setAttribute("aria-hidden", "true");
-    ctx = canvas.getContext("2d");
-    if (!ctx) {
+    const output = canvas.getContext("2d", { alpha: false });
+    const buffer = document.createElement("canvas");
+    buffer.width = W;
+    buffer.height = H;
+    // Compose the scene on a software-backed canvas where supported. The captured
+    // canvas receives a single opaque image, never the individual drawing operations.
+    const stage = buffer.getContext("2d", { alpha: false, willReadFrequently: true });
+    if (!stage || !output) {
       mix.end();
       return false;
     }
+    picture = { stage, output };
     try {
       out = canvas.captureStream(30);
       mix.tracks.forEach((t) => out.addTrack(t));
@@ -306,7 +313,7 @@ export function startRecording(o: StartOptions): boolean {
     mic: o.mic,
     canvas,
     canvasTracks: canvas ? out.getVideoTracks() : [],
-    ctx,
+    picture,
     video,
     stream: o.stream,
     recorder,
@@ -320,7 +327,7 @@ export function startRecording(o: StartOptions): boolean {
     sponsorPresentedAt: performance.now(),
     nextCourtesyAt: null,
     summaryPresentedAt: performance.now(),
-    colors: ctx ? readPalette(ctx) : FALLBACK,
+    colors: picture ? readPalette(picture.stage) : FALLBACK,
     timer: null,
     mixEnd: mix.end,
   };
@@ -332,7 +339,16 @@ export function startRecording(o: StartOptions): boolean {
     release(s);
     return false;
   }
-  if (ctx) s.timer = setInterval(() => paint(s), 1000 / 30);
+  if (picture) {
+    s.timer = setInterval(() => {
+      try {
+        paint(s);
+      } catch {
+        // Keep the last complete frame and start with a clean drawing state on retry.
+        picture.stage.canvas.width = W;
+      }
+    }, 1000 / 30);
+  }
   session = s;
   snapshot = { drawId: o.drawId, startedAt: s.startedAt, mode: o.mode, mic: o.mic };
   emit();
@@ -418,8 +434,11 @@ export function stopRecording(): Promise<Finished | null> {
     };
     s.recorder.onstop = finish;
     try {
-      // Paint one last frame so the final result is surely in the video.
-      paint(s);
+      try {
+        paint(s);
+      } catch {
+        // The last complete frame is still on the captured canvas.
+      }
       s.recorder.requestData();
       s.recorder.stop();
     } catch {
@@ -502,8 +521,14 @@ const SANS = '"Nunito", system-ui, sans-serif';
 const DISPLAY = '"Baloo 2", "Nunito", system-ui, sans-serif';
 
 function paint(s: Session) {
-  const { ctx, frame: f, colors: c } = s;
-  if (!ctx) return;
+  const { picture } = s;
+  if (!picture || picture.stage.isContextLost?.() || picture.output.isContextLost?.()) return;
+  paintScene(s, picture.stage);
+  picture.output.drawImage(picture.stage.canvas, 0, 0);
+}
+
+function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
+  const { frame: f, colors: c } = s;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = c.bg;
   ctx.fillRect(0, 0, W, H);
@@ -1096,17 +1121,31 @@ function paintFace(
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  if (video.videoWidth > 0 && video.videoHeight > 0) {
+  let hasImage = false;
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
     const side = Math.min(video.videoWidth, video.videoHeight);
     const sx = (video.videoWidth - side) / 2;
     const sy = (video.videoHeight - side) / 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.save();
     ctx.clip();
     // Mirrored, like looking in a mirror.
     ctx.translate(cx, cy);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, side, side, -r, -r, r * 2, r * 2);
+    try {
+      ctx.drawImage(video, sx, sy, side, side, -r, -r, r * 2, r * 2);
+      hasImage = true;
+    } catch {
+      // The camera can lose its current frame after readyState was checked.
+    } finally {
+      ctx.restore();
+    }
+  }
+  if (!hasImage) {
+    ctx.fillStyle = c.muted;
+    ctx.font = `800 21px ${SANS}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Câmera sem imagem", cx, cy, 2 * r - 28);
   }
   ctx.restore();
   ctx.save();
