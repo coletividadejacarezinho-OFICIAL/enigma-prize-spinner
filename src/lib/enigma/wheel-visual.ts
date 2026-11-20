@@ -29,3 +29,10 @@ export function wheelZoom(progress: number, enabled: boolean): number {
   const t = Math.max(0, Math.min(1, (progress - 0.56) / 0.32));
   return 1 + 0.9 * t * t * (3 - 2 * t);
 }
+
+/** Small visual click close to a slice boundary. No impact on probability or result. */
+export function pointerNudge(rotation: number, count: number, moving: boolean): number {
+  if (!moving || count < 2 || !Number.isFinite(rotation)) return 0;
+  const phase = (((rotation * count) / 360) % 1 + 1) % 1;
+  return phase < 0.3 ? -5 * Math.sin((Math.PI * phase) / 0.3) : 0;
+}
