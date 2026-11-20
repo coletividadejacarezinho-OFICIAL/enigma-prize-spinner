@@ -62,6 +62,8 @@ import {
 } from "@/lib/enigma/presentation";
 import {
   setRecFrame,
+  setRecIdleRotation,
+  setRecMotion,
   startRecording,
   stopRecording,
   stopStream,
@@ -88,6 +90,7 @@ import { NumberedListDialog } from "@/components/enigma/NumberedListDialog";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording, type RecordingMode } from "@/lib/enigma/types";
+import { cleanWhatsapp, formatWhatsapp } from "@/lib/enigma/partners";
 import { keepRecording } from "@/lib/enigma/recording-save";
 import { videoFileName } from "@/lib/enigma/videos";
 import { lockWheelViewport } from "@/lib/enigma/viewport-lock";
@@ -132,10 +135,9 @@ function Roleta() {
   const spinningRef = useRef(false);
   const [slowMotion, setSlowMotion] = useState(true);
   const idleRotationRef = useRef(0);
-  const spinFrameRef = useRef<RecFrame["spin"]>(null);
   const frameRef = useRef<RecFrame | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const cameraHostRef = useRef<HTMLDivElement>(null);
+  const previewHostRef = useRef<HTMLDivElement>(null);
   const [videoDone, setVideoDone] = useState<Parameters<typeof VideoDoneDialog>[0]["video"]>(null);
   const [stopping, setStopping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -227,6 +229,8 @@ function Roleta() {
   const readyCount = readyEntries(entriesOf(draw)).length;
   const canSpin = count >= minimumNames && !dirty && !result;
   const recording = !!rec;
+  const videoRecording = recording && rec.mode !== "voz";
+  const whatsapp = sponsor?.whatsapp ? cleanWhatsapp(sponsor.whatsapp) : null;
   const showRecordButton = recording || (!full && !done && !dirty && count >= minimumNames);
 
   frameRef.current = {
@@ -235,9 +239,12 @@ function Roleta() {
     roundLabel: multi ? `Prêmio ${ri + 1} de ${total}` : "",
     prize: round.prize,
     merchant: round.merchantName,
+    merchantLogo: round.merchantLogo,
+    address: sponsor?.address?.trim(),
+    phone: whatsapp ? formatWhatsapp(whatsapp) : undefined,
     names: pool,
-    rotation: result?.rotation ?? 0,
-    spin: spinning ? spinFrameRef.current : null,
+    rotation: spin?.from ?? result?.rotation ?? (slowMotion ? idleRotationRef.current : 0),
+    spinning,
     winner: showResult && result ? result.winner : null,
     winnerNumber: showResult ? resultNumber : null,
     summary:
@@ -279,7 +286,6 @@ function Roleta() {
         const to = r.value.result.rotation;
         const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
-        spinFrameRef.current = { from, to, startedAt: performance.now(), durationMs, zoom: !calm };
         // The music starts with the animation of the saved result, never before.
         if (state.sound && !calm) startSpinTrack(durationMs, clampVolume(state.volume));
         setSpin({ from, durationMs, key: Date.now(), zoom: !calm });
@@ -302,11 +308,10 @@ function Roleta() {
 
   const handleSpinEnd = () => {
     spinningRef.current = false;
-    spinFrameRef.current = null;
     setSpin(null);
     stopAllSound();
     if (state.sound) playReveal(clampVolume(state.volume));
-    if (multi && isLast) setSummaryOpen(true);
+    if (multi && isLast && !videoRecording) setSummaryOpen(true);
   };
 
   const handleStartRecording = (choice: { mode: RecordingMode; mic: boolean }, stream: MediaStream | null) => {
@@ -318,7 +323,7 @@ function Roleta() {
         mic: choice.mic,
         stream,
         drawId: draw.id,
-        cameraHost: cameraHostRef.current,
+        previewHost: previewHostRef.current,
         frame: frameRef.current,
         sound: state.sound,
         volume: clampVolume(state.volume),
@@ -336,9 +341,12 @@ function Roleta() {
     setStopping(false);
     if (!out) return;
     // Winners come from the saved results, never from the recording.
-    const decided = rounds
-      .filter((r) => r.result && r.result.at >= out.startedAt)
-      .map((r) => ({ prize: r.prize, merchant: r.merchantName, winner: r.result?.winner ?? "" }));
+    const decidedRounds = rounds.filter((r) => r.result && r.result.at >= out.startedAt);
+    const decided = decidedRounds.map((r) => ({
+      prize: r.prize,
+      merchant: r.merchantName,
+      winner: r.result?.winner ?? "",
+    }));
     const recording: Recording = {
       id: newId(),
       mode: out.mode,
@@ -363,7 +371,11 @@ function Roleta() {
       recording,
       saved,
       drawId: draw.id,
+      addresses: decidedRounds.map((r) =>
+        state.merchants.find((merchant) => merchant.id === r.merchantId)?.address?.trim(),
+      ),
     });
+    setSummaryOpen(false);
   };
   endRef.current = handleEndRecording;
 
@@ -418,10 +430,10 @@ function Roleta() {
     if (showResult && multi) {
       return (
         <GoldButton
-          onClick={() => setSummaryOpen(true)}
+          onClick={() => setSummaryOpen((open) => videoRecording ? !open : true)}
           className={recording ? "px-2 text-lg" : ""}
         >
-          <ListChecks className="shrink-0" aria-hidden="true" /> Ver resumo
+          <ListChecks className="shrink-0" aria-hidden="true" /> {videoRecording && summaryOpen ? "Ver roleta" : "Ver resumo"}
         </GoldButton>
       );
     }
@@ -450,6 +462,7 @@ function Roleta() {
 
   return (
     <div
+      data-video-recording={videoRecording || undefined}
       className={
         full
           ? "enigma-roleta-screen flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
@@ -539,9 +552,22 @@ function Roleta() {
             </button>
           </div>
         )}
-        <div ref={cameraHostRef} className="enigma-live-camera" />
       </div>
-      <div className="wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
+      <div
+        ref={previewHostRef}
+        className="enigma-recording-preview"
+        hidden={!videoRecording}
+        role="img"
+        aria-label={showResult && result
+          ? `Resultado do sorteio: ${result.winner}`
+          : `Prévia da gravação: ${round.prize} de ${round.merchantName}${sponsor?.address ? `, ${sponsor.address}` : ""}`}
+      />
+      <div
+        className={videoRecording
+          ? "sr-only"
+          : "wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4"}
+        aria-hidden={videoRecording || undefined}
+      >
         <Wheel
           key={`${draw.id}-${ri}`}
           names={pool}
@@ -549,7 +575,11 @@ function Roleta() {
           spin={spin}
           winner={showResult}
           idle={slowMotion && !spinning && !result}
-          onIdleRotation={(angle) => { idleRotationRef.current = angle; }}
+          onIdleRotation={(angle) => {
+            idleRotationRef.current = angle;
+            if (videoRecording) setRecIdleRotation(angle);
+          }}
+          {...(videoRecording ? { onSpinFrame: setRecMotion } : {})}
           onSpinEnd={handleSpinEnd}
         />
         {showResult && result && (
@@ -703,7 +733,7 @@ function Roleta() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={summaryOpen && done && !spinning} onOpenChange={setSummaryOpen}>
+      <Dialog open={!videoRecording && summaryOpen && done && !spinning} onOpenChange={setSummaryOpen}>
         <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Resumo do sorteio</DialogTitle>

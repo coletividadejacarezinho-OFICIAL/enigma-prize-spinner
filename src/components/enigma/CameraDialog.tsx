@@ -219,7 +219,7 @@ export function CameraDialog({
             )}
             {choice.mode === "roleta-camera" && view.kind === "ready" && (
               <p className="text-center text-xs font-semibold text-muted-foreground">
-                Centralize o rosto no círculo.
+                Centralize o rosto no círculo. Durante a gravação, sua câmera aparece à esquerda da roleta.
               </p>
             )}
             {view.kind === "asking" && choice.mode !== "roleta-camera" && (

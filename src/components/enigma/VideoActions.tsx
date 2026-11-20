@@ -56,13 +56,15 @@ export function VideoActions({
           controls
           playsInline
           autoPlay
-          className="mx-auto max-h-[38dvh] w-auto rounded-2xl border-2 border-gold bg-black"
+          className="mx-auto max-h-[38dvh] max-w-full rounded-xl border border-gold/50 bg-black"
           data-testid="recorded-video"
         />
       )}
-      <GoldButton onClick={() => setWatching(true)} disabled={watching}>
-        <Play aria-hidden="true" /> Assistir
-      </GoldButton>
+      {!watching && (
+        <GoldButton onClick={() => setWatching(true)}>
+          <Play aria-hidden="true" /> Assistir
+        </GoldButton>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => {
@@ -81,14 +83,21 @@ export function VideoActions({
           <Share2 className="h-5 w-5 text-gold" aria-hidden="true" /> Compartilhar
         </button>
       </div>
-      <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">
+      <p className="text-center text-sm text-muted-foreground empty:hidden" role="status">
         {note}
       </p>
     </div>
   );
 }
 
-type Done = { blob: Blob; filename: string; recording: Recording; saved: boolean; drawId: string };
+type Done = {
+  blob: Blob;
+  filename: string;
+  recording: Recording;
+  saved: boolean;
+  drawId: string;
+  addresses?: (string | undefined)[];
+};
 
 export function VideoDoneDialog({ video, onClose }: { video: Done | null; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
@@ -106,9 +115,9 @@ export function VideoDoneDialog({ video, onClose }: { video: Done | null; onClos
       <DialogContent className="max-h-[92dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
         <DialogHeader className="items-center text-center">
           {saved ? (
-            <CheckCircle2 className="h-10 w-10 text-gold" aria-hidden="true" />
+            <CheckCircle2 className="h-8 w-8 text-gold" aria-hidden="true" />
           ) : (
-            <AlertTriangle className="h-10 w-10 text-gold" aria-hidden="true" />
+            <AlertTriangle className="h-8 w-8 text-gold" aria-hidden="true" />
           )}
           <DialogTitle className="font-display text-2xl">
             {saved ? "Gravação salva" : "Gravação não guardada"}
@@ -138,10 +147,12 @@ export function VideoDoneDialog({ video, onClose }: { video: Done | null; onClos
           <ul className="space-y-1">
             {rounds.map((r, i) => (
               <li key={i} className="rounded-xl bg-card px-3 py-2 text-sm">
-                <span className="text-muted-foreground">
-                  {r.prize} · {r.merchant}
-                </span>
-                <span className="block font-bold text-gold">{r.winner}</span>
+                <p className="break-words font-extrabold text-gold">{r.winner}</p>
+                <p className="break-words font-bold">{r.prize}</p>
+                <p className="mt-1 break-words text-muted-foreground">{r.merchant}</p>
+                {video?.addresses?.[i] && (
+                  <p className="break-words text-muted-foreground">{video.addresses[i]}</p>
+                )}
               </li>
             ))}
           </ul>
