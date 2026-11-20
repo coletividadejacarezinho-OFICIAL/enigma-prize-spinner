@@ -181,7 +181,7 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
                     <text
                       key={`t${i}`}
                       aria-label={name}
-                      x={flip ? 12 : 188}
+                      x={flip ? 10 : 190}
                       y="100"
                       textAnchor={flip ? "start" : "end"}
                       dominantBaseline="central"
@@ -192,8 +192,9 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
                         fontWeight: 800,
                         fontFamily: "var(--font-sans)",
                         paintOrder: "stroke",
-                        stroke: "rgba(0,0,0,0.22)",
-                        strokeWidth: count > 100 ? 0.08 : 0.12,
+                        // Maintain contrast on both bright and dark wheel slices.
+                        stroke: light ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.52)",
+                        strokeWidth: count > 100 ? 0.1 : 0.15,
                       }}
                     >
                       {wheelLabel(name, count)}
