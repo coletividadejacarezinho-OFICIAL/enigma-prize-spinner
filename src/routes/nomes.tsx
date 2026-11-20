@@ -47,12 +47,12 @@ import {
   sameNameEntry,
 } from "@/lib/enigma/entries";
 import {
-  cleanName,
   formatDateBR,
   merchantOf,
   normalizeForCompare,
   parsePastedList,
 } from "@/lib/enigma/logic";
+import { formatPersonName } from "@/lib/enigma/input-format";
 import { report } from "@/lib/enigma/feedback";
 import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Entry } from "@/lib/enigma/types";
@@ -156,7 +156,7 @@ function Nomes() {
   };
 
   const add = async () => {
-    const name = cleanName(text);
+    const name = formatPersonName(text);
     if (!name) {
       inputRef.current?.focus();
       return;
@@ -167,7 +167,7 @@ function Nomes() {
   };
 
   const addPasted = async () => {
-    const list = parsePastedList(pasteText);
+    const list = parsePastedList(pasteText).map(formatPersonName);
     if (list.length === 0) return;
     const added = await addNames(list);
     if (added === null) return; // the pasted list stays in the box
@@ -209,8 +209,8 @@ function Nomes() {
 
   const diffError = (() => {
     if (!diff) return null;
-    const a = cleanName(diff.first);
-    const b = cleanName(diff.second);
+    const a = formatPersonName(diff.first);
+    const b = formatPersonName(diff.second);
     if (!a || !b) return "Preencha os dois nomes.";
     if (normalizeForCompare(a) === normalizeForCompare(b))
       return "Os nomes ainda estão iguais. Acrescente um detalhe, como o bairro.";
@@ -222,8 +222,8 @@ function Nomes() {
 
   const saveDiff = async () => {
     if (!diff || diffError) return;
-    const first = cleanName(diff.first);
-    const second = cleanName(diff.second);
+    const first = formatPersonName(diff.first);
+    const second = formatPersonName(diff.second);
     if (diff.mode === "new") {
       const before = (list: Entry[]) => [
         ...renameEntry(list, diff.matchId, first),
@@ -278,7 +278,7 @@ function Nomes() {
 
   const saveEdit = async () => {
     if (!editing) return;
-    const value = cleanName(editing.value);
+    const value = formatPersonName(editing.value);
     if (!value) return;
     const taken = sameNameEntry(entries, value, [editing.id]);
     if (taken) {
@@ -361,6 +361,8 @@ function Nomes() {
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                onBlur={(e) => setText(formatPersonName(e.target.value))}
+                autoCapitalize="words"
                 placeholder="Digite um nome"
                 aria-label="Digite um nome"
                 className={fieldClass}
@@ -449,6 +451,8 @@ function Nomes() {
                         autoFocus
                         value={editing.value}
                         onChange={(e) => setEditing({ id: entry.id, value: e.target.value })}
+                        onBlur={(e) => setEditing({ id: entry.id, value: formatPersonName(e.target.value) })}
+                        autoCapitalize="words"
                         aria-label="Corrigir nome"
                         className="h-11 min-w-0 rounded-lg border-2 border-gold bg-background px-3 text-base focus:outline-hidden"
                       />
@@ -529,6 +533,7 @@ function Nomes() {
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
+            autoCapitalize="words"
             rows={8}
             placeholder={"Maria da Silva\nJoão Pereira\nTereza Alves"}
             aria-label="Lista de nomes"
@@ -593,6 +598,8 @@ function Nomes() {
             <input
               value={diff?.first ?? ""}
               onChange={(e) => diff && setDiff({ ...diff, first: e.target.value })}
+              onBlur={(e) => diff && setDiff({ ...diff, first: formatPersonName(e.target.value) })}
+              autoCapitalize="words"
               className={`${fieldClass} mt-1 bg-background`}
               placeholder="Ex.: Maria Silva (Centro)"
             />
@@ -602,6 +609,8 @@ function Nomes() {
             <input
               value={diff?.second ?? ""}
               onChange={(e) => diff && setDiff({ ...diff, second: e.target.value })}
+              onBlur={(e) => diff && setDiff({ ...diff, second: formatPersonName(e.target.value) })}
+              autoCapitalize="words"
               className={`${fieldClass} mt-1 bg-background`}
               placeholder="Ex.: Maria Silva (Vila Rosa)"
             />
