@@ -115,6 +115,7 @@ export const Route = createFileRoute("/")({
 
 const SPIN_MS = 5500;
 const MIN_NAMES_FOR_CLOSEUP = 13;
+const VIDEO_CLOSEUP_MS = 3000;
 const FULL_WHEEL_RESULT_MS = 1200;
 /** With reduced motion the wheel only eases the last few degrees into the saved result. */
 const CALM_MS = 700;
@@ -318,6 +319,8 @@ function Roleta() {
         const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
         const zoom = !calm && wheelNames.length >= MIN_NAMES_FOR_CLOSEUP;
+        const holdMs = zoom && videoRecording ? VIDEO_CLOSEUP_MS
+          : !calm && !zoom ? FULL_WHEEL_RESULT_MS : undefined;
         setSpinLanded(false);
         setSpin({
           from,
@@ -325,7 +328,7 @@ function Roleta() {
           key: Date.now(),
           zoom,
           calm,
-          ...(!calm && !zoom ? { holdMs: FULL_WHEEL_RESULT_MS } : {}),
+          ...(holdMs !== undefined ? { holdMs } : {}),
         });
       });
   };

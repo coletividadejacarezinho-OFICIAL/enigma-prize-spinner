@@ -39,10 +39,15 @@ function smoothStep(value: number): number {
 }
 
 /** Ease into the anchored close-up, hold the saved result, then ease back to the full wheel. */
-export function wheelZoom(progress: number, enabled: boolean, landedMs = 0): number {
+export function wheelZoom(
+  progress: number,
+  enabled: boolean,
+  landedMs = 0,
+  closeupMs = WHEEL_CLOSEUP_MS,
+): number {
   if (!enabled) return 1;
   const enter = smoothStep((progress - 0.56) / 0.32);
-  const exit = smoothStep((landedMs - (WHEEL_CLOSEUP_MS - 800)) / 800);
+  const exit = smoothStep((landedMs - (closeupMs - 800)) / 800);
   return 1 + 0.9 * enter * (1 - exit);
 }
 
