@@ -90,6 +90,7 @@ import { currentDraw, repo, useAppState } from "@/lib/enigma/repo";
 import { GROUP_NAME, MIN_NAMES_TO_SPIN, type Recording, type RecordingMode } from "@/lib/enigma/types";
 import { keepRecording } from "@/lib/enigma/recording-save";
 import { videoFileName } from "@/lib/enigma/videos";
+import { lockWheelViewport } from "@/lib/enigma/viewport-lock";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -120,6 +121,13 @@ const CALM_MS = 700;
 function Roleta() {
   const state = useAppState();
   const navigate = useNavigate();
+
+  // A stationary draw screen: prevent the whole page and bottom tabs from drifting
+  // with vertical swipes. Restore normal document scrolling when leaving this route.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    return lockWheelViewport(document);
+  }, []);
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
   const [slowMotion, setSlowMotion] = useState(true);
