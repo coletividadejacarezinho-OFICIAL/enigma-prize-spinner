@@ -37,12 +37,13 @@ function NovoComercio() {
       </Link>
       <h1 className="mb-4 text-3xl font-extrabold">Cadastrar comércio</h1>
       <MerchantForm
-        onSave={async ({ name, logo }) => {
+        onSave={async (values) => {
+          const { name } = values;
           const dup = state.merchants.find(
             (m) => normalizeForCompare(m.name) === normalizeForCompare(name),
           );
           if (dup) return void toast.error(`“${dup.name}” já está cadastrado.`);
-          if (!report(await repo.saveMerchant(createMerchant({ name, logo })))) return;
+          if (!report(await repo.saveMerchant(createMerchant(values)))) return;
           toast.success(`${name} cadastrado!`);
           navigate({ to: "/sorteios", search: { aba: "comercios" } });
         }}

@@ -45,6 +45,25 @@ describe("formatação dos campos", () => {
     expect(save).toHaveBeenCalledWith({ name: "Padaria do Bairro", logo: undefined });
   });
 
+  it("valida o telefone opcional e salva o endereço comercial padronizado", () => {
+    const save = vi.fn();
+    render(<MerchantForm initial={{ name: "Padaria", logo: undefined }} onSave={save} />);
+    const phone = screen.getByRole<HTMLInputElement>("textbox", { name: /Telefone ou WhatsApp/ });
+    const address = screen.getByRole<HTMLInputElement>("textbox", { name: /Endereço comercial/ });
+    fireEvent.input(phone, { target: { value: "439" } });
+    fireEvent.submit(phone.form!);
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.input(phone, { target: { value: "4333330000" }, inputType: "insertFromPaste" });
+    fireEvent.change(address, { target: { value: "  rua   Paraná,  100 — Centro " } });
+    fireEvent.submit(phone.form!);
+    expect(save).toHaveBeenCalledWith({
+      name: "Padaria",
+      logo: undefined,
+      whatsapp: "4333330000",
+      address: "Rua Paraná, 100 — Centro",
+    });
+  });
+
   it("máscara de WhatsApp aceita telefone fixo, celular, DDD 55 e números do Brasil com +55", () => {
     for (const [raw, visible, saved] of [
       ["4333330000", "(43) 3333-0000", "4333330000"],

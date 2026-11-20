@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { MerchantLogo } from "./Logos";
-import { MerchantForm } from "./MerchantForm";
+import { MerchantForm, type MerchantFormValues } from "./MerchantForm";
 import { areaClass, fieldClass } from "./fields";
 import {
   Dialog,
@@ -135,7 +135,8 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
     setPicking(null);
   };
 
-  const addMerchant = async ({ name, logo }: { name: string; logo: string | undefined }) => {
+  const addMerchant = async (values: MerchantFormValues) => {
+    const { name } = values;
     const existing = merchants.find(
       (m) => normalizeForCompare(m.name) === normalizeForCompare(name),
     );
@@ -144,7 +145,7 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
       toast.info(`“${existing.name}” já estava cadastrada e foi escolhida.`);
       return;
     }
-    const m = createMerchant({ name, logo });
+    const m = createMerchant(values);
     if (!report(await repo.saveMerchant(m))) return;
     choose(m.id);
     toast.success(`${m.name} cadastrada e escolhida.`);

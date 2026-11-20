@@ -65,15 +65,21 @@ function Comercio() {
           </SecondaryButton>
           <MerchantForm
             key={merchant.id}
-            initial={{ name: merchant.name, logo: merchant.logo }}
-            onSave={async ({ name, logo }) => {
+            initial={{ ...merchant, logo: merchant.logo }}
+            onSave={async ({ name, logo, whatsapp, address }) => {
               const dup = state.merchants.find(
                 (m) =>
                   m.id !== merchant.id && normalizeForCompare(m.name) === normalizeForCompare(name),
               );
               if (dup) return void toast.error(`“${dup.name}” já está cadastrado.`);
-              const { logo: _old, ...rest } = merchant; // keeps whatsapp
-              const next = logo ? { ...rest, name, logo } : { ...rest, name };
+              const { logo: _old, whatsapp: _phone, address: _address, ...rest } = merchant;
+              const next = {
+                ...rest,
+                name,
+                ...(logo ? { logo } : {}),
+                ...(whatsapp ? { whatsapp } : {}),
+                ...(address ? { address } : {}),
+              };
               if (!report(await repo.saveMerchant(next))) return;
               toast.success("Comércio atualizado.");
               navigate({ to: "/sorteios", search: { aba: "comercios" } });

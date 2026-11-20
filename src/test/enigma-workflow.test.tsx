@@ -198,11 +198,13 @@ it("avisa sobre vídeo ausente e mantém os metadados no backup", async () => {
 it("libera a segunda cortesia quando resta um participante elegível", async () => {
   const { Route: WheelRoute } = await import("@/routes/index");
   const { createDraw } = await import("@/lib/enigma/logic");
-  const merchant = { id: "m", name: "Loja", createdAt: 1 };
+  const merchant = { id: "m", name: "Loja", createdAt: 1, address: "Rua Um, 100" };
+  const second = { id: "m2", name: "Padaria", createdAt: 2, whatsapp: "4333330000", address: "Rua Dois, 20" };
   await repo.saveMerchant(merchant);
+  await repo.saveMerchant(second);
   const draw = createDraw({
     merchant, date: "2026-11-19", prize: "Prêmio A", confirmed: true,
-    more: [{ merchant, prize: "Prêmio B" }], repeatWinners: false,
+    more: [{ merchant: second, prize: "Prêmio B" }], repeatWinners: false,
   });
   await repo.createDraw(draw, { makeCurrent: true });
   await repo.changeEntries(draw.id, () => ["Ana", "Bia"].map((n) => manualEntry(n, 1)));
@@ -215,6 +217,9 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
   await repo.nextRound(draw.id, draw.id);
   const Wheel = (WheelRoute as unknown as { component: () => React.ReactNode }).component;
   render(<Wheel />);
+  expect(screen.getByText("Rua Dois, 20")).toBeTruthy();
+  expect(screen.getByText("(43) 3333-0000")).toBeTruthy();
+  expect(screen.queryByText("Rua Um, 100")).toBeNull();
   expect(screen.getByText("Girar roleta")).toBeTruthy();
   fireEvent.click(screen.getByText("Girar roleta"));
   await waitFor(() => expect(currentDraw(saved()).extraPrizes?.[0]?.result?.winner).toBe("Bia"));
