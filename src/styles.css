@@ -690,3 +690,13 @@
     width: 2.75rem;
   }
 }
+
+
+/* Extra-narrow phones: allow control text to wrap instead of overflowing a chip. */
+@media (max-width: 360px) {
+  .enigma-roleta-screen > .enigma-roleta-toolbar > .enigma-toolbar-chip {
+    white-space: normal;
+    line-height: 1.08;
+    font-size: 0.7rem;
+  }
+}
