@@ -8,6 +8,7 @@ import {
   stopRecording,
   type RecFrame,
 } from "@/lib/enigma/recorder";
+import { WINNER_CONFETTI_MS } from "@/lib/enigma/winner-effects";
 
 const frame: RecFrame = {
   group: "Coletividade",
@@ -34,6 +35,7 @@ const translate = vi.fn();
 const scale = vi.fn();
 const rotate = vi.fn();
 const rect = vi.fn();
+const bezierCurveTo = vi.fn();
 const canvasContext = new Proxy(
   {
     arc,
@@ -44,6 +46,7 @@ const canvasContext = new Proxy(
     scale,
     rotate,
     rect,
+    bezierCurveTo,
     measureText: (text: string) => ({ width: text.length * 10 }),
     createLinearGradient: () => ({ addColorStop: vi.fn() }),
     createRadialGradient: () => ({ addColorStop: vi.fn() }),
@@ -82,6 +85,7 @@ beforeEach(() => {
   scale.mockClear();
   rotate.mockClear();
   rect.mockClear();
+  bezierCurveTo.mockClear();
   host = document.createElement("div");
   document.body.appendChild(host);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
@@ -213,7 +217,12 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(nameLines.map(([line]) => line).join(" ")).toBe(winner);
   expect(nameLines.every(([, x, , width]) => x - width / 2 > 145 + 111)).toBe(true);
   expect(rect).toHaveBeenCalledWith(44, 344, 632, 632);
-  vi.advanceTimersByTime(1400);
+  expect(bezierCurveTo).toHaveBeenCalled();
+  vi.advanceTimersByTime(1800);
+  bezierCurveTo.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(bezierCurveTo).toHaveBeenCalled();
+  vi.advanceTimersByTime(WINNER_CONFETTI_MS - 1800);
   rect.mockClear();
   vi.advanceTimersByTime(33);
   expect(rect).not.toHaveBeenCalledWith(44, 344, 632, 632);
