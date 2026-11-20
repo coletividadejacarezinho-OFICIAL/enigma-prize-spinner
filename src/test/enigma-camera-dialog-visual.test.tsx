@@ -25,6 +25,8 @@ it("keeps the three recording modes, their labels and a distinct visual icon eac
   expect(screen.getAllByRole("radio")).toHaveLength(3);
   expect(container.querySelectorAll(".enigma-capture-icon")).toHaveLength(3);
   expect(container.querySelectorAll(".enigma-capture-icon svg")).toHaveLength(3);
+  expect(container.querySelectorAll(".enigma-capture-option")).toHaveLength(3);
+  expect(screen.getByText("Roleta, rosto em círculo e voz.")).toBeTruthy();
   expect(screen.getByRole("radio", { name: /Roleta com meu rosto/ }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole("radio", { name: /Só a roleta/ })).toBeTruthy();
   expect(screen.getByRole("radio", { name: /Só minha voz/ })).toBeTruthy();
