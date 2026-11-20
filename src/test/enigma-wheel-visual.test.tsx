@@ -30,12 +30,33 @@ it.each([75, 150, 250])("keeps %i original names in order with readable edge lab
   expect(labels).toHaveLength(count);
   expect(labels.map((label) => label.getAttribute("aria-label"))).toEqual(original);
   expect(labels[0]?.getAttribute("x")).toBe("190");
-  expect(labels[count - 1]?.getAttribute("x")).toBe("10");
+  expect(labels[Math.ceil(count / 2)]?.getAttribute("x")).toBe("10");
+  expect(labels[count - 1]?.getAttribute("x")).toBe("190");
 
   // Bright slices use dark letters with a light border; dark slices use the reverse.
   expect(labels[0]?.style.stroke).not.toBe(labels[1]?.style.stroke);
   expect(labels[0]?.style.paintOrder).toBe("stroke");
   expect(labels[1]?.style.paintOrder).toBe("stroke");
+});
+
+it("uses 24 sequential lights without changing names or wheel segments", () => {
+  vi.spyOn(performance, "now").mockReturnValue(0);
+  vi.stubGlobal("requestAnimationFrame", () => 1);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const original = names.slice(0, 75);
+  const { container, rerender } = render(<Wheel names={original} rotation={0} />);
+  const rim = container.querySelector<HTMLElement>(".wheel-rim")!;
+  const bulbs = Array.from(rim.querySelectorAll<HTMLElement>(".wheel-bulb"));
+  const wheel = container.querySelector('svg[aria-label="Roleta"]')!;
+  expect(bulbs).toHaveLength(24);
+  expect(new Set(bulbs.map((bulb) => bulb.style.animationDelay)).size).toBe(24);
+  const idleDelay = bulbs[1]?.style.animationDelay;
+  const segmentCount = wheel.querySelectorAll("path").length;
+  rerender(<Wheel names={original} rotation={0} spin={{ from: 0, durationMs: 1000, key: 1, zoom: true }} />);
+  expect(rim.classList.contains("wheel-rim--spinning")).toBe(true);
+  expect(bulbs[1]?.style.animationDelay).not.toBe(idleDelay);
+  expect(wheel.querySelectorAll("path")).toHaveLength(segmentCount);
+  expect(Array.from(wheel.querySelectorAll("text"), (label) => label.textContent)).toEqual(original);
 });
 
 it("shows longer names where the wheel has space, without changing the original", () => {

@@ -108,7 +108,7 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
   return (
     <div className="wheel-size relative">
       <div className={spin?.zoom ? "absolute inset-0 overflow-hidden" : "absolute inset-0"}>
-        <div ref={rimRef} className="wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]">
+        <div ref={rimRef} className={`wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]${spin ? " wheel-rim--spinning" : ""}`}>
           {/* Independent perimeter lights: decorative only, never change the draw. */}
           <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden="true">
             {Array.from({ length: 24 }, (_, i) => {
@@ -120,7 +120,8 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
                   style={{
                     left: `${50 + 47 * Math.cos(angle)}%`,
                     top: `${50 + 47 * Math.sin(angle)}%`,
-                    animationDelay: `${-((i % 2) * 0.65)}s`,
+                    // Stagger all 24 bulbs so the illuminated group travels clockwise.
+                    animationDelay: `${-((24 - i) * (spin ? 0.05 : 0.1))}s`,
                   }}
                 />
               );
