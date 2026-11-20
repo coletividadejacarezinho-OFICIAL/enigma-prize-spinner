@@ -125,7 +125,7 @@ function Roleta() {
   // A stationary draw screen: prevent the whole page and bottom tabs from drifting
   // with vertical swipes. Restore normal document scrolling when leaving this route.
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
     return lockWheelViewport(document);
   }, []);
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
