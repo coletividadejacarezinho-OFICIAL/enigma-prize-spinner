@@ -818,3 +818,36 @@
     height: 2rem;
   }
 }
+
+
+/* Roleta is a single fixed viewport. Other routes keep their normal page scrolling.
+   The nav already uses position: fixed; removing document overscroll stops it
+   drifting with mobile swipes. Dialogs can still scroll inside their own panels. */
+html.enigma-roleta-viewport-locked,
+body.enigma-roleta-viewport-locked {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.enigma-roleta-root {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.enigma-roleta-screen {
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Keep the four navigation tabs anchored to the viewport, never in the
+   scrollable content area. This is scoped to the active Roleta only. */
+.enigma-roleta-viewport-locked .enigma-bottom-nav {
+  position: fixed;
+  bottom: 0;
+}
