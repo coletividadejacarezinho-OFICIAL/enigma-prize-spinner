@@ -196,6 +196,30 @@ function sparkle(ctx: Ctx, x: number, y: number, r: number, color: string) {
   ctx.restore();
 }
 
+/** Fits a registered image in its frame without trimming any part of the brand. */
+export function containedImageRect(
+  sourceWidth: number,
+  sourceHeight: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  padding = 0,
+): { x: number; y: number; width: number; height: number } | null {
+  if (sourceWidth <= 0 || sourceHeight <= 0 || width <= 0 || height <= 0) return null;
+  const availableWidth = Math.max(0, width - padding * 2);
+  const availableHeight = Math.max(0, height - padding * 2);
+  const scale = Math.min(availableWidth / sourceWidth, availableHeight / sourceHeight);
+  const fittedWidth = sourceWidth * scale;
+  const fittedHeight = sourceHeight * scale;
+  return {
+    x: x + (width - fittedWidth) / 2,
+    y: y + (height - fittedHeight) / 2,
+    width: fittedWidth,
+    height: fittedHeight,
+  };
+}
+
 /** Logo in a rounded tile, or the shop's initials when it has none. */
 function drawLogo(
   k: Kit,
@@ -204,6 +228,7 @@ function drawLogo(
   x: number,
   y: number,
   size: number,
+  fit: "cover" | "contain" = "cover",
 ) {
   const { ctx, pal } = k;
   ctx.save();
@@ -212,10 +237,15 @@ function drawLogo(
     ctx.fillStyle = pal.ink;
     ctx.fill();
     ctx.clip();
-    const s = Math.max(size / img.width, size / img.height);
-    const w = img.width * s;
-    const h = img.height * s;
-    ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
+    if (fit === "contain") {
+      const rect = containedImageRect(img.width, img.height, x, y, size, size, size * 0.06);
+      if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
+    } else {
+      const s = Math.max(size / img.width, size / img.height);
+      const w = img.width * s;
+      const h = img.height * s;
+      ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
+    }
   } else {
     ctx.fillStyle = pal.glow;
     ctx.fill();
@@ -296,14 +326,8 @@ function drawFrame(k: Kit) {
     ctx.save();
     ctx.clip();
     const img = k.groupLogo;
-    const s = Math.max(badge / img.width, badge / img.height);
-    ctx.drawImage(
-      img,
-      bx + (badge - img.width * s) / 2,
-      by + (badge - img.height * s) / 2,
-      img.width * s,
-      img.height * s,
-    );
+    const rect = containedImageRect(img.width, img.height, bx, by, badge, badge, 4);
+    if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
   } else {
     ctx.fillStyle = pal.gold;
@@ -798,7 +822,7 @@ export async function renderWinnerCard(
   setFont(ctx, 800, 30, SANS, 6);
   ctx.fillText("OFERECIMENTO", W / 2, y + 30);
   y += 40 + 18;
-  drawLogo(k, logo, card.merchantName, (W - l.logo) / 2, y, l.logo);
+  drawLogo(k, logo, card.merchantName, (W - l.logo) / 2, y, l.logo, "contain");
   y += l.logo + 18;
   ctx.textAlign = "center";
   ctx.fillStyle = pal.ink;
@@ -867,7 +891,7 @@ export async function renderSummaryCards(
       ctx.lineWidth = 2;
       ctx.stroke();
       const x = M + 30;
-      drawLogo(k, logos[i] ?? null, r.merchantName, x, y + 30, L);
+      drawLogo(k, logos[i] ?? null, r.merchantName, x, y + 30, L, "contain");
       let ty = y + 30 + (l.topH - (l.head.length * 38 + 6 + l.prize.length * 48)) / 2;
       ctx.fillStyle = pal.muted;
       setFont(ctx, 800, 28, SANS, 2);
