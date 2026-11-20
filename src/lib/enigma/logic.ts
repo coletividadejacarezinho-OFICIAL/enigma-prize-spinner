@@ -104,9 +104,16 @@ export function entriesFromNames(names: string[], now: number, flagRepeats: bool
   });
 }
 
-export function createMerchant(input: { name: string; logo?: string | undefined }): Merchant {
+export function createMerchant(input: {
+  name: string;
+  logo?: string | undefined;
+  whatsapp?: string | undefined;
+  address?: string | undefined;
+}): Merchant {
   const m: Merchant = { id: newId(), name: cleanName(input.name), createdAt: Date.now() };
   if (input.logo) m.logo = input.logo;
+  if (input.whatsapp) m.whatsapp = input.whatsapp;
+  if (input.address) m.address = input.address;
   return m;
 }
 

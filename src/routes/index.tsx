@@ -209,6 +209,7 @@ function Roleta() {
   const multi = total > 1;
   const ri = shownRound(draw);
   const round = rounds[ri] ?? rounds[0]!;
+  const sponsor = state.merchants.find((merchant) => merchant.id === round.merchantId);
   const isLast = ri === total - 1;
   const pool = poolFor(draw, ri);
   const count = pool.length;
@@ -465,6 +466,8 @@ function Roleta() {
         prize={round.prize}
         roundIndex={ri}
         roundTotal={total}
+        whatsapp={sponsor?.whatsapp}
+        address={sponsor?.address}
       />
 
       <div className="enigma-roleta-toolbar mt-1 flex min-h-9 flex-wrap items-center justify-end gap-1.5 px-4 text-xs text-muted-foreground" role="group" aria-label="Controles da roleta">

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 
 import { AppHeader } from "@/components/enigma/AppHeader";
@@ -56,4 +56,24 @@ it("does not show a multi-prize label for a single courtesy", () => {
   expect(screen.queryByText(/Prêmio 1 de 1/)).toBeNull();
   expect(screen.getByTestId("prize-label").textContent).toBe("Cortesia especial");
   expect(container.querySelector(".enigma-sponsor-card")).toBeTruthy();
+});
+
+it("keeps long sponsor information in the compact card and opens the complete details", () => {
+  const merchantName = "Padaria e Confeitaria Família da Silva de Jacarezinho";
+  const prize = "Uma cesta completa com pães, bolos e outros produtos artesanais para toda a família";
+  const address = "Avenida das Flores, 1200, esquina com a Rua Paraná — Centro, Jacarezinho";
+  const { container } = render(
+    <SponsorCard merchantName={merchantName} prize={prize} roundIndex={1} roundTotal={8}
+      whatsapp="43999990000" address={address} />,
+  );
+  expect(container.querySelector(".enigma-sponsor-card--contact")).toBeTruthy();
+  expect(screen.getByText("Oferecimento")).toBeTruthy();
+  expect(screen.getByText("Prêmio 2 de 8")).toBeTruthy();
+  expect(screen.getByText("(43) 99999-0000")).toBeTruthy();
+  expect(screen.getByText(address).classList.contains("truncate")).toBe(true);
+  expect(screen.getByTestId("prize-label").textContent).toBe(prize);
+  fireEvent.click(screen.getByRole("button", { name: "Ver detalhes do oferecimento" }));
+  const dialog = within(screen.getByRole("dialog", { name: merchantName }));
+  expect(dialog.getByText(address)).toBeTruthy();
+  expect(dialog.getByText(prize)).toBeTruthy();
 });

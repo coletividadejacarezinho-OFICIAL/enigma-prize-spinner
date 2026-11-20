@@ -15,6 +15,8 @@ export type Merchant = {
   logo?: string;
   /** P1: WhatsApp with DDD, digits only (optional). */
   whatsapp?: string;
+  /** Optional public address of the shop. */
+  address?: string;
   createdAt: number;
 };
 
