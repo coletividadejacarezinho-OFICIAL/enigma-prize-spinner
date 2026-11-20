@@ -40,13 +40,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { entriesOf, needsConfirmation, readyEntries } from "@/lib/enigma/entries";
 import {
   formatDateBR,
