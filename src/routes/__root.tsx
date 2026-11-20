@@ -163,6 +163,8 @@ function RootComponent() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const needsDraw = path === "/" || path === "/nomes" || path.startsWith("/convite");
   const empty = store?.kind === "ok" && !store.state.draws.some((d) => !d.draft) && needsDraw;
+  // Only the active draw screen uses a viewport-locked layout; lists and settings still scroll.
+  const wheelReady = path === "/" && store?.kind === "ok" && !empty;
   const [recovery, setRecovery] = useState<"opening" | "ready" | "pending">("opening");
   const recover = async () => {
     setRecovery("opening");
@@ -189,9 +191,10 @@ function RootComponent() {
           so the frame keeps content inside the phone's safe area (Roleta full screen pads itself). */}
       <div
         className={
-          presenting
+          (presenting
             ? "mx-auto min-h-dvh max-w-md"
-            : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+            : "mx-auto min-h-dvh max-w-md pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]") +
+          (wheelReady && recovery === "ready" ? " enigma-roleta-root" : "")
         }
       >
         {recovery === "pending" ? (
