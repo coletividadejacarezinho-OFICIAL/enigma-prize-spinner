@@ -326,7 +326,7 @@ function drawFrame(k: Kit) {
     ctx.save();
     ctx.clip();
     const img = k.groupLogo;
-    const rect = containedImageRect(img.width, img.height, bx, by, badge, badge, 4);
+    const rect = containedImageRect(img.width, img.height, bx, by, badge, badge, badge * 0.16);
     if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
   } else {
