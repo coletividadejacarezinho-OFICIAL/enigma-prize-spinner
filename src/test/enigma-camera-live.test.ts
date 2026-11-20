@@ -29,6 +29,7 @@ const drawImage = vi.fn();
 const fillText = vi.fn();
 const translate = vi.fn();
 const scale = vi.fn();
+const rotate = vi.fn();
 const canvasContext = new Proxy(
   {
     arc,
@@ -36,6 +37,7 @@ const canvasContext = new Proxy(
     fillText,
     translate,
     scale,
+    rotate,
     measureText: (text: string) => ({ width: text.length * 10 }),
     createLinearGradient: () => ({ addColorStop: vi.fn() }),
     createRadialGradient: () => ({ addColorStop: vi.fn() }),
@@ -69,6 +71,7 @@ beforeEach(() => {
   fillText.mockClear();
   translate.mockClear();
   scale.mockClear();
+  rotate.mockClear();
   host = document.createElement("div");
   document.body.appendChild(host);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
@@ -141,19 +144,25 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
 
   setRecFrame({ ...frame, spinning: true });
-  setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5 });
+  setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5, pointerTilt: -3 });
   vi.advanceTimersByTime(900);
   expect(scale).toHaveBeenCalledWith(1.5, 1.5);
+  expect(rotate.mock.lastCall?.[0]).toBeCloseTo(-Math.PI / 60);
+  expect(fillText).toHaveBeenCalledWith("Girando…", 483, 1110, 370);
   expect(arc).toHaveBeenCalledWith(360, 660, 300, Math.PI, Math.PI * 2);
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
 
   const winner = "Maria Clara dos Santos de Almeida Pereira Rodrigues da Conceição Ferreira";
-  setRecMotion({ rotation: 270, progress: 1, zoom: 1.5 });
+  setRecMotion({ rotation: 270, progress: 1, zoom: 1.5, pointerTilt: 0 });
+  fillText.mockClear();
+  vi.advanceTimersByTime(40);
+  expect(fillText).toHaveBeenCalledWith("Resultado", 483, 1110, 370);
+  expect(fillText).not.toHaveBeenCalledWith("Girando…", 483, 1110, 370);
   setRecFrame({ ...frame, winner, rotation: 270 });
   fillText.mockClear();
   arc.mockClear();
-  vi.advanceTimersByTime(40);
+  vi.advanceTimersByTime(33);
   expect(host.querySelector("video")).toBe(video);
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);

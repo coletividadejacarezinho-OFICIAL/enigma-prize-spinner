@@ -10,7 +10,15 @@ import type { CountdownStep } from "./jingle";
 import { segmentAtPointer } from "./logic";
 import { audioContext, prefersReducedMotion, setRecordTap } from "./sound";
 import type { RecordingMode } from "./types";
-import { pointerNudge, wheelFontSize, wheelLabel } from "./wheel-visual";
+import {
+  rimLampIsLit,
+  rimLightIndex,
+  RIM_LAMP_COUNT,
+  wheelFocusOpacity,
+  wheelFontSize,
+  wheelLabel,
+  type WheelMotion,
+} from "./wheel-visual";
 
 export type CameraProblem = "denied" | "missing" | "busy" | "unsupported" | "other";
 
@@ -92,8 +100,6 @@ export type RecFrame = {
   winnerNumber?: number | null;
   summary: { prize: string; merchant: string; winner: string }[] | null;
 };
-
-type WheelMotion = { rotation: number; zoom: number; progress: number };
 
 const W = 720;
 const H = 1280;
@@ -505,17 +511,18 @@ function paint(s: Session) {
 
   paintSponsor(ctx, c, f, s.logo, s.sponsorPresentedAt);
 
+  const motion = f.spinning ? s.motion : null;
+  const landed = motion?.progress === 1;
   if (f.summary) paintSummary(ctx, c, f.summary);
   else {
-    const motion = f.spinning ? s.motion : null;
     const rotation = motion?.rotation ?? f.rotation;
     const zoom = motion?.zoom ?? 1;
-    const landed = motion?.progress === 1;
-    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, f.spinning, f.spinning && !landed, !!f.winner || landed);
+    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, motion?.pointerTilt ?? 0, !!f.winner || landed);
     const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
     if (focus) {
       // Match the interface's raised zoom label, clear of the wheel hub.
       ctx.save();
+      ctx.globalAlpha = wheelFocusOpacity(zoom);
       ctx.textAlign = "center";
       ctx.font = `800 27px ${DISPLAY}`;
       const lines = wrap(ctx, focus, W - 164, 2);
@@ -600,7 +607,10 @@ function paint(s: Session) {
   } else {
     ctx.fillStyle = c.ink;
     ctx.font = `800 32px ${DISPLAY}`;
-    ctx.fillText(f.spinning ? "Girando…" : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Valendo!", infoCenter, 1110, infoTextWidth);
+    const status = f.spinning
+      ? (landed ? "Resultado" : "Girando…")
+      : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Valendo!";
+    ctx.fillText(status, infoCenter, 1110, infoTextWidth);
     ctx.fillStyle = c.muted;
     ctx.font = `700 24px ${SANS}`;
     ctx.fillText(
@@ -784,8 +794,7 @@ function paintWheel(
   cy: number,
   r: number,
   zoom: number,
-  spinning: boolean,
-  pointerMoving: boolean,
+  pointerTilt: number,
   pointerHighlighted: boolean,
 ) {
   const count = names.length;
@@ -807,17 +816,18 @@ function paintWheel(
   ctx.beginPath();
   ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
   ctx.fill();
-  // Match the clockwise sequence in the interface (and its faster spin speed).
-  const activeLight = Math.floor(performance.now() / (spinning ? 50 : 100)) % 24;
-  for (let i = 0; i < 24; i++) {
-    const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
-    const on = ((i - activeLight + 24) % 24) < 4;
+  const firstLamp = rimLightIndex(rotation);
+  const steadyLamps = prefersReducedMotion();
+  for (let i = 0; i < RIM_LAMP_COUNT; i++) {
+    const angle = (i * Math.PI * 2) / RIM_LAMP_COUNT - Math.PI / 2;
+    const on = rimLampIsLit(i, firstLamp);
+    const bright = !steadyLamps && on;
     const x = cx + Math.cos(angle) * (r + 11);
     const y = cy + Math.sin(angle) * (r + 11);
     ctx.beginPath();
     ctx.arc(x, y, 4.8, 0, Math.PI * 2);
-    ctx.fillStyle = on ? "#fffaf0" : "#d99517";
-    if (on) {
+    ctx.fillStyle = steadyLamps ? "#ffe7a5" : bright ? "#fffaf0" : "#d99517";
+    if (bright) {
       ctx.shadowColor = "#fff5b8";
       ctx.shadowBlur = 10;
     }
@@ -887,7 +897,7 @@ function paintWheel(
   // Same stationary marker as the app: metallic finish, short click and final glow.
   ctx.save();
   ctx.translate(cx, cy - r - 22);
-  ctx.rotate((pointerNudge(rotation, count, pointerMoving) * Math.PI) / 180);
+  ctx.rotate((pointerTilt * Math.PI) / 180);
   const gold = ctx.createLinearGradient(-26, -26, 26, 56);
   gold.addColorStop(0, "#fff5bf");
   gold.addColorStop(0.48, "#ffd452");

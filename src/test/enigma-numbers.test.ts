@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampVolume, noteCount, spinNoteTimes, wheelEase } from "@/lib/enigma/jingle";
+import { clampVolume, noteCount, spinBeatTimes, spinNoteTimes, wheelEase } from "@/lib/enigma/jingle";
 import { createDraw, segmentAtPointer, targetRotation } from "@/lib/enigma/logic";
 import {
   MAX_PARTICIPANTS,
@@ -72,6 +72,14 @@ describe("E06: trilha do giro", () => {
     // At each note the wheel has covered k/40 of its turn.
     t.forEach((x, k) => expect(wheelEase(x / 5.5)).toBeCloseTo(k / 40, 6));
     expect(noteCount(5500)).toBeLessThanOrEqual(48);
+  });
+  it("spaces audible beats and keeps a soft beat near the landing", () => {
+    for (const duration of [2500, 5500]) {
+      const beats = spinBeatTimes(duration);
+      expect(beats[0]).toBe(0);
+      expect(beats.every((time, i) => i === 0 || time - beats[i - 1]! >= 0.09)).toBe(true);
+      expect(beats.at(-1)).toBeCloseTo((duration / 1000) * 0.93);
+    }
   });
   it("volume preference is clamped, default 70%", () => {
     expect(clampVolume(undefined)).toBe(0.7);

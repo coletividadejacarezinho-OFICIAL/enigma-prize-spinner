@@ -15,7 +15,20 @@ export function spinNoteTimes(durationMs: number, count: number): number[] {
   return out;
 }
 
-/** Cheerful loop (C major pentatonic, Hz); bass on every 4th note. */
+/** Space the dense opening notes and add two soft beats through the final slow turns. */
+export function spinBeatTimes(durationMs: number): number[] {
+  const beats: number[] = [];
+  for (const time of spinNoteTimes(durationMs, noteCount(durationMs))) {
+    if (time - (beats.at(-1) ?? -Infinity) >= 0.09) beats.push(time);
+  }
+  for (const fraction of [0.78, 0.93]) {
+    const time = (durationMs / 1000) * fraction;
+    if (time - (beats.at(-1) ?? -Infinity) >= 0.09) beats.push(time);
+  }
+  return beats;
+}
+
+/** Cheerful loop (C major pentatonic, Hz); bass on the stronger beats. */
 export const MELODY = [523.25, 659.25, 783.99, 659.25, 880, 783.99, 659.25, 587.33];
 export const BASS = [130.81, 196, 174.61, 196];
 /** Reveal chord (C major, rising). */

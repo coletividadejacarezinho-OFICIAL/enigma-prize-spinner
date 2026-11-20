@@ -135,6 +135,7 @@ function Roleta() {
   }, []);
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
+  const [spinLanded, setSpinLanded] = useState(false);
   const countdownCancelPressed = useRef(false);
   const [countdown, setCountdown] = useState<{
     roundId: string | undefined;
@@ -299,8 +300,7 @@ function Roleta() {
         const to = r.value.result.rotation;
         const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
-        // The music starts with the animation of the saved result, never before.
-        if (state.sound && !calm) startSpinTrack(durationMs, clampVolume(state.volume));
+        setSpinLanded(false);
         setSpin({ from, durationMs, key: Date.now(), zoom: !calm });
       });
   };
@@ -342,6 +342,7 @@ function Roleta() {
   const handleSpinEnd = () => {
     spinningRef.current = false;
     setSpin(null);
+    setSpinLanded(false);
     stopAllSound();
     if (state.sound) playReveal(clampVolume(state.volume));
     if (multi && isLast && !videoRecording) setSummaryOpen(true);
@@ -501,7 +502,7 @@ function Roleta() {
       );
     }
     return spinning ? (
-      <GoldButton disabled>Girando…</GoldButton>
+      <GoldButton disabled>{spinLanded ? "Resultado" : "Girando…"}</GoldButton>
     ) : (
       <HoldToSpinButton
         key={roundIdOf(draw, ri)}
@@ -647,6 +648,11 @@ function Roleta() {
             if (videoRecording) setRecIdleRotation(angle);
           }}
           {...(videoRecording ? { onSpinFrame: setRecMotion } : {})}
+          onSpinStart={(durationMs) => {
+            if (state.sound && spin?.zoom) return startSpinTrack(durationMs, clampVolume(state.volume));
+            return undefined;
+          }}
+          onSpinLand={() => setSpinLanded(true)}
           onSpinEnd={handleSpinEnd}
         />
         {activeCountdown && !videoRecording && (

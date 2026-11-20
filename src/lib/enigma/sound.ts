@@ -1,5 +1,5 @@
 /** Browser-only sound. Every function is safe when the device blocks audio: it just stays silent. */
-import { BASS, MELODY, REVEAL, noteCount, spinNoteTimes, type CountdownStep } from "./jingle";
+import { BASS, MELODY, REVEAL, spinBeatTimes, type CountdownStep } from "./jingle";
 
 let ctx: AudioContext | null = null;
 
@@ -100,13 +100,16 @@ function master(a: AudioContext, volume: number) {
 
 /** The spin part: starts with the saved result's animation; returns stop(). */
 export function startSpinTrack(durationMs: number, volume: number): () => void {
-  const a = audio();
-  if (!a || volume <= 0) return () => undefined;
+  const a = volume > 0 && durationMs > 0 ? audio() : null;
+  if (!a) return () => undefined;
   const { g, stop } = master(a, volume);
-  const t0 = a.currentTime + 0.02;
-  spinNoteTimes(durationMs, noteCount(durationMs)).forEach((t, i) => {
-    note(a, g, MELODY[i % MELODY.length]!, t0 + t, 0.16, 0.16, "triangle");
-    if (i % 4 === 0) note(a, g, BASS[(i / 4) % BASS.length]!, t0 + t, 0.3, 0.22, "sine");
+  const t0 = a.currentTime;
+  const seconds = durationMs / 1000;
+  spinBeatTimes(durationMs).forEach((t, i) => {
+    const intensity = 1 - 0.72 * (t / seconds);
+    note(a, g, MELODY[i % MELODY.length]!, t0 + t, Math.min(0.16, seconds - t), 0.19 * intensity, "triangle");
+    if (i % 4 === 0 && t < seconds * 0.58)
+      note(a, g, BASS[(i / 4) % BASS.length]!, t0 + t, 0.3, 0.22 * intensity, "sine");
   });
   return stop;
 }
