@@ -621,18 +621,18 @@ function paint(s: Session) {
   const infoLeft = W - 30 - infoWidth;
   const infoCenter = infoLeft + infoWidth / 2;
   const infoTextWidth = infoWidth - 44;
-  ctx.fillStyle = c.card;
+  const winnerCard = !!f.winner && !f.spinning && !f.summary;
+  const infoSurface = ctx.createLinearGradient(infoLeft, 1000, infoLeft + infoWidth, 1240);
+  infoSurface.addColorStop(0, c.card);
+  infoSurface.addColorStop(1, c.bg);
+  ctx.fillStyle = infoSurface;
   roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
   ctx.fill();
-  ctx.strokeStyle = "#f4d19038";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = winnerCard ? c.gold : "#f4d19038";
+  ctx.lineWidth = winnerCard ? 3 : 2;
   ctx.stroke();
   ctx.textAlign = "center";
-  if (f.winner && !f.spinning && !f.summary) {
-    ctx.strokeStyle = c.gold;
-    ctx.lineWidth = 5;
-    roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
-    ctx.stroke();
+  if (winnerCard && f.winner) {
     ctx.save();
     if (celebrationMs !== undefined) {
       const entrance = winnerEntryProgress(celebrationMs);
@@ -643,13 +643,28 @@ function paint(s: Session) {
       ctx.translate(0, 14 * (1 - entrance));
     }
     ctx.fillStyle = c.gold;
-    ctx.font = `800 28px ${SANS}`;
-    ctx.fillText(
-      f.winnerNumber ? `🏆 GANHADOR(A) · Nº ${f.winnerNumber}` : "🏆 GANHADOR(A)",
-      infoCenter,
-      1050,
-      infoTextWidth,
-    );
+    ctx.font = `800 25px ${SANS}`;
+    if (f.winnerNumber !== null && f.winnerNumber !== undefined) {
+      const number = `Nº ${f.winnerNumber}`;
+      const badgeWidth = Math.max(82, ctx.measureText(number).width + 24);
+      const badgeRight = infoLeft + infoWidth - 22;
+      ctx.fillStyle = "#f4d19026";
+      roundRect(ctx, badgeRight - badgeWidth, 1025, badgeWidth, 36, 12);
+      ctx.fill();
+      ctx.fillStyle = c.gold;
+      ctx.fillText(number, badgeRight - badgeWidth / 2, 1050);
+      ctx.textAlign = "left";
+      ctx.fillText("🏆 GANHADOR(A)", infoLeft + 22, 1050, infoTextWidth - badgeWidth - 14);
+      ctx.textAlign = "center";
+    } else {
+      ctx.fillText("🏆 GANHADOR(A)", infoCenter, 1050, infoTextWidth);
+    }
+    ctx.strokeStyle = "#f4d19038";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(infoLeft + 22, 1075);
+    ctx.lineTo(infoLeft + infoWidth - 22, 1075);
+    ctx.stroke();
     ctx.fillStyle = c.ink;
     const { size, lines } = fitText(f.winner, infoTextWidth, 3, [46, 40, 34, 28, 22], (text, px) => {
       ctx.font = `800 ${px}px ${DISPLAY}`;
@@ -664,10 +679,11 @@ function paint(s: Session) {
     ctx.restore();
   } else {
     ctx.fillStyle = c.ink;
-    ctx.font = `800 32px ${DISPLAY}`;
+    const waiting = !f.spinning && !f.summary && !f.countdown;
+    ctx.font = `800 ${waiting ? 28 : 32}px ${DISPLAY}`;
     const status = f.spinning
       ? (landed ? "Resultado" : "Girando…")
-      : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Valendo!";
+      : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Sorteio prestes a começar";
     ctx.fillText(status, infoCenter, 1110, infoTextWidth);
     ctx.fillStyle = c.muted;
     ctx.font = `700 24px ${SANS}`;
@@ -797,11 +813,8 @@ function paintSponsor(
     }
   }
 
-  ctx.fillStyle = c.ink;
   const merchantLines = fitSponsorText(ctx, f.merchant, textWidth, 2, [25, 23, 21], SANS);
-  merchantLines.forEach((line, i) => ctx.fillText(line, x, 163 + i * 20));
-
-  ctx.fillStyle = c.gold;
+  const merchantFont = ctx.font;
   let prizeLines = fitSponsorText(
     ctx,
     f.prize,
@@ -812,34 +825,46 @@ function paintSponsor(
   );
   if (hasContact && merchantLines.length === 2 && prizeLines.length === 3)
     prizeLines = fitSponsorText(ctx, f.prize, textWidth, 3, [23, 22, 21], DISPLAY);
-  const prizeTop = merchantLines.length === 1 ? 191 : hasContact ? 205 : 211;
+  const prizeFont = ctx.font;
+  const compact = !logo && merchantLines.length === 1 && prizeLines.length === 1
+    && ctx.measureText(f.merchant).width <= textWidth * 0.72
+    && ctx.measureText(f.prize).width <= textWidth * 0.72;
+  ctx.fillStyle = c.ink;
+  ctx.font = compact ? `800 34px ${SANS}` : merchantFont;
+  const merchantTop = compact ? (hasContact ? 177 : 184) : 163;
+  merchantLines.forEach((line, i) => ctx.fillText(line, x, merchantTop + i * 20, textWidth));
+
+  ctx.fillStyle = c.gold;
+  ctx.font = compact ? `800 39px ${DISPLAY}` : prizeFont;
+  const prizeTop = compact ? (hasContact ? 219 : 233) : merchantLines.length === 1 ? 191 : hasContact ? 205 : 211;
   const prizeLineHeight = hasContact && merchantLines.length === 2 ? 19 : 22;
-  prizeLines.forEach((line, i) => ctx.fillText(line, x, prizeTop + i * prizeLineHeight));
+  prizeLines.forEach((line, i) => ctx.fillText(line, x, prizeTop + i * prizeLineHeight, textWidth));
 
   if (hasContact) {
+    const contactOffset = compact ? -11 : 0;
     ctx.strokeStyle = "#f4d1903d";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(left + pad, 248);
-    ctx.lineTo(right, 248);
+    ctx.moveTo(left + pad, 248 + contactOffset);
+    ctx.lineTo(right, 248 + contactOffset);
     ctx.stroke();
 
     ctx.font = `800 20px ${SANS}`;
     const phoneWidth = f.phone ? ctx.measureText(f.phone).width + 28 : 0;
     if (f.phone) {
       ctx.fillStyle = "#f4d19020";
-      roundRect(ctx, right - phoneWidth, 253, phoneWidth, 34, 12);
+      roundRect(ctx, right - phoneWidth, 253 + contactOffset, phoneWidth, 34, 12);
       ctx.fill();
       ctx.fillStyle = c.ink;
       ctx.textAlign = "right";
-      ctx.fillText(f.phone, right - 14, 277);
+      ctx.fillText(f.phone, right - 14, 277 + contactOffset);
       ctx.textAlign = "left";
     }
     if (f.address) {
       ctx.fillStyle = c.ink;
       const addressWidth = right - (left + pad) - (phoneWidth ? phoneWidth + 20 : 0);
       const address = fitSponsorText(ctx, f.address, addressWidth, 2, [22, 21, 20, 19], SANS, 700);
-      address.forEach((line, i) => ctx.fillText(line, left + pad, (address.length === 1 ? 277 : 269) + i * 19));
+      address.forEach((line, i) => ctx.fillText(line, left + pad, (address.length === 1 ? 277 : 269) + contactOffset + i * 19));
     }
   }
   ctx.restore();
