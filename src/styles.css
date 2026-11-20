@@ -395,7 +395,8 @@
   border-color: var(--rec);
   background: color-mix(in oklab, var(--rec) 9%, var(--card));
   font-size: clamp(0.6875rem, 3.4vw, 0.875rem);
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .enigma-roleta-actions .enigma-secondary-action {
@@ -643,7 +644,7 @@
 }
 
 .enigma-recording-status {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   border: 1px solid color-mix(in oklab, var(--gold) 18%, transparent);
   background: color-mix(in oklab, var(--card) 76%, var(--background));
 }
@@ -664,17 +665,20 @@
 
 .enigma-recording-preview:not([hidden]) {
   position: relative;
-  display: grid;
-  place-items: center;
   flex: 1 1 0%;
   min-height: 0;
-  margin: 0.25rem 0.75rem 0.5rem;
+  min-width: 0;
+  margin: 0.25rem 1rem 0.5rem;
   container-type: size;
 }
 
+/* Fit the portrait canvas inside the available space without sizing the UI from its bitmap. */
 .enigma-recording-preview > canvas {
+  position: absolute;
+  inset: 0;
+  margin: auto;
   display: block;
-  width: min(100cqw, 56.25cqh);
+  width: min(100%, 56.25cqh);
   max-width: 100%;
   height: auto;
   border-radius: 0.85rem;
@@ -963,6 +967,7 @@ body.enigma-roleta-viewport-locked {
 }
 
 .enigma-roleta-root {
+  width: 100%;
   height: 100dvh;
   min-height: 0;
   max-height: 100dvh;
@@ -971,6 +976,7 @@ body.enigma-roleta-viewport-locked {
 }
 
 .enigma-roleta-screen {
+  width: 100%;
   max-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
