@@ -50,7 +50,12 @@ it("preserves the exact merchant logo and prize while distinguishing courtesy 4 
 
 it("does not show a multi-prize label for a single courtesy", () => {
   const { container } = render(
-    <SponsorCard merchantName="Parceiro Local" prize="Cortesia especial" roundIndex={0} roundTotal={1} />,
+    <SponsorCard
+      merchantName="Parceiro Local"
+      prize="Cortesia especial"
+      roundIndex={0}
+      roundTotal={1}
+    />,
   );
 
   expect(screen.queryByText(/Prêmio 1 de 1/)).toBeNull();
@@ -60,11 +65,18 @@ it("does not show a multi-prize label for a single courtesy", () => {
 
 it("keeps long sponsor information in the compact card and opens the complete details", () => {
   const merchantName = "Padaria e Confeitaria Família da Silva de Jacarezinho";
-  const prize = "Uma cesta completa com pães, bolos e outros produtos artesanais para toda a família";
+  const prize =
+    "Uma cesta completa com pães, bolos e outros produtos artesanais para toda a família";
   const address = "Avenida das Flores, 1200, esquina com a Rua Paraná — Centro, Jacarezinho";
   const { container } = render(
-    <SponsorCard merchantName={merchantName} prize={prize} roundIndex={1} roundTotal={8}
-      whatsapp="43999990000" address={address} />,
+    <SponsorCard
+      merchantName={merchantName}
+      prize={prize}
+      roundIndex={1}
+      roundTotal={8}
+      whatsapp="43999990000"
+      address={address}
+    />,
   );
   expect(container.querySelector(".enigma-sponsor-card--contact")).toBeTruthy();
   expect(screen.getByText("Oferecimento")).toBeTruthy();
@@ -72,8 +84,29 @@ it("keeps long sponsor information in the compact card and opens the complete de
   expect(screen.getByText("(43) 99999-0000")).toBeTruthy();
   expect(screen.getByText(address).classList.contains("truncate")).toBe(true);
   expect(screen.getByTestId("prize-label").textContent).toBe(prize);
+  expect(screen.getByTestId("prize-label").classList.contains("line-clamp-2")).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Ver detalhes do oferecimento" }));
   const dialog = within(screen.getByRole("dialog", { name: merchantName }));
   expect(dialog.getByText(address)).toBeTruthy();
   expect(dialog.getByText(prize)).toBeTruthy();
+});
+
+it.each([
+  [300, 600, "0.5"],
+  [500, 500, "1"],
+  [900, 300, "3"],
+])("adapts the merchant frame to an image of %i × %i", (width, height, ratio) => {
+  const logo = "data:image/png;base64,fixture";
+  render(
+    <SponsorCard logo={logo} merchantName="Loja" prize="Cortesia" roundIndex={0} roundTotal={1} />,
+  );
+  const image = screen.getByAltText("Logo do comércio");
+  Object.defineProperties(image, {
+    naturalWidth: { value: width },
+    naturalHeight: { value: height },
+  });
+  fireEvent.load(image);
+  expect(image.getAttribute("src")).toBe(logo);
+  expect(image.classList.contains("object-contain")).toBe(true);
+  expect(image.parentElement?.style.getPropertyValue("--sponsor-logo-ratio")).toBe(ratio);
 });
