@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { wheelEase } from "@/lib/enigma/jingle";
 import { segmentAtPointer } from "@/lib/enigma/logic";
 import { wheelFontSize, wheelLabel, wheelZoom } from "@/lib/enigma/wheel-visual";
@@ -25,16 +25,20 @@ type Props = {
   /** When set, the wheel animates from `from` to `rotation`. */
   spin?: { from: number; durationMs: number; key: number; zoom: boolean } | null;
   idle?: boolean;
+  winner?: boolean;
   onIdleRotation?: (rotation: number) => void;
   onTick?: () => void;
   onSpinEnd?: () => void;
 };
 
-export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onTick, onSpinEnd }: Props) {
+export function Wheel({ names, rotation, spin, idle = false, winner = false, onIdleRotation, onTick, onSpinEnd }: Props) {
   // The whole <svg> turns (its centre is symmetric), so the browser can move it as one layer.
   const groupRef = useRef<SVGSVGElement>(null);
   const rimRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef<HTMLDivElement>(null);
+  const pointerRef = useRef<SVGSVGElement>(null);
+  const pointerTipRef = useRef<SVGGElement>(null);
+  const pointerGradientId = "wheel-pointer-gold-" + useId().replace(/:/g, "");
   const count = names.length;
   const seg = count > 0 ? 360 / count : 360;
   const onTickRef = useRef(onTick);
@@ -210,17 +214,31 @@ export function Wheel({ names, rotation, spin, idle = false, onIdleRotation, onT
           </div>
         </div>
       </div>
-      {/* Fixed pointer at the top */}
+      {/* The fixed pointer is decorative and does not affect the selected winner. */}
       <svg
+        ref={pointerRef}
         viewBox="0 0 40 48"
-        className="absolute left-1/2 top-0 z-10 w-[11%] -translate-x-1/2 -translate-y-[38%] drop-shadow-lg"
+        className={["wheel-pointer absolute left-1/2 top-0 z-10 w-[11%] -translate-x-1/2 -translate-y-[38%]", winner && !spin ? "wheel-pointer--winner" : ""].filter(Boolean).join(" ")}
         aria-hidden="true"
       >
-        <path
-          d="M20 46 L4 14 A16 16 0 1 1 36 14 Z"
-          style={{ fill: "var(--gold)", stroke: "var(--gold-deep)", strokeWidth: 2 }}
-        />
-        <circle cx="20" cy="15" r="6" style={{ fill: "var(--background)" }} />
+        <defs>
+          <linearGradient id={pointerGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fff5bf" />
+            <stop offset="48%" stopColor="#ffd452" />
+            <stop offset="100%" stopColor="#b87910" />
+          </linearGradient>
+        </defs>
+        <g ref={pointerTipRef} className="wheel-pointer-tip">
+          <path
+            d="M20 46 L4 14 A16 16 0 1 1 36 14 Z"
+            fill={"url(#" + pointerGradientId + ")"}
+            stroke="var(--gold-deep)"
+            strokeWidth="2"
+          />
+          <path d="M20 39 L10 16 Q12 8 18 7 L18 27 Z" fill="#fff9dc" opacity="0.25" />
+          <circle cx="20" cy="15" r="6" fill="var(--background)" />
+          <circle cx="18" cy="13" r="2" fill="#fff6bb" opacity="0.75" />
+        </g>
       </svg>
       <div
         ref={focusRef}
