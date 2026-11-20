@@ -339,3 +339,124 @@
     filter: none;
   }
 }
+
+
+/* Etapa 4C — controls and navigation. Visual changes only; events remain unchanged. */
+.enigma-roleta-toolbar {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.enigma-toolbar-date {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.enigma-toolbar-chip {
+  border: 1px solid color-mix(in oklab, var(--gold) 19%, transparent);
+  background: color-mix(in oklab, var(--secondary) 85%, var(--background));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.enigma-toolbar-chip--on {
+  border-color: color-mix(in oklab, var(--gold) 55%, transparent);
+  background: color-mix(in oklab, var(--gold) 11%, var(--secondary));
+}
+
+.enigma-toolbar-chip:active:not(:disabled) {
+  background: var(--accent);
+}
+
+.enigma-roleta-actions .btn-gold {
+  border: 1px solid color-mix(in oklab, var(--primary-glow) 54%, var(--gold-deep));
+  box-shadow:
+    0 10px 24px -15px color-mix(in oklab, var(--gold) 75%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 42%, transparent);
+  font-size: clamp(1rem, 4.5vw, 1.25rem);
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.enigma-roleta-actions .enigma-record-button {
+  border: 1px solid color-mix(in oklab, var(--gold) 24%, transparent);
+  background: linear-gradient(155deg,
+    color-mix(in oklab, var(--secondary) 92%, var(--card)),
+    color-mix(in oklab, var(--card) 83%, var(--background)));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--foreground) 9%, transparent);
+  font-size: clamp(0.9rem, 3.65vw, 1rem);
+  text-wrap: balance;
+}
+
+.enigma-roleta-actions .enigma-record-button--active {
+  border-color: var(--rec);
+  background: color-mix(in oklab, var(--rec) 9%, var(--card));
+}
+
+.enigma-roleta-actions .enigma-secondary-action {
+  border: 1px solid color-mix(in oklab, var(--gold) 21%, transparent);
+  border-radius: 0.9rem;
+  background: color-mix(in oklab, var(--secondary) 40%, transparent);
+  font-weight: 750;
+  text-align: center;
+  padding-inline: 0.5rem;
+}
+
+.enigma-roleta-actions .enigma-secondary-action:active:not(:disabled) {
+  background: var(--secondary);
+}
+
+.enigma-toolbar-chip:focus-visible,
+.enigma-roleta-actions button:focus-visible,
+.enigma-bottom-item:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* The persistent navigation stays 64px high and retains the same four routes. */
+.enigma-bottom-nav {
+  border-top-color: color-mix(in oklab, var(--gold) 25%, var(--border));
+  background: color-mix(in oklab, var(--nav) 95%, transparent);
+  box-shadow: 0 -8px 22px -18px color-mix(in oklab, var(--gold) 30%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.enigma-bottom-item {
+  position: relative;
+  transition: color 160ms ease;
+}
+
+.enigma-bottom-item[data-status="active"]::before {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 50%;
+  width: 2.25rem;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--gold);
+  transform: translateX(-50%);
+}
+
+.enigma-bottom-icon {
+  border: 1px solid transparent;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.enigma-bottom-item[data-status="active"] .enigma-bottom-icon {
+  border-color: color-mix(in oklab, var(--gold) 27%, transparent);
+  background: color-mix(in oklab, var(--gold) 13%, var(--secondary));
+}
+
+.enigma-bottom-label {
+  font-size: 0.73rem;
+  letter-spacing: 0.005em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enigma-toolbar-chip,
+  .enigma-bottom-icon,
+  .enigma-bottom-item {
+    transition: none;
+  }
+}
