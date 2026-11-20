@@ -771,6 +771,7 @@ export async function renderWinnerCard(
       g(20) +
       46 +
       12 +
+      (card.number !== null ? 60 : 0) +
       winner.lines.length * winner.size * 1.05 +
       g(44) +
       20 +
@@ -802,8 +803,22 @@ export async function renderWinnerCard(
   ctx.textAlign = "center";
   ctx.fillStyle = pal.gold;
   setFont(ctx, 800, 40, DISPLAY, 4);
-  ctx.fillText(card.number ? `GANHADOR(A) · Nº ${card.number}` : "GANHADOR(A)", W / 2, y + 36);
+  ctx.fillText("GANHADOR(A)", W / 2, y + 36);
   y += 46 + 12;
+  if (card.number !== null) {
+    const numberText = `Nº ${card.number}`;
+    setFont(ctx, 800, 34, SANS);
+    const badgeW = Math.min(CONTENT_W - 40, Math.max(142, ctx.measureText(numberText).width + 76));
+    ctx.fillStyle = pal.card;
+    rr(ctx, (W - badgeW) / 2, y, badgeW, 52, 26);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = pal.goldDeep;
+    ctx.stroke();
+    ctx.fillStyle = pal.gold;
+    ctx.fillText(numberText, W / 2, y + 37);
+    y += 60;
+  }
   ctx.fillStyle = pal.ink;
   setFont(ctx, 800, winner.size, DISPLAY);
   drawLines(ctx, winner.lines, W / 2, y, winnerLH, winner.size);
