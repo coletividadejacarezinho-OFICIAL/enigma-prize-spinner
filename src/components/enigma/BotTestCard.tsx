@@ -12,6 +12,7 @@ import {
   type BotInput,
 } from "@/lib/enigma/entries";
 import { cleanName, formatDateBR, merchantOf } from "@/lib/enigma/logic";
+import { formatPersonName } from "@/lib/enigma/input-format";
 import { report } from "@/lib/enigma/feedback";
 import { repo } from "@/lib/enigma/repo";
 import {
@@ -84,7 +85,7 @@ export function BotTestCard({ state }: { state: AppState }) {
   const submit = async () => {
     if (!canSend || !validTime) return;
     const d = day || draw.date;
-    if (!(await send({ name, senderId, time: validTime, situation, eventId, day: d }))) return;
+    if (!(await send({ name: formatPersonName(name), senderId, time: validTime, situation, eventId, day: d }))) return;
     const ev = /^(.*?)(\d+)$/.exec(cleanName(eventId));
     if (ev)
       setEventId(`${ev[1] ?? ""}${String(Number(ev[2]) + 1).padStart(ev[2]?.length ?? 3, "0")}`);
@@ -132,6 +133,8 @@ export function BotTestCard({ state }: { state: AppState }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onBlur={(e) => setName(formatPersonName(e.target.value))}
+          autoCapitalize="words"
           placeholder="Ex.: Carla Mendes"
           className={`${field} mt-1`}
           autoComplete="off"
@@ -143,6 +146,8 @@ export function BotTestCard({ state }: { state: AppState }) {
         <input
           value={senderId}
           onChange={(e) => setSenderId(e.target.value)}
+          autoCapitalize="none"
+          spellCheck={false}
           className={`${field} mt-1`}
           autoComplete="off"
         />
@@ -184,6 +189,8 @@ export function BotTestCard({ state }: { state: AppState }) {
           <input
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
+            autoCapitalize="none"
+            spellCheck={false}
             className={`${field} mt-1`}
             autoComplete="off"
           />

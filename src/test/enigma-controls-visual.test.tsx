@@ -39,7 +39,7 @@ it("keeps all four bottom navigation destinations and the compact height", () =>
     ["Nomes", "/nomes"],
     ["Sorteios", "/sorteios"],
     ["Ajustes", "/ajustes"],
-  ]) {
+  ] as const) {
     const link = screen.getByRole("link", { name: label });
     expect(link.getAttribute("href")).toBe(path);
     expect(link.classList.contains("enigma-bottom-item")).toBe(true);

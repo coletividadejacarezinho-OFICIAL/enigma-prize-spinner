@@ -54,13 +54,36 @@ export function digits(s: string): string {
 /** Brazilian WhatsApp with DDD: 10 or 11 digits (an optional leading 55 is ignored). */
 export function cleanWhatsapp(s: string): string | null {
   let d = digits(s);
-  if (d.length >= 12 && d.startsWith("55")) d = d.slice(2);
+  const text = s.trimStart();
+  if (text.startsWith("+")) {
+    if (!d.startsWith("55")) return null;
+    d = d.slice(2);
+  } else if (!text.startsWith("(") && d.length >= 12 && d.startsWith("55")) {
+    d = d.slice(2);
+  }
   return d.length === 10 || d.length === 11 ? d : null;
 }
 export function formatWhatsapp(d: string): string {
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return d;
+}
+
+/** Keep partial digits editable and leave excessive or unsupported numbers visible for correction. */
+export function maskWhatsapp(value: string): string {
+  const text = value.trimStart();
+  const all = digits(text);
+  const explicit = text.startsWith("+");
+  if (explicit && !all.startsWith("55")) return `+${all}`;
+  const country = explicit || (!text.startsWith("(") && all.length >= 12 && all.startsWith("55"));
+  const local = country ? all.slice(2) : all;
+  const prefix = country ? "+55" : "";
+  if (!local) return prefix;
+  if (local.length <= 2) return `${prefix ? prefix + " " : ""}(${local}`;
+  const body = local.slice(2);
+  const split = body.length >= 9 ? 5 : 4;
+  const number = body.length > split ? body.slice(0, split) + "-" + body.slice(split) : body;
+  return `${prefix ? prefix + " " : ""}(${local.slice(0, 2)}) ${number}`;
 }
 
 /** A shop already registered with the same name or the same WhatsApp ("Conferir cadastro"). */

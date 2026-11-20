@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createMerchant, newId, normalizeForCompare, todayISO } from "@/lib/enigma/logic";
+import { formatDescription } from "@/lib/enigma/input-format";
 import { report } from "@/lib/enigma/feedback";
 import { repo } from "@/lib/enigma/repo";
 import type { Merchant, Riddle } from "@/lib/enigma/types";
@@ -121,7 +122,7 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
     onSubmit(
       {
         ...values,
-        prizes: values.prizes.map((p) => ({ ...p, prize: p.prize.trim() })),
+        prizes: values.prizes.map((p) => ({ ...p, prize: p.locked ? p.prize : formatDescription(p.prize) })),
         confirmed: values.confirmed ?? false,
       },
       intent,
@@ -217,6 +218,8 @@ export function DrawForm({ merchants, initial, actions, onSubmit }: Props) {
                     value={row.prize}
                     disabled={row.locked}
                     onChange={(e) => setRow(row.key, { prize: e.target.value })}
+                    onBlur={(e) => setRow(row.key, { prize: formatDescription(e.target.value) })}
+                    autoCapitalize="sentences"
                     placeholder="Ex.: Um lanche com batata"
                     rows={2}
                     className={areaClass}

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { GoldButton } from "./GoldButton";
 import { LogoPicker } from "./LogoPicker";
 import { fieldClass } from "./fields";
-import { cleanName } from "@/lib/enigma/logic";
+import { formatShopName } from "@/lib/enigma/input-format";
 
 export type MerchantFormValues = { name: string; logo: string | undefined };
 
@@ -25,8 +25,9 @@ export function MerchantForm({
       onSubmit={(e) => {
         e.preventDefault();
         setTried(true);
-        if (!cleanName(name)) return;
-        onSave({ name: cleanName(name), logo });
+        const formatted = formatShopName(name);
+        if (!formatted) return;
+        onSave({ name: formatted, logo });
       }}
     >
       <label className="block">
@@ -34,11 +35,13 @@ export function MerchantForm({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onBlur={(e) => setName(formatShopName(e.target.value))}
+          autoCapitalize="words"
           placeholder="Ex.: Burguer 7"
           className={fieldClass}
           autoComplete="off"
         />
-        {tried && !cleanName(name) && (
+        {tried && !formatShopName(name) && (
           <span className="mt-1 block text-sm font-semibold text-destructive">
             Escreva o nome do comércio.
           </span>

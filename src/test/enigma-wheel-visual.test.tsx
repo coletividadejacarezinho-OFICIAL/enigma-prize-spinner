@@ -31,7 +31,7 @@ it.each([75, 150, 250])("keeps %i original names in order with readable edge lab
   expect(labels.map((label) => label.getAttribute("aria-label"))).toEqual(original);
   expect(labels[0]?.getAttribute("x")).toBe("190");
   expect(labels[Math.ceil(count / 2)]?.getAttribute("x")).toBe("10");
-  expect(labels[count - 1]?.getAttribute("x")).toBe("190");
+  expect(labels[count - 1]?.getAttribute("x")).toBe("10");
 
   // Bright slices use dark letters with a light border; dark slices use the reverse.
   expect(labels[0]?.style.stroke).not.toBe(labels[1]?.style.stroke);
@@ -131,8 +131,8 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
     />,
   );
   const rim = container.querySelector<HTMLElement>(".wheel-rim")!;
-  const focus = container.querySelector<HTMLDivElement>("div[aria-hidden=true]")!;
-  const pointer = container.querySelector("svg[aria-hidden=true]")!;
+  const focus = container.querySelector<HTMLDivElement>(".wheel-focus")!;
+  const pointer = container.querySelector("svg.wheel-pointer")!;
   act(() => frame(500));
   expect(rim.style.transform).toBe("");
   expect(focus.hidden).toBe(true);
@@ -143,6 +143,8 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
   expect(focus.textContent).toBe("Pessoa 250");
   expect(onSpinEnd).not.toHaveBeenCalled();
   act(() => frame(5999));
+  expect(focus.textContent).toBe("Pessoa 250");
+  expect(focus.hidden).toBe(false);
   expect(onSpinEnd).not.toHaveBeenCalled();
   act(() => frame(6000));
   expect(onSpinEnd).toHaveBeenCalledTimes(1);

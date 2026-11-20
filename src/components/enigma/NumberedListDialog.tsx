@@ -37,6 +37,7 @@ export function NumberedListDialog({ open, onClose, list, onWheel, highlight }: 
         <label className="flex h-12 items-center gap-2 rounded-xl bg-secondary px-3">
           <Search className="h-5 w-5 text-gold" aria-hidden="true" />
           <input
+            autoCapitalize="none"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             inputMode="search"

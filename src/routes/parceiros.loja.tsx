@@ -5,11 +5,13 @@ import { toast } from "sonner";
 
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { LogoPicker } from "@/components/enigma/LogoPicker";
+import { WhatsappInput } from "@/components/enigma/WhatsappInput";
 import { ENSAIO_TAG } from "@/components/enigma/Partners";
 import { areaClass, fieldClass } from "@/components/enigma/fields";
 import { report, reportPartner } from "@/lib/enigma/feedback";
-import { cleanName, formatDateBR, newId } from "@/lib/enigma/logic";
-import { cleanWhatsapp, formatWhatsapp, type Account } from "@/lib/enigma/partners";
+import { formatDateBR, newId } from "@/lib/enigma/logic";
+import { formatDescription, formatShopName } from "@/lib/enigma/input-format";
+import { cleanWhatsapp, maskWhatsapp, type Account } from "@/lib/enigma/partners";
 import { PartnerRecovery } from "@/components/enigma/PartnerRecovery";
 import { partnersRepo, usePartnerSnapshot } from "@/lib/enigma/partners-repo";
 import { repo, useAppState } from "@/lib/enigma/repo";
@@ -105,7 +107,7 @@ function Loja() {
         <section className="rounded-2xl bg-card p-4">
           <label className="block">
             <span className="mb-1.5 block text-xl font-extrabold">Qual é o prêmio?</span>
-            <textarea disabled={sending} value={prize} onChange={(e) => setPrize(e.target.value)} rows={3} placeholder="Ex.: Um hambúrguer com batata" className={areaClass} />
+            <textarea disabled={sending} value={prize} onChange={(e) => setPrize(e.target.value)} onBlur={(e) => setPrize(formatDescription(e.target.value))} autoCapitalize="sentences" rows={3} placeholder="Ex.: Um hambúrguer com batata" className={areaClass} />
           </label>
           <GoldButton
             className="mt-4"
@@ -123,7 +125,7 @@ function Loja() {
                   name: m?.name ?? fresh.name ?? "",
                   whatsapp: m?.whatsapp ?? fresh.whatsapp ?? "",
                   ...((m?.logo ?? fresh.logo) ? { logo: (m?.logo ?? fresh.logo)! } : {}),
-                  prize: prize.trim(), createdAt: offerIdentity.createdAt,
+                  prize: formatDescription(prize), createdAt: offerIdentity.createdAt,
                 });
                 if (!reportPartner(result)) return;
                 setOfferIdentity({ id: newId(), createdAt: Date.now() });
@@ -199,23 +201,24 @@ function Profile({
   onDone: () => void;
 }) {
   const [name, setName] = useState(shop?.name ?? account.name ?? "");
-  const [wa, setWa] = useState(shop?.whatsapp ? formatWhatsapp(shop.whatsapp) : account.whatsapp ?? "");
+  const [wa, setWa] = useState(() => maskWhatsapp(shop?.whatsapp ?? account.whatsapp ?? ""));
   const [logo, setLogo] = useState<string | undefined>(shop?.logo ?? account.logo);
   const [tried, setTried] = useState(false);
   const w = cleanWhatsapp(wa);
+  const formattedName = formatShopName(name);
   return (
     <form
       className="space-y-4 rounded-2xl bg-card p-4"
       onSubmit={async (e) => {
         e.preventDefault();
         setTried(true);
-        if (!cleanName(name) || !w) return;
+        if (!formattedName || !w) return;
         if (shop) {
           const { logo: _l, ...rest } = shop;
-          if (!report(await repo.saveMerchant({ ...rest, name: cleanName(name), whatsapp: w, ...(logo ? { logo } : {}) }))) return;
+          if (!report(await repo.saveMerchant({ ...rest, name: formattedName, whatsapp: w, ...(logo ? { logo } : {}) }))) return;
         } else {
           const result = await partnersRepo.saveProfile(account.id, {
-            name: cleanName(name), whatsapp: w, ...(logo ? { logo } : {}),
+            name: formattedName, whatsapp: w, ...(logo ? { logo } : {}),
           });
           if (!reportPartner(result)) return;
         }
@@ -225,12 +228,12 @@ function Profile({
       <h1 className="text-2xl font-extrabold">Meu comércio</h1>
       <label className="block">
         <span className="mb-1.5 block font-bold">Nome</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} className={fieldClass} />
-        {tried && !cleanName(name) && <span className="text-sm font-semibold text-destructive">Escreva o nome.</span>}
+        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={(e) => setName(formatShopName(e.target.value))} autoCapitalize="words" autoComplete="organization" className={fieldClass} />
+        {tried && !formattedName && <span className="text-sm font-semibold text-destructive">Escreva o nome.</span>}
       </label>
       <label className="block">
         <span className="mb-1.5 block font-bold">WhatsApp com DDD</span>
-        <input value={wa} onChange={(e) => setWa(e.target.value)} inputMode="tel" placeholder="(43) 99999-0000" className={fieldClass} />
+        <WhatsappInput value={wa} onValueChange={setWa} />
         {tried && !w && <span className="text-sm font-semibold text-destructive">Coloque o DDD e o número.</span>}
       </label>
       <div>
