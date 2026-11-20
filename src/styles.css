@@ -592,34 +592,32 @@
   flex: 1 1 0%;
 }
 
-/* On phones, form a deliberate two-tier toolbar: date above evenly sized controls.
-   This also works with 1, 2 or 3 controls, depending on the raffle state. */
-@media (max-width: 480px) {
-  .enigma-roleta-screen > .enigma-roleta-toolbar {
-    column-gap: 0.375rem;
-    row-gap: 0.25rem;
-  }
+/* Date above equally sized controls for the 448px-wide app, on desktop and mobile.
+   1, 2 or 3 controls adapt to the same row depending on raffle state. */
+.enigma-roleta-screen > .enigma-roleta-toolbar {
+  column-gap: 0.375rem;
+  row-gap: 0.25rem;
+}
 
-  .enigma-roleta-screen .enigma-toolbar-date {
-    flex: 0 0 100%;
-    min-height: 1.35rem;
-    margin-right: 0;
-  }
+.enigma-roleta-screen .enigma-toolbar-date {
+  flex: 0 0 100%;
+  min-height: 1.35rem;
+  margin-right: 0;
+}
 
-  .enigma-roleta-screen > .enigma-roleta-toolbar > .enigma-toolbar-chip {
-    flex: 1 1 0%;
-    min-width: 0;
-    justify-content: center;
-    gap: 0.25rem;
-    padding-inline: 0.35rem;
-    font-size: clamp(0.7rem, 2.8vw, 0.8rem);
-    white-space: nowrap;
-  }
+.enigma-roleta-screen > .enigma-roleta-toolbar > .enigma-toolbar-chip {
+  flex: 1 1 0%;
+  min-width: 0;
+  justify-content: center;
+  gap: 0.25rem;
+  padding-inline: 0.35rem;
+  font-size: clamp(0.7rem, 2.8vw, 0.8rem);
+  white-space: nowrap;
+}
 
-  .enigma-roleta-screen .enigma-toolbar-chip svg {
-    height: 0.875rem;
-    width: 0.875rem;
-  }
+.enigma-roleta-screen .enigma-toolbar-chip svg {
+  height: 0.875rem;
+  width: 0.875rem;
 }
 
 /* Preserve wheel prominence on shorter viewports by reclaiming decorative spacing,
