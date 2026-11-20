@@ -487,7 +487,7 @@ function paint(s: Session) {
       : 0;
     const rotation = spin ? spin.from + (spin.to - spin.from) * wheelEase(progress) : f.rotation;
     const zoom = wheelZoom(progress, spin?.zoom ?? false);
-    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom);
+    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, !!spin);
     const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
     if (focus) {
       ctx.fillStyle = c.bg;
@@ -549,6 +549,7 @@ function paintWheel(
   cy: number,
   r: number,
   zoom: number,
+  spinning: boolean,
 ) {
   const count = names.length;
   ctx.save();
@@ -569,11 +570,11 @@ function paintWheel(
   ctx.beginPath();
   ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
   ctx.fill();
-  // Keep the same alternating rim lights in the recorded canvas video.
-  const lightPhase = Math.floor(performance.now() / 650) % 2;
+  // Match the clockwise sequence in the interface (and its faster spin speed).
+  const activeLight = Math.floor(performance.now() / (spinning ? 50 : 100)) % 24;
   for (let i = 0; i < 24; i++) {
     const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
-    const on = (i + lightPhase) % 2 === 0;
+    const on = ((i - activeLight + 24) % 24) < 4;
     const x = cx + Math.cos(angle) * (r + 11);
     const y = cy + Math.sin(angle) * (r + 11);
     ctx.beginPath();
