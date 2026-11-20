@@ -727,7 +727,6 @@ function paintWinnerCard(
   ctx.translate(center, WHEEL_Y + 11 * (1 - entrance));
   ctx.scale(scale, scale);
   ctx.translate(-center, -WHEEL_Y);
-  ctx.globalAlpha = 0.65 + 0.35 * entrance;
   const surface = ctx.createLinearGradient(left, top, left + width, top + height);
   surface.addColorStop(0, c.card);
   surface.addColorStop(1, c.bg);
