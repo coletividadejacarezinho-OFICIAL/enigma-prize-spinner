@@ -114,6 +114,8 @@ export const Route = createFileRoute("/")({
 });
 
 const SPIN_MS = 5500;
+const MIN_NAMES_FOR_CLOSEUP = 13;
+const FULL_WHEEL_RESULT_MS = 1200;
 /** With reduced motion the wheel only eases the last few degrees into the saved result. */
 const CALM_MS = 700;
 
@@ -127,7 +129,14 @@ function Roleta() {
     if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
     return lockWheelViewport(document);
   }, []);
-  const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
+  const [spin, setSpin] = useState<{
+    from: number;
+    durationMs: number;
+    key: number;
+    zoom: boolean;
+    calm: boolean;
+    holdMs?: number;
+  } | null>(null);
   const spinningRef = useRef(false);
   const [preparingSpin, setPreparingSpin] = useState(false);
   const [spinLanded, setSpinLanded] = useState(false);
@@ -308,8 +317,16 @@ function Roleta() {
         const to = r.value.result.rotation;
         const from = calm ? to - 20 : (slowMotion ? idleRotationRef.current : 0);
         const durationMs = calm ? CALM_MS : SPIN_MS;
+        const zoom = !calm && wheelNames.length >= MIN_NAMES_FOR_CLOSEUP;
         setSpinLanded(false);
-        setSpin({ from, durationMs, key: Date.now(), zoom: !calm });
+        setSpin({
+          from,
+          durationMs,
+          key: Date.now(),
+          zoom,
+          calm,
+          ...(!calm && !zoom ? { holdMs: FULL_WHEEL_RESULT_MS } : {}),
+        });
       });
   };
 
@@ -662,7 +679,8 @@ function Roleta() {
           }}
           {...(videoRecording ? { onSpinFrame: setRecMotion } : {})}
           onSpinStart={(durationMs) => {
-            if (state.sound && spin?.zoom) return startSpinTrack(durationMs, clampVolume(state.volume));
+            if (state.sound && spin && !spin.calm)
+              return startSpinTrack(durationMs, clampVolume(state.volume));
             return undefined;
           }}
           onSpinLand={() => setSpinLanded(true)}
@@ -728,7 +746,7 @@ function Roleta() {
                 : "Quando quiser, toque em Sortear próxima cortesia."
               : activeCountdown
                 ? "A roleta vai girar ao fim da contagem."
-                : "Fale com o público e segure o botão para iniciar.",
+                : "Fale com o público. Pressione e segure para iniciar.",
           )
         ) : done ? (
           <SecondaryButton

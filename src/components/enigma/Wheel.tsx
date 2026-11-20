@@ -41,7 +41,7 @@ type Props = {
   names: string[];
   rotation: number;
   /** When set, the wheel animates from `from` to `rotation`. */
-  spin?: { from: number; durationMs: number; key: number; zoom: boolean } | null;
+  spin?: { from: number; durationMs: number; key: number; zoom: boolean; holdMs?: number } | null;
   idle?: boolean;
   winner?: boolean;
   winnerIndex?: number | undefined;
@@ -115,6 +115,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, win
     const start = performance.now();
     const stopTrack = onSpinStartRef.current?.(spin.durationMs);
     const from = spin.from;
+    const holdMs = spin.holdMs ?? (spin.zoom ? WHEEL_CLOSEUP_MS : 0);
     const total = rotation - from;
     const tip = pointerTipRef.current;
     let lastSeg = Math.floor(from / seg);
@@ -165,7 +166,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, win
         stopTrack?.();
         onSpinLandRef.current?.();
       }
-      if (t < 1 || (spin.zoom && landedMs < WHEEL_CLOSEUP_MS)) raf = requestAnimationFrame(frame);
+      if (t < 1 || landedMs < holdMs) raf = requestAnimationFrame(frame);
       else onEndRef.current?.();
     };
     raf = requestAnimationFrame(frame);

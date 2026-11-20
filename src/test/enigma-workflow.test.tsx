@@ -216,11 +216,11 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
   });
   await repo.nextRound(draw.id, draw.id);
   const Wheel = (WheelRoute as unknown as { component: () => React.ReactNode }).component;
-  render(<Wheel />);
+  const { container } = render(<Wheel />);
   expect(screen.getByText("Rua Dois, 20")).toBeTruthy();
   expect(screen.getByText("(43) 3333-0000")).toBeTruthy();
   expect(screen.queryByText("Rua Um, 100")).toBeNull();
-  const startButton = () => screen.getByRole("button", { name: "Segure para iniciar" });
+  const startButton = () => screen.getByRole("button", { name: "Pressione e segure" });
   const button = startButton();
   function pointerEvent(type: string) {
     fireEvent(startButton(), Object.assign(new MouseEvent(type, { bubbles: true, button: 0 }), {
@@ -269,6 +269,7 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
     }
     await act(async () => vi.advanceTimersByTime(500));
     expect(currentDraw(saved()).extraPrizes?.[0]?.result?.winner).toBe("Bia");
+    expect(container.querySelector(".wheel-rim")?.parentElement).not.toHaveClass("overflow-hidden");
   } finally {
     vi.useRealTimers();
   }

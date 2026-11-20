@@ -106,7 +106,7 @@ export function HoldToSpinButton({
             style={{ animation: `enigma-hold-fill ${HOLD_MS}ms linear both` }}
           />
         )}
-        <span className="relative">Segure para iniciar</span>
+        <span className="relative">Pressione e segure</span>
       </GoldButton>
 
       <AlertDialogContent
