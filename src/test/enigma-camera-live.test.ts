@@ -26,6 +26,7 @@ const frame: RecFrame = {
 
 const arc = vi.fn();
 const drawImage = vi.fn();
+const publishFrame = vi.fn();
 const fillText = vi.fn();
 const translate = vi.fn();
 const scale = vi.fn();
@@ -69,7 +70,8 @@ beforeEach(() => {
   arc.mockClear();
   capture.mockClear();
   capturedTrack.stop.mockClear();
-  drawImage.mockClear();
+  drawImage.mockReset();
+  publishFrame.mockClear();
   fillText.mockClear();
   translate.mockClear();
   scale.mockClear();
@@ -77,9 +79,17 @@ beforeEach(() => {
   rect.mockClear();
   host = document.createElement("div");
   document.body.appendChild(host);
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
-    canvasContext as unknown as CanvasRenderingContext2D,
-  );
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    this: HTMLCanvasElement,
+    _type: string,
+    settings?: CanvasRenderingContext2DSettings,
+  ) {
+    if (settings?.willReadFrequently) {
+      Object.assign(canvasContext, { canvas: this });
+      return canvasContext as unknown as CanvasRenderingContext2D;
+    }
+    return { drawImage: publishFrame } as unknown as CanvasRenderingContext2D;
+  });
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
   Object.defineProperty(HTMLCanvasElement.prototype, "captureStream", {
     configurable: true,
@@ -136,7 +146,11 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(video.srcObject).toBe(stream);
   expect(video.muted).toBe(true);
   expect(video.playsInline).toBe(true);
-  Object.defineProperties(video, { videoWidth: { value: 480 }, videoHeight: { value: 640 } });
+  Object.defineProperties(video, {
+    videoWidth: { value: 480 },
+    videoHeight: { value: 640 },
+    readyState: { value: HTMLMediaElement.HAVE_CURRENT_DATA },
+  });
 
   vi.advanceTimersByTime(40);
   const initialCrop = drawImage.mock.lastCall;
@@ -147,6 +161,9 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   vi.advanceTimersByTime(40);
   expect(fillText).toHaveBeenCalledWith("3", 0, 0, 126);
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
+  expect(publishFrame).toHaveBeenLastCalledWith(expect.any(HTMLCanvasElement), 0, 0);
+  expect(publishFrame.mock.lastCall?.[0]).not.toBe(canvas);
+  expect(host.querySelectorAll("canvas")).toHaveLength(1);
 
   setRecFrame({ ...frame, spinning: true, winnerIndex: 0 });
   setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5, pointerTilt: -3 });
@@ -301,4 +318,41 @@ it("shows the full list of winners in readable pages, with their public numbers"
   expect(fillText).toHaveBeenCalledWith("Página 2 de 2", 360, 203);
   expect(fillText).toHaveBeenCalledWith("Prêmio 8 · Nº 22", expect.any(Number), expect.any(Number));
   expect(fillText).not.toHaveBeenCalledWith("Prêmio 1 · Nº 15", expect.any(Number), expect.any(Number));
+});
+
+it("keeps rendering the countdown and result if the camera loses a frame", () => {
+  const { stream } = source();
+  expect(startRecording({ ...options(), mode: "roleta-camera", stream })).toBe(true);
+  const video = host.querySelector("video")!;
+  Object.defineProperties(video, {
+    videoWidth: { value: 480 },
+    videoHeight: { value: 640 },
+    readyState: { value: HTMLMediaElement.HAVE_CURRENT_DATA },
+  });
+  drawImage.mockImplementationOnce(() => { throw new DOMException("No frame", "InvalidStateError"); });
+  setRecFrame({ ...frame, countdown: { step: 2, startedAt: performance.now() } });
+  fillText.mockClear();
+  publishFrame.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(fillText).toHaveBeenCalledWith("2", 0, 0, 126);
+  expect(fillText).toHaveBeenCalledWith("Câmera sem imagem", 145, 1120, 194);
+  expect(publishFrame).toHaveBeenCalledOnce();
+
+  setRecFrame({ ...frame, winner: "Ana", winnerNumber: 1 });
+  fillText.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(fillText).toHaveBeenCalledWith("Nº 1", expect.any(Number), 1050);
+  expect(fillText).toHaveBeenCalledWith("Ana", 483, 1145, 370);
+  expect(fillText).not.toHaveBeenCalledWith("Câmera sem imagem", expect.any(Number), expect.any(Number), expect.any(Number));
+  expect(publishFrame).toHaveBeenCalledTimes(2);
+});
+
+it("keeps the last complete frame if a drawing operation throws and retries on the next frame", () => {
+  expect(startRecording({ ...options(), mode: "roleta-voz", stream: null })).toBe(true);
+  publishFrame.mockClear();
+  fillText.mockImplementationOnce(() => { throw new Error("Drawing failed"); });
+  vi.advanceTimersByTime(33);
+  expect(publishFrame).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(33);
+  expect(publishFrame).toHaveBeenCalledOnce();
 });
