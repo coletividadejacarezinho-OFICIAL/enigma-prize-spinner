@@ -249,7 +249,14 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
     expect(screen.getByRole("status")).toHaveTextContent("3");
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByRole("status")).toHaveTextContent("2");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar início" }));
+    const cancel = screen.getByRole("button", { name: "Cancelar início" });
+    fireEvent.click(cancel, { detail: 1 });
+    expect(screen.getByRole("status")).toHaveTextContent("2");
+    fireEvent(cancel, Object.assign(new MouseEvent("pointerdown", { bubbles: true, button: 0 }), {
+      isPrimary: true,
+      pointerId: 2,
+    }));
+    fireEvent.click(cancel, { detail: 1 });
     act(() => vi.advanceTimersByTime(4000));
     expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
 

@@ -135,6 +135,7 @@ function Roleta() {
   }, []);
   const [spin, setSpin] = useState<{ from: number; durationMs: number; key: number; zoom: boolean } | null>(null);
   const spinningRef = useRef(false);
+  const countdownCancelPressed = useRef(false);
   const [countdown, setCountdown] = useState<{
     roundId: string | undefined;
     step: CountdownStep;
@@ -308,6 +309,7 @@ function Roleta() {
     if (spinningRef.current || !canSpin) return;
     if (state.sound) unlockSound();
     const next = { roundId: activeRoundId, step: 3 as const, startedAt: performance.now(), repeat };
+    countdownCancelPressed.current = false;
     setCountdown((current) => current ?? next);
   };
 
@@ -480,7 +482,20 @@ function Roleta() {
     }
     if (activeCountdown) {
       return (
-        <SecondaryButton className="h-14 bg-secondary px-1 text-sm" onClick={() => setCountdown(null)}>
+        <SecondaryButton
+          className="h-14 bg-secondary px-1 text-sm"
+          onPointerDown={(event) => {
+            countdownCancelPressed.current = event.isPrimary && event.button === 0;
+          }}
+          onPointerCancel={() => {
+            countdownCancelPressed.current = false;
+          }}
+          onClick={(event) => {
+            // The release of the start hold can land on this newly mounted button.
+            if (event.detail === 0 || countdownCancelPressed.current) setCountdown(null);
+            countdownCancelPressed.current = false;
+          }}
+        >
           Cancelar início
         </SecondaryButton>
       );

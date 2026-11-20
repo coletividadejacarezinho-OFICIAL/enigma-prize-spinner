@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from "react";
 
 import { pickType, recordedMusicLevel, type Needs } from "./capture";
-import { fitText } from "./cards";
+import { fitText, initials } from "./cards";
 import type { CountdownStep } from "./jingle";
 import { segmentAtPointer } from "./logic";
 import { audioContext, prefersReducedMotion, setRecordTap } from "./sound";
@@ -115,6 +115,7 @@ type Session = {
   frame: RecFrame;
   motion: WheelMotion | null;
   logo: HTMLImageElement | null;
+  sponsorPresentedAt: number;
   colors: Palette;
   /** Mix of microphone + spin music; disconnected at the end. */
   mixEnd: () => void;
@@ -299,6 +300,7 @@ export function startRecording(o: StartOptions): boolean {
     frame: o.frame,
     motion: null,
     logo: loadLogo(o.frame.merchantLogo),
+    sponsorPresentedAt: performance.now(),
     colors: ctx ? readPalette(ctx) : FALLBACK,
     timer: null,
     mixEnd: mix.end,
@@ -320,8 +322,10 @@ export function startRecording(o: StartOptions): boolean {
 
 export function setRecFrame(frame: RecFrame) {
   if (!session) return;
-  if (session.frame.merchantLogo !== frame.merchantLogo)
-    session.logo = loadLogo(frame.merchantLogo);
+  const previous = session.frame;
+  if (previous.merchantLogo !== frame.merchantLogo) session.logo = loadLogo(frame.merchantLogo);
+  if (previous.merchant !== frame.merchant || previous.prize !== frame.prize || previous.roundLabel !== frame.roundLabel)
+    session.sponsorPresentedAt = performance.now();
   if (!frame.spinning) session.motion = null;
   session.frame = frame;
 }
@@ -482,16 +486,24 @@ function paint(s: Session) {
   ctx.fillStyle = c.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Header
+  const spotlight = ctx.createRadialGradient(W / 2, 610, 30, W / 2, 610, 630);
+  spotlight.addColorStop(0, "#9258d526");
+  spotlight.addColorStop(1, "#9258d500");
+  ctx.fillStyle = spotlight;
+  ctx.fillRect(0, 0, W, H);
+
   ctx.textAlign = "center";
   ctx.fillStyle = c.gold;
-  ctx.font = `800 34px ${DISPLAY}`;
-  ctx.fillText(f.group, W / 2, 62, W - 60);
+  ctx.font = `800 24px ${SANS}`;
+  ctx.fillText(f.group, W / 2, 31, W - 60);
+  ctx.fillStyle = c.ink;
+  ctx.font = `800 43px ${DISPLAY}`;
+  ctx.fillText("Enigma Premiado", W / 2, 70);
   ctx.fillStyle = c.muted;
-  ctx.font = `700 26px ${SANS}`;
-  ctx.fillText(`Enigma Premiado · ${f.date}`, W / 2, 100);
+  ctx.font = `700 21px ${SANS}`;
+  ctx.fillText(f.date, W / 2, 96);
 
-  paintSponsor(ctx, c, f, s.logo);
+  paintSponsor(ctx, c, f, s.logo, s.sponsorPresentedAt);
 
   if (f.summary) paintSummary(ctx, c, f.summary);
   else {
@@ -556,6 +568,9 @@ function paint(s: Session) {
   ctx.fillStyle = c.card;
   roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
   ctx.fill();
+  ctx.strokeStyle = "#f4d19038";
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.textAlign = "center";
   if (f.winner && !f.spinning) {
     ctx.strokeStyle = c.gold;
@@ -583,9 +598,10 @@ function paint(s: Session) {
     );
     ctx.textBaseline = "alphabetic";
   } else {
-    ctx.fillStyle = c.muted;
+    ctx.fillStyle = c.ink;
     ctx.font = `800 32px ${DISPLAY}`;
     ctx.fillText(f.spinning ? "Girando…" : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Valendo!", infoCenter, 1110, infoTextWidth);
+    ctx.fillStyle = c.muted;
     ctx.font = `700 24px ${SANS}`;
     ctx.fillText(
       `${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`,
@@ -598,56 +614,165 @@ function paint(s: Session) {
   if (s.video) paintFace(s, s.video, ctx, 145, 1120, 111);
 }
 
+/**
+ * Fit each field separately. Keep the phone intact even when the address needs both lines.
+ * The ellipsis is reserved for copy that exceeds the card at the smallest readable size.
+ */
+function fitSponsorText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  width: number,
+  maxLines: number,
+  sizes: number[],
+  family: string,
+  weight = 800,
+) {
+  const { size, lines } = fitText(text, width, maxLines, sizes, (line, px) => {
+    ctx.font = `${weight} ${px}px ${family}`;
+    return ctx.measureText(line).width;
+  });
+  ctx.font = `${weight} ${size}px ${family}`;
+  const visible = lines.slice(0, maxLines);
+  if (lines.length > maxLines) {
+    const chars = Array.from(visible[maxLines - 1] ?? "");
+    while (chars.length && ctx.measureText(`${chars.join("")}…`).width > width) chars.pop();
+    visible[maxLines - 1] = `${chars.join("").trimEnd()}…`;
+  }
+  return visible;
+}
+
 function paintSponsor(
   ctx: CanvasRenderingContext2D,
   c: Palette,
   f: RecFrame,
   logo: HTMLImageElement | null,
+  presentedAt: number,
 ) {
-  ctx.fillStyle = c.card;
-  roundRect(ctx, 30, 124, W - 60, 190, 24);
-  ctx.fill();
+  const left = 30;
+  const top = 112;
+  const width = W - left * 2;
+  const height = 190;
+  const pad = 20;
+  const right = left + width - pad;
+  const hasContact = !!(f.address || f.phone);
 
-  const hasLogo = !!logo?.naturalWidth && !!logo?.naturalHeight;
-  const x = logo ? 176 : 54;
-  const width = W - x - 54;
-  if (hasLogo && logo) {
-    const scale = Math.min(100 / logo.naturalWidth, 112 / logo.naturalHeight);
-    const w = logo.naturalWidth * scale;
-    const h = logo.naturalHeight * scale;
-    ctx.drawImage(logo, 105 - w / 2, 219 - h / 2, w, h);
+  ctx.save();
+  const surface = ctx.createLinearGradient(left, top, W - left, top + height);
+  surface.addColorStop(0, c.card);
+  surface.addColorStop(1, c.bg);
+  ctx.fillStyle = surface;
+  ctx.strokeStyle = "#f4d1905c";
+  ctx.lineWidth = 2;
+  roundRect(ctx, left, top, width, height, 24);
+  ctx.fill();
+  ctx.stroke();
+
+  const sweep = (performance.now() - presentedAt) / 900;
+  if (!f.spinning && !f.countdown && sweep >= 0 && sweep < 1 && !prefersReducedMotion()) {
+    const center = left - 100 + (width + 200) * sweep;
+    const glow = ctx.createLinearGradient(center - 100, 0, center + 100, 0);
+    glow.addColorStop(0, "#ffe29600");
+    glow.addColorStop(0.5, "#ffe296cc");
+    glow.addColorStop(1, "#ffe29600");
+    ctx.strokeStyle = glow;
+    ctx.stroke();
   }
 
-  ctx.font = `800 20px ${SANS}`;
-  ctx.fillStyle = c.muted;
   ctx.textAlign = "left";
-  ctx.fillText("OFERECIMENTO", x, 153, width);
+  ctx.fillStyle = c.gold;
+  ctx.font = `800 16px ${SANS}`;
+  ctx.fillText("OFERECIMENTO", left + pad, 136);
+
   if (f.roundLabel) {
+    ctx.font = `800 18px ${SANS}`;
+    const labelWidth = ctx.measureText(f.roundLabel).width + 24;
+    ctx.fillStyle = "#f4d19026";
+    roundRect(ctx, right - labelWidth, 119, labelWidth, 24, 12);
+    ctx.fill();
     ctx.textAlign = "right";
     ctx.fillStyle = c.gold;
-    ctx.fillText(f.roundLabel, W - 54, 153, Math.max(110, width - 190));
+    ctx.fillText(f.roundLabel, right - 12, 137);
     ctx.textAlign = "left";
   }
 
-  ctx.font = `800 27px ${SANS}`;
-  ctx.fillStyle = c.ink;
-  ctx.fillText(f.merchant, x, 183, width);
-
-  ctx.font = `800 33px ${DISPLAY}`;
-  ctx.fillStyle = c.gold;
-  wrap(ctx, f.prize, width, 2).forEach((line, i) => ctx.fillText(line, x, 216 + i * 29, width));
-
-  ctx.fillStyle = c.muted;
-  const contact = [f.address, f.phone].filter(Boolean).join(" · ");
-  if (contact) {
-    const { size, lines } = fitText(contact, width, 2, [23, 21, 19, 17], (line, px) => {
-      ctx.font = `700 ${px}px ${SANS}`;
-      return ctx.measureText(line).width;
-    });
-    const lineHeight = Math.min(size + 2, 49 / lines.length);
-    ctx.font = `700 ${Math.min(size, lineHeight - 1)}px ${SANS}`;
-    lines.forEach((line, i) => ctx.fillText(line, x, 273 + i * lineHeight, width));
+  const x = logo ? left + pad + 124 : left + pad;
+  const textWidth = right - x;
+  if (logo) {
+    const tileWidth = 108;
+    const tileHeight = hasContact ? 89 : 128;
+    const tileTop = 146;
+    ctx.fillStyle = "#ffffff10";
+    ctx.strokeStyle = "#ffffff25";
+    ctx.lineWidth = 1;
+    roundRect(ctx, left + pad, tileTop, tileWidth, tileHeight, 14);
+    ctx.fill();
+    ctx.stroke();
+    if (logo.naturalWidth && logo.naturalHeight) {
+      const ratio = Math.min((tileWidth - 10) / logo.naturalWidth, (tileHeight - 10) / logo.naturalHeight);
+      const imageWidth = logo.naturalWidth * ratio;
+      const imageHeight = logo.naturalHeight * ratio;
+      ctx.drawImage(
+        logo,
+        left + pad + (tileWidth - imageWidth) / 2,
+        tileTop + (tileHeight - imageHeight) / 2,
+        imageWidth,
+        imageHeight,
+      );
+    } else {
+      ctx.fillStyle = c.muted;
+      ctx.font = `800 29px ${DISPLAY}`;
+      ctx.textAlign = "center";
+      ctx.fillText(initials(f.merchant), left + pad + tileWidth / 2, tileTop + tileHeight / 2 + 9);
+      ctx.textAlign = "left";
+    }
   }
+
+  ctx.fillStyle = c.ink;
+  const merchantLines = fitSponsorText(ctx, f.merchant, textWidth, 2, [25, 23, 21], SANS);
+  merchantLines.forEach((line, i) => ctx.fillText(line, x, 163 + i * 20));
+
+  ctx.fillStyle = c.gold;
+  let prizeLines = fitSponsorText(
+    ctx,
+    f.prize,
+    textWidth,
+    hasContact ? 3 : 5 - merchantLines.length,
+    [31, 28, 25, 23],
+    DISPLAY,
+  );
+  if (hasContact && merchantLines.length === 2 && prizeLines.length === 3)
+    prizeLines = fitSponsorText(ctx, f.prize, textWidth, 3, [23, 22, 21], DISPLAY);
+  const prizeTop = merchantLines.length === 1 ? 191 : hasContact ? 205 : 211;
+  const prizeLineHeight = hasContact && merchantLines.length === 2 ? 19 : 22;
+  prizeLines.forEach((line, i) => ctx.fillText(line, x, prizeTop + i * prizeLineHeight));
+
+  if (hasContact) {
+    ctx.strokeStyle = "#f4d1903d";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left + pad, 248);
+    ctx.lineTo(right, 248);
+    ctx.stroke();
+
+    ctx.font = `800 20px ${SANS}`;
+    const phoneWidth = f.phone ? ctx.measureText(f.phone).width + 28 : 0;
+    if (f.phone) {
+      ctx.fillStyle = "#f4d19020";
+      roundRect(ctx, right - phoneWidth, 253, phoneWidth, 34, 12);
+      ctx.fill();
+      ctx.fillStyle = c.ink;
+      ctx.textAlign = "right";
+      ctx.fillText(f.phone, right - 14, 277);
+      ctx.textAlign = "left";
+    }
+    if (f.address) {
+      ctx.fillStyle = c.ink;
+      const addressWidth = right - (left + pad) - (phoneWidth ? phoneWidth + 20 : 0);
+      const address = fitSponsorText(ctx, f.address, addressWidth, 2, [22, 21, 20, 19], SANS, 700);
+      address.forEach((line, i) => ctx.fillText(line, left + pad, (address.length === 1 ? 277 : 269) + i * 19));
+    }
+  }
+  ctx.restore();
 }
 
 function paintWheel(
@@ -850,10 +975,17 @@ function paintFace(
   }
   ctx.restore();
   ctx.save();
-  ctx.strokeStyle = c.gold;
-  ctx.lineWidth = 4;
-  ctx.shadowColor = c.bg;
-  ctx.shadowBlur = 12;
+  ctx.strokeStyle = "#e9c47c4d";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 6, 0, Math.PI * 2);
+  ctx.stroke();
+  const rim = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  rim.addColorStop(0, "#ffe8ad");
+  rim.addColorStop(0.55, c.gold);
+  rim.addColorStop(1, c.goldDeep);
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();

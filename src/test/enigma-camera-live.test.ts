@@ -38,6 +38,7 @@ const canvasContext = new Proxy(
     scale,
     measureText: (text: string) => ({ width: text.length * 10 }),
     createLinearGradient: () => ({ addColorStop: vi.fn() }),
+    createRadialGradient: () => ({ addColorStop: vi.fn() }),
   },
   { get: (target, key) => Reflect.get(target, key) ?? (() => {}) },
 );
@@ -180,12 +181,16 @@ it("cleans the camera and the canvas, then shows only the canvas in wheel-only m
   expect(host.querySelector("video")).toBeNull();
 });
 
-it("uses the active courtesy's logo and replaces its address when the round changes", () => {
+it.each([
+  [200, 100],
+  [200, 200],
+  [100, 200],
+])("fits a %i×%i logo and replaces its address when the round changes", (width, height) => {
   vi.stubGlobal("Image", class {
     crossOrigin = "";
     src = "";
-    naturalWidth = 200;
-    naturalHeight = 100;
+    naturalWidth = width;
+    naturalHeight = height;
     get nodeName() {
       return "IMG";
     }
@@ -198,7 +203,11 @@ it("uses the active courtesy's logo and replaces its address when the round chan
   })).toBe(true);
   const [image, x, y, w, h] = drawImage.mock.lastCall!;
   expect(image.src).toBe("data:image/png;base64,logo");
-  expect([x, y, w, h]).toEqual([55, 194, 100, 50]);
+  expect(w / h).toBeCloseTo(width / height);
+  expect(x).toBeGreaterThanOrEqual(55);
+  expect(x + w).toBeLessThanOrEqual(153);
+  expect(y).toBeGreaterThanOrEqual(151);
+  expect(y + h).toBeLessThanOrEqual(230);
 
   setRecFrame({
     ...frame,
@@ -216,4 +225,22 @@ it("uses the active courtesy's logo and replaces its address when the round chan
   expect(text).not.toContain(frame.address);
   expect(text).not.toContain(frame.phone);
   expect(drawImage).not.toHaveBeenCalled();
+});
+
+it("keeps a long prize and address inside their areas and shows the full phone", () => {
+  const prize = "Vale compras na Padaria Central com entrega em Jacarezinho e um bolo para a família toda";
+  const address = "Rua Paraná, 778, Centro, Jacarezinho, Paraná";
+  expect(startRecording({
+    ...options(),
+    frame: { ...frame, address, prize },
+    mode: "roleta-voz",
+    stream: null,
+  })).toBe(true);
+
+  const prizeLines = fillText.mock.calls.filter(([, , y]) => y >= 191 && y <= 236);
+  const addressLines = fillText.mock.calls.filter(([, x, y]) => x === 50 && y >= 269 && y <= 288);
+  expect(prizeLines.map(([line]) => line).join(" ")).toBe(prize);
+  expect(addressLines).toHaveLength(2);
+  expect(addressLines.map(([line]) => line).join(" ")).toBe(address);
+  expect(fillText).toHaveBeenCalledWith(frame.phone, 656, 277);
 });
