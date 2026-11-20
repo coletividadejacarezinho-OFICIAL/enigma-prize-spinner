@@ -136,11 +136,12 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
   const fontSize = wheelFontSize(count);
 
   return (
-    <div className="wheel-size relative">
+    <div className="wheel-size relative isolate">
+      <div className="wheel-stage-halo pointer-events-none absolute -inset-[6%] rounded-full" aria-hidden="true" />
       <div className={spin?.zoom ? "absolute inset-0 overflow-hidden" : "absolute inset-0"}>
         <div ref={rimRef} className={`wheel-rim absolute inset-0 origin-top rounded-full p-[3.5%]${spin ? " wheel-rim--spinning" : ""}`}>
           {/* Independent perimeter lights: decorative only, never change the draw. */}
-          <div className="pointer-events-none absolute inset-0 rounded-full" aria-hidden="true">
+          <div className="wheel-bulb-track pointer-events-none absolute inset-0 z-[2] rounded-full" aria-hidden="true">
             {Array.from({ length: 24 }, (_, i) => {
               const angle = (i * Math.PI * 2) / 24 - Math.PI / 2;
               return (
@@ -157,7 +158,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
               );
             })}
           </div>
-          <div className="relative h-full w-full overflow-hidden rounded-full bg-card">
+          <div className="relative z-0 h-full w-full overflow-hidden rounded-full bg-card">
             <svg
               ref={groupRef}
               viewBox="0 0 200 200"
@@ -240,6 +241,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
           </div>
         </div>
       </div>
+      <div className="wheel-pointer-aura pointer-events-none absolute -top-[5%] left-1/2 z-[3] h-[15%] w-[19%] -translate-x-1/2 rounded-full" aria-hidden="true" />
       {/* The fixed pointer is decorative and does not affect the selected winner. */}
       <svg
         ref={pointerRef}
@@ -270,7 +272,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
         ref={focusRef}
         hidden
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-4 bottom-3 truncate rounded-full bg-background/95 px-3 py-1 text-center text-base font-bold text-foreground"
+        className="wheel-focus pointer-events-none absolute inset-x-[7%] top-[72%] z-20 rounded-2xl border border-gold/55 bg-background/95 px-3 py-2 text-center text-[clamp(0.8rem,3.6vw,1rem)] font-extrabold leading-snug text-foreground shadow-xl backdrop-blur-md [overflow-wrap:anywhere]"
       />
     </div>
   );
