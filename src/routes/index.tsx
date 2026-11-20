@@ -135,6 +135,7 @@ function Roleta() {
   const spinFrameRef = useRef<RecFrame["spin"]>(null);
   const frameRef = useRef<RecFrame | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraHostRef = useRef<HTMLDivElement>(null);
   const [videoDone, setVideoDone] = useState<Parameters<typeof VideoDoneDialog>[0]["video"]>(null);
   const [stopping, setStopping] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -317,6 +318,7 @@ function Roleta() {
         mic: choice.mic,
         stream,
         drawId: draw.id,
+        cameraHost: cameraHostRef.current,
         frame: frameRef.current,
         sound: state.sound,
         volume: clampVolume(state.volume),
@@ -512,6 +514,7 @@ function Roleta() {
       </div>
 
       <div className="wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
+        <div ref={cameraHostRef} className="enigma-live-camera" />
         {rec && (
           <div className="absolute left-4 top-1 z-20">
             <div className="flex items-center gap-1.5">
