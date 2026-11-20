@@ -286,3 +286,56 @@
   border: 1px solid color-mix(in oklab, var(--gold) 24%, transparent);
   background: color-mix(in oklab, var(--gold) 10%, var(--background));
 }
+
+
+/* Etapa 4B — visual-only wheel stage finish. */
+.wheel-stage-halo {
+  background:
+    radial-gradient(circle at 50% 46%,
+      color-mix(in oklab, var(--gold) 11%, transparent) 0%,
+      color-mix(in oklab, var(--accent) 16%, transparent) 50%,
+      transparent 72%);
+  filter: blur(11px);
+}
+
+.wheel-size .wheel-rim {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--primary-glow) 48%, transparent),
+    var(--shadow-wheel),
+    0 0 24px -12px color-mix(in oklab, var(--gold) 38%, transparent);
+}
+
+/* Draw the 24 bulbs above the colored disk, while leaving names unobstructed. */
+.wheel-bulb-track {
+  isolation: isolate;
+}
+
+.wheel-pointer-aura {
+  background: radial-gradient(ellipse,
+    color-mix(in oklab, var(--gold) 34%, transparent),
+    transparent 72%);
+  filter: blur(8px);
+}
+
+.wheel-focus {
+  background: linear-gradient(
+    115deg,
+    color-mix(in oklab, var(--background) 96%, var(--card)),
+    color-mix(in oklab, var(--card) 79%, var(--background))
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--gold) 12%, transparent),
+    0 14px 30px -12px color-mix(in oklab, var(--background) 80%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+/* The focus name must only appear during zoom. */
+.wheel-focus[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-stage-halo, .wheel-pointer-aura {
+    filter: none;
+  }
+}
