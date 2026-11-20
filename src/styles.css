@@ -476,3 +476,99 @@
     display: none;
   }
 }
+
+
+/* Etapa 4D: presentation-only announcement of a previously saved winner. */
+.enigma-winner-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in oklab, var(--background) 34%, transparent) 0%,
+    transparent 68%
+  );
+}
+
+.enigma-winner-card {
+  border: 1.5px solid color-mix(in oklab, var(--gold) 76%, transparent);
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in oklab, var(--accent) 43%, transparent) 0%,
+      transparent 70%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--card) 94%, var(--background)),
+      color-mix(in oklab, var(--background) 95%, var(--card))
+    );
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--gold) 9%, transparent),
+    0 24px 54px -18px color-mix(in oklab, var(--background) 82%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 11%, transparent);
+  backdrop-filter: blur(8px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
+}
+
+.enigma-winner-trophy {
+  border: 1px solid color-mix(in oklab, var(--gold) 43%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--gold) 18%, var(--card)),
+    color-mix(in oklab, var(--gold-deep) 13%, var(--background))
+  );
+  box-shadow: 0 0 16px -8px color-mix(in oklab, var(--gold) 67%, transparent);
+}
+
+.enigma-winner-round,
+.enigma-winner-number {
+  border: 1px solid color-mix(in oklab, var(--gold) 36%, transparent);
+  background: color-mix(in oklab, var(--gold) 11%, var(--background));
+  font-variant-numeric: tabular-nums;
+}
+
+.enigma-winner-name {
+  font-size: clamp(1.55rem, 6.1vw, 2.25rem);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  text-wrap: balance;
+  text-shadow: 0 2px 8px color-mix(in oklab, var(--background) 58%, transparent);
+}
+
+.enigma-winner-divider {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--gold) 78%, transparent),
+    transparent
+  );
+}
+
+.enigma-winner-prize,
+.enigma-winner-merchant {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+/* On short phone viewports, maintain the wheel/card balance and permit internal scroll. */
+@media (max-height: 650px) {
+  .enigma-winner-card {
+    padding-block: 0.75rem;
+  }
+
+  .enigma-winner-trophy {
+    width: 2rem;
+    height: 2rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .enigma-winner-trophy svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enigma-winner-card {
+    animation: none !important;
+  }
+}
