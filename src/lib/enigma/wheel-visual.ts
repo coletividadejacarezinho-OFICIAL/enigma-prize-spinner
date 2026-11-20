@@ -23,16 +23,46 @@ export function wheelLabel(name: string, count: number): string {
   return (boundary >= Math.ceil(max * 0.58) ? excerpt.slice(0, boundary) : excerpt) + "…";
 }
 
-/** Enlarge the upper half as the spin slows down, keeping the top pointer anchored. */
-export function wheelZoom(progress: number, enabled: boolean): number {
-  if (!enabled) return 1;
-  const t = Math.max(0, Math.min(1, (progress - 0.56) / 0.32));
-  return 1 + 0.9 * t * t * (3 - 2 * t);
+export const WHEEL_CLOSEUP_MS = 5000;
+export const RIM_LAMP_COUNT = 24;
+
+export type WheelMotion = {
+  rotation: number;
+  zoom: number;
+  progress: number;
+  pointerTilt: number;
+};
+
+function smoothStep(value: number): number {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
 }
 
-/** Small visual click close to a slice boundary. No impact on probability or result. */
-export function pointerNudge(rotation: number, count: number, moving: boolean): number {
-  if (!moving || count < 2 || !Number.isFinite(rotation)) return 0;
-  const phase = (((rotation * count) / 360) % 1 + 1) % 1;
-  return phase < 0.3 ? -5 * Math.sin((Math.PI * phase) / 0.3) : 0;
+/** Ease into the anchored close-up, hold the saved result, then ease back to the full wheel. */
+export function wheelZoom(progress: number, enabled: boolean, landedMs = 0): number {
+  if (!enabled) return 1;
+  const enter = smoothStep((progress - 0.56) / 0.32);
+  const exit = smoothStep((landedMs - (WHEEL_CLOSEUP_MS - 800)) / 800);
+  return 1 + 0.9 * enter * (1 - exit);
+}
+
+export function wheelFocusOpacity(zoom: number): number {
+  return Math.min(1, Math.max(0, (zoom - 1) / 0.2));
+}
+
+/** The light cluster makes one lap for every two turns of the wheel. */
+export function rimLightIndex(rotation: number): number {
+  const advance = Math.floor((rotation / 720) * RIM_LAMP_COUNT);
+  return ((advance % RIM_LAMP_COUNT) + RIM_LAMP_COUNT) % RIM_LAMP_COUNT;
+}
+
+export function rimLampIsLit(lamp: number, first: number): boolean {
+  return (lamp - first + RIM_LAMP_COUNT) % RIM_LAMP_COUNT < 4;
+}
+
+/** A short mechanical deflection and return after the pointer crosses a slice. */
+export function pointerClickTilt(elapsedMs: number): number {
+  if (elapsedMs < 0 || elapsedMs >= 170) return 0;
+  const t = elapsedMs / 170;
+  return -8 * Math.sin(2 * Math.PI * t) * (1 - t);
 }

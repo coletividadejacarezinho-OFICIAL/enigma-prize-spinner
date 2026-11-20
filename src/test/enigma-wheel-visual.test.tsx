@@ -3,7 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { Wheel } from "@/components/enigma/Wheel";
 import { targetRotation } from "@/lib/enigma/logic";
-import { pointerNudge, wheelFontSize, wheelLabel, wheelZoom } from "@/lib/enigma/wheel-visual";
+import { rimLightIndex, wheelFontSize, wheelLabel, wheelZoom } from "@/lib/enigma/wheel-visual";
 
 const names = Array.from({ length: 250 }, (_, i) => `Pessoa ${i + 1}`);
 
@@ -39,23 +39,36 @@ it.each([75, 150, 250])("keeps %i original names in order with readable edge lab
   expect(labels[1]?.style.paintOrder).toBe("stroke");
 });
 
-it("uses 24 sequential lights without changing names or wheel segments", () => {
+it("moves the 24 rim lights with the reported rotation and leaves them in place when it stops", () => {
+  let frame: FrameRequestCallback = () => {};
   vi.spyOn(performance, "now").mockReturnValue(0);
-  vi.stubGlobal("requestAnimationFrame", () => 1);
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   const original = names.slice(0, 75);
-  const { container, rerender } = render(<Wheel names={original} rotation={0} />);
-  const rim = container.querySelector<HTMLElement>(".wheel-rim")!;
-  const bulbs = Array.from(rim.querySelectorAll<HTMLElement>(".wheel-bulb"));
+  const onSpinFrame = vi.fn();
+  const { container } = render(
+    <Wheel names={original} rotation={1880} spin={{ from: 0, durationMs: 1000, key: 1, zoom: true }} onSpinFrame={onSpinFrame} />,
+  );
+  const bulbs = Array.from(container.querySelectorAll(".wheel-bulb"));
   const wheel = container.querySelector('svg[aria-label="Roleta"]')!;
+  const lit = () => bulbs.flatMap((bulb, index) => bulb.hasAttribute("data-lit") ? [index] : []);
   expect(bulbs).toHaveLength(24);
-  expect(new Set(bulbs.map((bulb) => bulb.style.animationDelay)).size).toBe(24);
-  const idleDelay = bulbs[1]?.style.animationDelay;
-  const segmentCount = wheel.querySelectorAll("path").length;
-  rerender(<Wheel names={original} rotation={0} spin={{ from: 0, durationMs: 1000, key: 1, zoom: true }} />);
-  expect(rim.classList.contains("wheel-rim--spinning")).toBe(true);
-  expect(bulbs[1]?.style.animationDelay).not.toBe(idleDelay);
-  expect(wheel.querySelectorAll("path")).toHaveLength(segmentCount);
+  expect(lit()).toEqual([0, 1, 2, 3]);
+
+  act(() => frame(330));
+  const first = rimLightIndex(onSpinFrame.mock.lastCall![0].rotation);
+  expect(lit()).toContain(first);
+  expect(lit()).toHaveLength(4);
+  expect(lit()).not.toEqual([0, 1, 2, 3]);
+
+  act(() => frame(1000));
+  const stopped = lit();
+  act(() => frame(3000));
+  expect(lit()).toEqual(stopped);
+  expect(wheel.querySelectorAll("path")).toHaveLength(75);
   expect(Array.from(wheel.querySelectorAll("text"), (label) => label.textContent)).toEqual(original);
 });
 
@@ -142,12 +155,18 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
   expect(focus.hidden).toBe(false);
   expect(focus.textContent).toBe("Pessoa 250");
   expect(onSpinEnd).not.toHaveBeenCalled();
+  act(() => frame(5200));
+  expect(rim.style.transform).toBe("scale(1.9)");
+  act(() => frame(5600));
+  expect(rim.style.transform).toBe("scale(1.45)");
   act(() => frame(5999));
   expect(focus.textContent).toBe("Pessoa 250");
   expect(focus.hidden).toBe(false);
   expect(onSpinEnd).not.toHaveBeenCalled();
   act(() => frame(6000));
   expect(onSpinEnd).toHaveBeenCalledTimes(1);
+  expect(rim.style.transform).toBe("");
+  expect(focus.hidden).toBe(true);
   rerender(<Wheel names={names} rotation={rotation} />);
   expect(rim.style.transform).toBe("");
   expect(focus.hidden).toBe(true);
@@ -195,7 +214,7 @@ it("keeps the metallic pointer stationary at the top and highlights a confirmed 
   expect(wheel.querySelectorAll("path")).toHaveLength(75);
 });
 
-it("flicks pointer on segment crossings, throttles dense slices and holds final glow", () => {
+it("shares the pointer deflection and stops the track when the wheel lands", () => {
   let frame: FrameRequestCallback = () => {};
   vi.spyOn(performance, "now").mockReturnValue(0);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -204,44 +223,52 @@ it("flicks pointer on segment crossings, throttles dense slices and holds final 
   });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   const onSpinEnd = vi.fn();
+  const onSpinLand = vi.fn();
+  const onSpinFrame = vi.fn();
+  const stopTrack = vi.fn();
+  const startTrack = vi.fn(() => stopTrack);
   const rotation = targetRotation(0, 74, 75, 0.5);
   const { container, rerender } = render(
     <Wheel
       names={names.slice(0, 75)}
+      winnerIndex={74}
       rotation={rotation}
       spin={{ from: 0, durationMs: 1000, key: 1, zoom: true }}
+      onSpinStart={startTrack}
+      onSpinFrame={onSpinFrame}
+      onSpinLand={onSpinLand}
       onSpinEnd={onSpinEnd}
     />,
   );
   const pointer = container.querySelector<SVGSVGElement>(".wheel-pointer")!;
+  const rim = container.querySelector(".wheel-rim")!;
+  expect(rim.querySelector(".wheel-winning-slice")).toBeTruthy();
+  expect(rim.hasAttribute("data-landed")).toBe(false);
   const tip = container.querySelector<SVGGElement>(".wheel-pointer-tip")!;
-  const cancel = vi.fn();
-  const animate = vi.fn(() => ({ cancel }));
-  Object.defineProperty(tip, "animate", { configurable: true, value: animate });
+  expect(startTrack).toHaveBeenCalledExactlyOnceWith(1000);
   act(() => frame(200));
-  expect(animate).toHaveBeenCalledTimes(1);
-  act(() => frame(250));
-  expect(animate).toHaveBeenCalledTimes(1);
-  act(() => frame(400));
-  expect(animate).toHaveBeenCalledTimes(2);
+  act(() => frame(240));
+  const tilt = onSpinFrame.mock.lastCall![0].pointerTilt;
+  // The next slice can cross during that same deflection without restarting it.
+  expect(tilt).toBeLessThan(-3);
+  expect(tip.style.transform).toBe(`rotate(${tilt}deg)`);
+  expect(onSpinLand).not.toHaveBeenCalled();
+  expect(stopTrack).not.toHaveBeenCalled();
+
   act(() => frame(1000));
   expect(pointer.classList.contains("wheel-pointer--landed")).toBe(true);
-  expect(onSpinEnd).not.toHaveBeenCalled();
-  act(() => frame(5999));
+  expect(rim.hasAttribute("data-landed")).toBe(true);
+  expect(onSpinFrame.mock.lastCall![0]).toMatchObject({ rotation, progress: 1, pointerTilt: 0 });
+  expect(tip.style.transform).toBe("");
+  expect(stopTrack).toHaveBeenCalledOnce();
+  expect(onSpinLand).toHaveBeenCalledOnce();
   expect(onSpinEnd).not.toHaveBeenCalled();
   act(() => frame(6000));
-  expect(onSpinEnd).toHaveBeenCalledTimes(1);
-  rerender(<Wheel names={names.slice(0, 75)} rotation={rotation} winner />);
+  expect(onSpinLand).toHaveBeenCalledOnce();
+  expect(onSpinEnd).toHaveBeenCalledOnce();
+  rerender(<Wheel names={names.slice(0, 75)} winnerIndex={74} rotation={rotation} winner />);
+  expect(rim.hasAttribute("data-landed")).toBe(false);
+  expect(rim.hasAttribute("data-winner")).toBe(true);
   expect(pointer.classList.contains("wheel-pointer--landed")).toBe(false);
   expect(pointer.classList.contains("wheel-pointer--winner")).toBe(true);
-});
-
-it("limits recorded pointer nudge to a subtle visual click", () => {
-  const oneSlice = 360 / 75;
-  expect(pointerNudge(0, 75, true)).toBeCloseTo(0);
-  expect(pointerNudge(oneSlice * 0.15, 75, true)).toBeCloseTo(-5);
-  expect(pointerNudge(oneSlice * 0.7, 75, true)).toBe(0);
-  expect(pointerNudge(oneSlice * 0.15, 75, false)).toBe(0);
-  expect(pointerNudge(oneSlice * 0.15, 1, true)).toBe(0);
-  expect(pointerNudge(Infinity, 250, true)).toBe(0);
 });

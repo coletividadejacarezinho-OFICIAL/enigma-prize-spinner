@@ -183,7 +183,7 @@
   }
 }
 
-/* Premium miniature perimeter lamps: the 24 lights and their chase timing stay unchanged. */
+/* The wheel drives its perimeter lamps from the current rotation. */
 .wheel-bulb {
   width: 1.8%;
   height: 1.8%;
@@ -191,33 +191,33 @@
   border: 1px solid rgba(255, 227, 153, 0.83);
   background: radial-gradient(circle at 36% 28%, #ffe8ac 0%, #dfa32b 52%, #945313 100%);
   box-shadow: inset 0 1px 1px rgba(255, 252, 230, 0.37), 0 0 0 1px rgba(34, 13, 43, 0.35);
-  animation: wheel-bulb-chase 2.4s linear infinite;
 }
 
-/* Only the lights speed up during the spin; the wheel animation is unchanged. */
-.wheel-rim--spinning .wheel-bulb {
-  animation-duration: 1.2s;
-}
-
-@keyframes wheel-bulb-chase {
-  0%, 16.5% {
-    background: radial-gradient(circle at 36% 28%, #ffffff 0%, #fff8d7 35%, #ffdc78 68%, #d79024 100%);
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.88),
-      0 0 7px 1px rgba(255, 246, 185, 0.8);
-  }
-  22%, 100% {
-    background: radial-gradient(circle at 36% 28%, #ffe8ac 0%, #dfa32b 52%, #945313 100%);
-    box-shadow: inset 0 1px 1px rgba(255, 252, 230, 0.37), 0 0 0 1px rgba(34, 13, 43, 0.35);
-  }
+.wheel-bulb[data-lit] {
+  background: radial-gradient(circle at 36% 28%, #ffffff 0%, #fff8d7 35%, #ffdc78 68%, #d79024 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.88),
+    0 0 7px 1px rgba(255, 246, 185, 0.8);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wheel-bulb {
-    animation: none;
+  .wheel-bulb,
+  .wheel-bulb[data-lit] {
     background: radial-gradient(circle at 36% 28%, #ffffff, #ffe7a5 65%, #d99517);
     box-shadow: 0 0 3px rgba(255, 246, 185, 0.38);
   }
+}
+
+.wheel-winning-slice {
+  visibility: hidden;
+  fill: #ffd96b30;
+  stroke: #fff0b5;
+  filter: drop-shadow(0 0 2px #ffe18a);
+}
+
+.wheel-rim[data-landed] .wheel-winning-slice,
+.wheel-rim[data-winner] .wheel-winning-slice {
+  visibility: visible;
 }
 
 /* Etapa 3: fixed metallic pointer and winner glow. */
@@ -597,6 +597,41 @@
   flex: 1 1 0%;
 }
 
+.enigma-countdown-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  min-width: 4rem;
+  min-height: 4rem;
+  padding-inline: 0.8rem;
+  border: 2px solid var(--gold);
+  border-radius: 1.1rem;
+  background: var(--background);
+  box-shadow: 0 0 1.2rem color-mix(in oklab, var(--gold) 35%, transparent);
+  color: var(--gold);
+  font-size: 2rem;
+  font-weight: 800;
+  animation: enigma-countdown-pulse 260ms ease-out both;
+  pointer-events: none;
+}
+
+@keyframes enigma-countdown-pulse {
+  from { scale: 1.1; }
+  to { scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enigma-countdown-badge { animation: none; }
+}
+
+@keyframes enigma-hold-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 .enigma-recording-dock {
   display: flex;
   flex: 0 0 auto;
@@ -633,7 +668,7 @@
   place-items: center;
   flex: 1 1 0%;
   min-height: 0;
-  margin: 0.125rem 0.5rem 0.5rem;
+  margin: 0.25rem 0.75rem 0.5rem;
   container-type: size;
 }
 
@@ -643,7 +678,8 @@
   max-width: 100%;
   height: auto;
   border-radius: 0.85rem;
-  outline: 1px solid color-mix(in oklab, var(--gold) 38%, var(--card));
+  outline: 1px solid color-mix(in oklab, var(--gold) 32%, var(--card));
+  box-shadow: 0 8px 22px color-mix(in oklab, var(--background) 80%, transparent);
 }
 
 .enigma-recording-camera-source {
@@ -880,8 +916,7 @@
 }
 
 
-/* Etapa 4G — place miniature bulbs on a narrow bezel outside the colored slices.
-   The 24 bulbs, animation cadence, wheel segments and spin algorithm are unchanged. */
+/* Keep the perimeter lamps on the narrow bezel outside the colored slices. */
 .wheel-bezel-line {
   border: 1px solid color-mix(in oklab, var(--gold) 76%, transparent);
   box-shadow:

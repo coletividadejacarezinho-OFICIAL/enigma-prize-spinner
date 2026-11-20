@@ -29,6 +29,8 @@ const drawImage = vi.fn();
 const fillText = vi.fn();
 const translate = vi.fn();
 const scale = vi.fn();
+const rotate = vi.fn();
+const rect = vi.fn();
 const canvasContext = new Proxy(
   {
     arc,
@@ -36,8 +38,11 @@ const canvasContext = new Proxy(
     fillText,
     translate,
     scale,
+    rotate,
+    rect,
     measureText: (text: string) => ({ width: text.length * 10 }),
     createLinearGradient: () => ({ addColorStop: vi.fn() }),
+    createRadialGradient: () => ({ addColorStop: vi.fn() }),
   },
   { get: (target, key) => Reflect.get(target, key) ?? (() => {}) },
 );
@@ -68,6 +73,8 @@ beforeEach(() => {
   fillText.mockClear();
   translate.mockClear();
   scale.mockClear();
+  rotate.mockClear();
+  rect.mockClear();
   host = document.createElement("div");
   document.body.appendChild(host);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
@@ -134,20 +141,39 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(initialCrop).toEqual([video, 0, 80, 480, 480, -111, -111, 222, 222]);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
 
-  setRecFrame({ ...frame, spinning: true });
-  setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5 });
+  setRecFrame({ ...frame, countdown: { step: 3, startedAt: performance.now() } });
+  vi.advanceTimersByTime(40);
+  expect(fillText).toHaveBeenCalledWith("3", 0, 0, 126);
+  expect(drawImage.mock.lastCall).toEqual(initialCrop);
+
+  setRecFrame({ ...frame, spinning: true, winnerIndex: 0 });
+  setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5, pointerTilt: -3 });
   vi.advanceTimersByTime(900);
   expect(scale).toHaveBeenCalledWith(1.5, 1.5);
+  expect(rotate.mock.lastCall?.[0]).toBeCloseTo(-Math.PI / 60);
+  expect(fillText).toHaveBeenCalledWith("Girando…", 483, 1110, 370);
+  expect(arc).not.toHaveBeenCalledWith(360, 660, 291, Math.PI, Math.PI * 2);
   expect(arc).toHaveBeenCalledWith(360, 660, 300, Math.PI, Math.PI * 2);
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
 
   const winner = "Maria Clara dos Santos de Almeida Pereira Rodrigues da Conceição Ferreira";
-  setRecMotion({ rotation: 270, progress: 1, zoom: 1.5 });
-  setRecFrame({ ...frame, winner, rotation: 270 });
+  setRecMotion({ rotation: 270, progress: 1, zoom: 1.5, pointerTilt: 0 });
+  fillText.mockClear();
+  vi.advanceTimersByTime(40);
+  expect(fillText).toHaveBeenCalledWith("Resultado", 483, 1110, 370);
+  expect(fillText).not.toHaveBeenCalledWith("Girando…", 483, 1110, 370);
+  expect(arc).toHaveBeenCalledWith(360, 660, 291, Math.PI, Math.PI * 2);
+  setRecFrame({
+    ...frame,
+    winner,
+    winnerIndex: 0,
+    rotation: 270,
+    celebrationAt: performance.now() - 200,
+  });
   fillText.mockClear();
   arc.mockClear();
-  vi.advanceTimersByTime(40);
+  vi.advanceTimersByTime(33);
   expect(host.querySelector("video")).toBe(video);
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
@@ -155,6 +181,11 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   const nameLines = fillText.mock.calls.filter(([, x, y]) => x === 483 && y > 1050);
   expect(nameLines.map(([line]) => line).join(" ")).toBe(winner);
   expect(nameLines.every(([, x, , width]) => x - width / 2 > 145 + 111)).toBe(true);
+  expect(rect).toHaveBeenCalledWith(44, 344, 632, 632);
+  vi.advanceTimersByTime(1400);
+  rect.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(rect).not.toHaveBeenCalledWith(44, 344, 632, 632);
 
   await stopRecording();
   expect(capturedTrack.stop).toHaveBeenCalledOnce();
@@ -175,12 +206,16 @@ it("cleans the camera and the canvas, then shows only the canvas in wheel-only m
   expect(host.querySelector("video")).toBeNull();
 });
 
-it("uses the active courtesy's logo and replaces its address when the round changes", () => {
+it.each([
+  [200, 100],
+  [200, 200],
+  [100, 200],
+])("fits a %i×%i logo and replaces its address when the round changes", (width, height) => {
   vi.stubGlobal("Image", class {
     crossOrigin = "";
     src = "";
-    naturalWidth = 200;
-    naturalHeight = 100;
+    naturalWidth = width;
+    naturalHeight = height;
     get nodeName() {
       return "IMG";
     }
@@ -193,7 +228,11 @@ it("uses the active courtesy's logo and replaces its address when the round chan
   })).toBe(true);
   const [image, x, y, w, h] = drawImage.mock.lastCall!;
   expect(image.src).toBe("data:image/png;base64,logo");
-  expect([x, y, w, h]).toEqual([55, 194, 100, 50]);
+  expect(w / h).toBeCloseTo(width / height);
+  expect(x).toBeGreaterThanOrEqual(55);
+  expect(x + w).toBeLessThanOrEqual(153);
+  expect(y).toBeGreaterThanOrEqual(151);
+  expect(y + h).toBeLessThanOrEqual(230);
 
   setRecFrame({
     ...frame,
@@ -206,9 +245,56 @@ it("uses the active courtesy's logo and replaces its address when the round chan
   drawImage.mockClear();
   vi.advanceTimersByTime(40);
   const text = fillText.mock.calls.map(([line]) => line).join(" ");
+  expect(text).toContain("Próxima cortesia");
+  expect(text).toContain("Prêmio 2 de 2");
   expect(text).toContain("Segundo comércio");
   expect(text).toContain("Avenida Nova, 80");
   expect(text).not.toContain(frame.address);
   expect(text).not.toContain(frame.phone);
   expect(drawImage).not.toHaveBeenCalled();
+});
+
+it("keeps a long prize and address inside their areas and shows the full phone", () => {
+  const prize = "Vale compras na Padaria Central com entrega em Jacarezinho e um bolo para a família toda";
+  const address = "Rua Paraná, 778, Centro, Jacarezinho, Paraná";
+  expect(startRecording({
+    ...options(),
+    frame: { ...frame, address, prize },
+    mode: "roleta-voz",
+    stream: null,
+  })).toBe(true);
+
+  const prizeLines = fillText.mock.calls.filter(([, , y]) => y >= 191 && y <= 236);
+  const addressLines = fillText.mock.calls.filter(([, x, y]) => x === 50 && y >= 269 && y <= 288);
+  expect(prizeLines.map(([line]) => line).join(" ")).toBe(prize);
+  expect(addressLines).toHaveLength(2);
+  expect(addressLines.map(([line]) => line).join(" ")).toBe(address);
+  expect(fillText).toHaveBeenCalledWith(frame.phone, 656, 277);
+});
+
+it("shows the full list of winners in readable pages, with their public numbers", () => {
+  const rows = Array.from({ length: 8 }, (_, i) => ({
+    merchant: `Comércio ${i + 1}`,
+    prize: `Cortesia ${i + 1}`,
+    winner: `Pessoa ${i + 1}`,
+    number: i + 15,
+  }));
+  const end = { ...frame, winner: "Pessoa 8", winnerNumber: 22 };
+
+  expect(startRecording({ ...options(), frame: end, mode: "roleta-voz", stream: null })).toBe(true);
+  setRecFrame({ ...end, summary: rows });
+  fillText.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(fillText).toHaveBeenCalledWith("Resumo do sorteio", 360, 169);
+  expect(fillText).toHaveBeenCalledWith("Prêmio 1 · Nº 15", 55, 237);
+  expect(fillText).toHaveBeenCalledWith("Página 1 de 2", 360, 203);
+  expect(fillText).not.toHaveBeenCalledWith("Prêmio 8 · Nº 22", expect.any(Number), expect.any(Number));
+  expect(fillText).toHaveBeenCalledWith("8 cortesias sorteadas", 360, 1155, 616);
+
+  vi.advanceTimersByTime(5500);
+  fillText.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(fillText).toHaveBeenCalledWith("Página 2 de 2", 360, 203);
+  expect(fillText).toHaveBeenCalledWith("Prêmio 8 · Nº 22", expect.any(Number), expect.any(Number));
+  expect(fillText).not.toHaveBeenCalledWith("Prêmio 1 · Nº 15", expect.any(Number), expect.any(Number));
 });

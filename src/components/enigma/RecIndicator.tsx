@@ -15,8 +15,8 @@ export function RecIndicator({ startedAt }: { startedAt: number }) {
       aria-label="Tempo de gravação"
     >
       <span className="h-2 w-2 rounded-full bg-rec" aria-hidden="true" />
-      Gravando
-      {formatDuration(now - startedAt)}
+      <span>Gravando</span>
+      <span className="text-muted-foreground">{formatDuration(now - startedAt)}</span>
     </span>
   );
 }
