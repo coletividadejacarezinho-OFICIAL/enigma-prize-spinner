@@ -947,3 +947,33 @@ body.enigma-roleta-viewport-locked {
   position: fixed;
   bottom: 0;
 }
+
+
+/* Etapa 5A: scroll stays inside the multi-courtesy results dialog, never on Roleta. */
+.enigma-summary-dialog {
+  box-shadow: 0 24px 60px -20px color-mix(in oklab, var(--background) 80%, transparent);
+}
+
+.enigma-summary-progress {
+  border: 1px solid color-mix(in oklab, var(--gold) 34%, transparent);
+  background: color-mix(in oklab, var(--gold) 10%, var(--card));
+}
+
+.enigma-summary-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
+}
+
+.enigma-summary-item {
+  background: linear-gradient(
+    128deg,
+    color-mix(in oklab, var(--card) 94%, var(--background)),
+    var(--card)
+  );
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.enigma-summary-round {
+  border: 1px solid color-mix(in oklab, var(--gold) 24%, transparent);
+  background: color-mix(in oklab, var(--gold) 9%, var(--background));
+}
