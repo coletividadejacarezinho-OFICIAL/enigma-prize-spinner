@@ -238,7 +238,7 @@ function drawLogo(
     ctx.fill();
     ctx.clip();
     if (fit === "contain") {
-      const rect = containedImageRect(img.width, img.height, x, y, size, size, size * 0.06);
+      const rect = containedImageRect(img.width, img.height, x, y, size, size, size * 0.08);
       if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
     } else {
       const s = Math.max(size / img.width, size / img.height);
