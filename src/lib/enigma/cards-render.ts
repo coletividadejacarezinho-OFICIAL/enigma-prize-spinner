@@ -196,6 +196,30 @@ function sparkle(ctx: Ctx, x: number, y: number, r: number, color: string) {
   ctx.restore();
 }
 
+/** Fits a registered image in its frame without trimming any part of the brand. */
+export function containedImageRect(
+  sourceWidth: number,
+  sourceHeight: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  padding = 0,
+): { x: number; y: number; width: number; height: number } | null {
+  if (sourceWidth <= 0 || sourceHeight <= 0 || width <= 0 || height <= 0) return null;
+  const availableWidth = Math.max(0, width - padding * 2);
+  const availableHeight = Math.max(0, height - padding * 2);
+  const scale = Math.min(availableWidth / sourceWidth, availableHeight / sourceHeight);
+  const fittedWidth = sourceWidth * scale;
+  const fittedHeight = sourceHeight * scale;
+  return {
+    x: x + (width - fittedWidth) / 2,
+    y: y + (height - fittedHeight) / 2,
+    width: fittedWidth,
+    height: fittedHeight,
+  };
+}
+
 /** Logo in a rounded tile, or the shop's initials when it has none. */
 function drawLogo(
   k: Kit,
@@ -204,6 +228,7 @@ function drawLogo(
   x: number,
   y: number,
   size: number,
+  fit: "cover" | "contain" = "cover",
 ) {
   const { ctx, pal } = k;
   ctx.save();
@@ -212,10 +237,15 @@ function drawLogo(
     ctx.fillStyle = pal.ink;
     ctx.fill();
     ctx.clip();
-    const s = Math.max(size / img.width, size / img.height);
-    const w = img.width * s;
-    const h = img.height * s;
-    ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
+    if (fit === "contain") {
+      const rect = containedImageRect(img.width, img.height, x, y, size, size, size * 0.08);
+      if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
+    } else {
+      const s = Math.max(size / img.width, size / img.height);
+      const w = img.width * s;
+      const h = img.height * s;
+      ctx.drawImage(img, x + (size - w) / 2, y + (size - h) / 2, w, h);
+    }
   } else {
     ctx.fillStyle = pal.glow;
     ctx.fill();
@@ -296,14 +326,8 @@ function drawFrame(k: Kit) {
     ctx.save();
     ctx.clip();
     const img = k.groupLogo;
-    const s = Math.max(badge / img.width, badge / img.height);
-    ctx.drawImage(
-      img,
-      bx + (badge - img.width * s) / 2,
-      by + (badge - img.height * s) / 2,
-      img.width * s,
-      img.height * s,
-    );
+    const rect = containedImageRect(img.width, img.height, bx, by, badge, badge, badge * 0.16);
+    if (rect) ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
   } else {
     ctx.fillStyle = pal.gold;
@@ -747,6 +771,7 @@ export async function renderWinnerCard(
       g(20) +
       46 +
       12 +
+      (card.number !== null ? 60 : 0) +
       winner.lines.length * winner.size * 1.05 +
       g(44) +
       20 +
@@ -778,8 +803,22 @@ export async function renderWinnerCard(
   ctx.textAlign = "center";
   ctx.fillStyle = pal.gold;
   setFont(ctx, 800, 40, DISPLAY, 4);
-  ctx.fillText(card.number ? `GANHADOR(A) · Nº ${card.number}` : "GANHADOR(A)", W / 2, y + 36);
+  ctx.fillText("GANHADOR(A)", W / 2, y + 36);
   y += 46 + 12;
+  if (card.number !== null) {
+    const numberText = `Nº ${card.number}`;
+    setFont(ctx, 800, 34, SANS);
+    const badgeW = Math.min(CONTENT_W - 40, Math.max(142, ctx.measureText(numberText).width + 76));
+    ctx.fillStyle = pal.card;
+    rr(ctx, (W - badgeW) / 2, y, badgeW, 52, 26);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = pal.goldDeep;
+    ctx.stroke();
+    ctx.fillStyle = pal.gold;
+    ctx.fillText(numberText, W / 2, y + 37);
+    y += 60;
+  }
   ctx.fillStyle = pal.ink;
   setFont(ctx, 800, winner.size, DISPLAY);
   drawLines(ctx, winner.lines, W / 2, y, winnerLH, winner.size);
@@ -798,7 +837,7 @@ export async function renderWinnerCard(
   setFont(ctx, 800, 30, SANS, 6);
   ctx.fillText("OFERECIMENTO", W / 2, y + 30);
   y += 40 + 18;
-  drawLogo(k, logo, card.merchantName, (W - l.logo) / 2, y, l.logo);
+  drawLogo(k, logo, card.merchantName, (W - l.logo) / 2, y, l.logo, "contain");
   y += l.logo + 18;
   ctx.textAlign = "center";
   ctx.fillStyle = pal.ink;
@@ -822,25 +861,17 @@ export async function renderSummaryCards(
   const L = 110;
   const textW = CONTENT_W - 60 - L - 26;
   const layout = card.rows.map((r) => {
-    const head = wrap(
-      probe.ctx,
-      `${r.label.toUpperCase()} · ${r.merchantName}`,
-      textW,
-      800,
-      28,
-      SANS,
-    );
+    const label = wrap(probe.ctx, r.label.toUpperCase(), textW, 800, 28, SANS);
+    const merchant = wrap(probe.ctx, r.merchantName, textW, 800, 28, SANS);
     const prize = wrap(probe.ctx, r.prize, textW, 800, 40, DISPLAY);
-    const winner = wrap(
-      probe.ctx,
-      r.number ? `Nº ${r.number} · ${r.winner}` : r.winner,
-      CONTENT_W - 60 - 72,
-      800,
-      60,
-      DISPLAY,
-    );
-    const topH = Math.max(L, head.length * 38 + 6 + prize.length * 48);
-    return { head, prize, winner, topH, h: 30 + topH + 24 + winner.length * 68 + 30 };
+    const winner = wrap(probe.ctx, r.winner, CONTENT_W - 60 - 72, 800, 60, DISPLAY);
+    const topTextH = label.length * 34 + merchant.length * 38 + 8 + prize.length * 48;
+    const topH = Math.max(L, topTextH);
+    const badgeH = r.number !== null ? 50 : 0;
+    return {
+      label, merchant, prize, winner, topH, topTextH, badgeH,
+      h: 30 + topH + 24 + badgeH + winner.length * 68 + 30,
+    };
   });
   const subtitle = `${formatDateBR(card.date)} · ${card.rows.length} cortesias`;
   const top = contentTop(probe, "Resultado do sorteio", subtitle);
@@ -867,12 +898,16 @@ export async function renderSummaryCards(
       ctx.lineWidth = 2;
       ctx.stroke();
       const x = M + 30;
-      drawLogo(k, logos[i] ?? null, r.merchantName, x, y + 30, L);
-      let ty = y + 30 + (l.topH - (l.head.length * 38 + 6 + l.prize.length * 48)) / 2;
-      ctx.fillStyle = pal.muted;
+      drawLogo(k, logos[i] ?? null, r.merchantName, x, y + 30, L, "contain");
+      let ty = y + 30 + (l.topH - l.topTextH) / 2;
+      ctx.fillStyle = pal.gold;
       setFont(ctx, 800, 28, SANS, 2);
-      drawLines(ctx, l.head, x + L + 26, ty, 38, 28);
-      ty += l.head.length * 38 + 6;
+      drawLines(ctx, l.label, x + L + 26, ty, 34, 28);
+      ty += l.label.length * 34;
+      ctx.fillStyle = pal.muted;
+      setFont(ctx, 800, 28, SANS);
+      drawLines(ctx, l.merchant, x + L + 26, ty, 38, 28);
+      ty += l.merchant.length * 38 + 8;
       ctx.fillStyle = pal.gold;
       setFont(ctx, 800, 40, DISPLAY);
       drawLines(ctx, l.prize, x + L + 26, ty, 48, 40);
@@ -883,10 +918,23 @@ export async function renderSummaryCards(
       ctx.moveTo(x, wy - 12);
       ctx.lineTo(W - M - 30, wy - 12);
       ctx.stroke();
-      drawTrophy(k, x + 28, wy + 14, 40);
+      if (r.number !== null) {
+        const badgeText = `Nº ${r.number}`;
+        setFont(ctx, 800, 28, SANS);
+        const bw = Math.max(118, ctx.measureText(badgeText).width + 38);
+        rr(ctx, x + 72, wy, bw, 42, 21);
+        ctx.fillStyle = pal.bg;
+        ctx.fill();
+        ctx.strokeStyle = pal.goldDeep;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = pal.gold;
+        ctx.fillText(badgeText, x + 91, wy + 30);
+      }
+      drawTrophy(k, x + 28, wy + l.badgeH + 14, 40);
       ctx.fillStyle = pal.ink;
       setFont(ctx, 800, 60, DISPLAY);
-      drawLines(ctx, l.winner, x + 72, wy, 68, 60);
+      drawLines(ctx, l.winner, x + 72, wy + l.badgeH, 68, 60);
       y += l.h + 24;
     }
     out.push(await toFile(k.canvas, cardFileName("resumo", card.date, p, pages.length)));

@@ -39,7 +39,7 @@ export function WinnerArtDialog({
     <ImageShareDialog
       open={open && choices.length > 0}
       onClose={onClose}
-      title="Arte do ganhador"
+      title={valid === "resumo" ? "Arte dos ganhadores" : "Arte do ganhador"}
       description={
         valid === "resumo"
           ? "Todos os resultados juntos, cada ganhador com o seu prêmio e a sua empresa."
