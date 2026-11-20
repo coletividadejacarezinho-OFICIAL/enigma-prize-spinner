@@ -216,3 +216,23 @@
     box-shadow: none;
   }
 }
+
+/* Etapa 3: fixed metallic pointer and winner glow. */
+.wheel-pointer {
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(25, 9, 38, 0.8))
+    drop-shadow(0 0 3px rgba(255, 209, 80, 0.4));
+}
+.wheel-pointer-tip { transform-box: view-box; transform-origin: 20px 15px; }
+.wheel-pointer--landed .wheel-pointer-tip,
+.wheel-pointer--winner .wheel-pointer-tip {
+  filter: drop-shadow(0 0 6px rgba(255, 238, 155, 0.9));
+}
+.wheel-pointer--winner .wheel-pointer-tip { animation: wheel-pointer-victory 1.6s ease-in-out infinite; }
+@keyframes wheel-pointer-victory {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 231, 131, 0.7)); }
+  50% { filter: drop-shadow(0 0 10px rgba(255, 246, 192, 0.98)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-pointer--winner .wheel-pointer-tip { animation: none; }
+}
