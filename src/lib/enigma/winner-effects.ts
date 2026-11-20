@@ -4,7 +4,7 @@ const PARTICLES = Array.from({ length: 84 }, (_, i) => {
   const wave = i % 3;
   return {
     side: Math.floor(i / 3) % 2 === 0 ? 1 : -1,
-    reach: 0.19 + ((i * 19) % 43) / 230,
+    reach: 0.052 + ((i * 19) % 43) / 1000,
     lift: 1.8 + ((i * 13) % 33) / 40,
     delay: wave * 510 + (i * 17) % 140,
     duration: 1700 + (i * 41) % 320,
@@ -38,7 +38,7 @@ export function paintWinnerConfetti(
   for (const p of PARTICLES) {
     const t = (elapsedMs - p.delay) / p.duration;
     if (t <= 0 || t >= 1) continue;
-    const x = left + size * (0.5 - p.side * (0.46 - p.reach * t));
+    const x = left + size * (0.5 - p.side * (0.467 - p.reach * t));
     const y = top + size * (0.84 - p.lift * t * (1 - t));
     const w = size * p.size;
     const flutter = 0.42 + 0.58 * Math.abs(Math.cos(t * p.turn * 2));

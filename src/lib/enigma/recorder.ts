@@ -560,6 +560,7 @@ function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
   const celebrationMs = f.celebrationAt !== undefined && !reducedMotion
     ? Math.max(0, now - f.celebrationAt)
     : undefined;
+  const winner = !f.spinning && !f.summary ? f.winner : null;
   const nextCourtesy = s.nextCourtesyAt !== null && now - s.nextCourtesyAt < COURTESY_INTRO_MS
     && !f.countdown && !f.spinning && !f.winner;
   if (f.summary) {
@@ -573,7 +574,7 @@ function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
       ctx, c, f.names, wheelLabels(s), rotation, zoom, motion?.pointerTilt ?? 0,
       winnerVisible, winnerVisible ? f.winnerIndex : undefined, reducedMotion,
     );
-    if (f.winner && celebrationMs !== undefined) {
+    if (winner && celebrationMs !== undefined) {
       const radius = WHEEL_RADIUS + WHEEL_BEZEL;
       paintWinnerConfetti(ctx, W / 2 - radius, WHEEL_Y - radius, 2 * radius, celebrationMs);
     }
@@ -645,67 +646,23 @@ function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
     ctx.restore();
   }
 
-  const infoWidth = s.video ? 414 : W - 60;
-  const infoLeft = W - 30 - infoWidth;
-  const infoCenter = infoLeft + infoWidth / 2;
-  const infoTextWidth = infoWidth - 44;
-  const winnerCard = !!f.winner && !f.spinning && !f.summary;
-  const infoSurface = ctx.createLinearGradient(infoLeft, 1000, infoLeft + infoWidth, 1240);
-  infoSurface.addColorStop(0, c.card);
-  infoSurface.addColorStop(1, c.bg);
-  ctx.fillStyle = infoSurface;
-  roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
-  ctx.fill();
-  ctx.strokeStyle = winnerCard ? c.gold : "#f4d19038";
-  ctx.lineWidth = winnerCard ? 3 : 2;
-  ctx.stroke();
-  ctx.textAlign = "center";
-  if (winnerCard && f.winner) {
-    ctx.save();
-    if (celebrationMs !== undefined) {
-      const entrance = winnerEntryProgress(celebrationMs);
-      ctx.beginPath();
-      ctx.rect(infoLeft + 12, 1020, infoWidth - 24, 200);
-      ctx.clip();
-      ctx.globalAlpha = 0.4 + 0.6 * entrance;
-      ctx.translate(0, 14 * (1 - entrance));
-    }
-    ctx.fillStyle = c.gold;
-    ctx.font = `800 25px ${SANS}`;
-    if (f.winnerNumber !== null && f.winnerNumber !== undefined) {
-      const number = `Nº ${f.winnerNumber}`;
-      const badgeWidth = Math.max(82, ctx.measureText(number).width + 24);
-      const badgeRight = infoLeft + infoWidth - 22;
-      ctx.fillStyle = "#f4d19026";
-      roundRect(ctx, badgeRight - badgeWidth, 1025, badgeWidth, 36, 12);
-      ctx.fill();
-      ctx.fillStyle = c.gold;
-      ctx.fillText(number, badgeRight - badgeWidth / 2, 1050);
-      ctx.textAlign = "left";
-      ctx.fillText("🏆 GANHADOR(A)", infoLeft + 22, 1050, infoTextWidth - badgeWidth - 14);
-      ctx.textAlign = "center";
-    } else {
-      ctx.fillText("🏆 GANHADOR(A)", infoCenter, 1050, infoTextWidth);
-    }
-    ctx.strokeStyle = "#f4d19038";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(infoLeft + 22, 1075);
-    ctx.lineTo(infoLeft + infoWidth - 22, 1075);
-    ctx.stroke();
-    ctx.fillStyle = c.ink;
-    const { size, lines } = fitText(f.winner, infoTextWidth, 3, [46, 40, 34, 28, 22], (text, px) => {
-      ctx.font = `800 ${px}px ${DISPLAY}`;
-      return ctx.measureText(text).width;
-    });
-    const lineHeight = Math.min(size * 1.14, 136 / lines.length);
-    ctx.font = `800 ${Math.min(size, lineHeight / 1.08)}px ${DISPLAY}`;
-    ctx.textBaseline = "middle";
-    lines.forEach((line, i) =>
-      ctx.fillText(line, infoCenter, 1145 + (i - (lines.length - 1) / 2) * lineHeight, infoTextWidth),
-    );
-    ctx.restore();
+  if (winner) {
+    paintWinnerCard(ctx, c, f, winner, celebrationMs);
   } else {
+    const infoWidth = s.video ? 414 : W - 60;
+    const infoLeft = W - 30 - infoWidth;
+    const infoCenter = infoLeft + infoWidth / 2;
+    const infoTextWidth = infoWidth - 44;
+    const infoSurface = ctx.createLinearGradient(infoLeft, 1000, infoLeft + infoWidth, 1240);
+    infoSurface.addColorStop(0, c.card);
+    infoSurface.addColorStop(1, c.bg);
+    ctx.fillStyle = infoSurface;
+    ctx.strokeStyle = "#f4d19038";
+    ctx.lineWidth = 2;
+    roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = "center";
     ctx.fillStyle = c.ink;
     const waiting = !f.spinning && !f.summary && !f.countdown;
     ctx.font = `800 ${waiting ? 28 : 32}px ${DISPLAY}`;
@@ -726,6 +683,153 @@ function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
   }
 
   if (s.video) paintFace(s, s.video, ctx, 145, 1120, 111);
+}
+
+/** Mirrors WinnerAnnouncement in the same canvas used for preview and recording. */
+function paintWinnerCard(
+  ctx: CanvasRenderingContext2D,
+  c: Palette,
+  f: RecFrame,
+  winner: string,
+  elapsedMs: number | undefined,
+) {
+  const width = 520;
+  const textWidth = width - 64;
+  const center = W / 2;
+  const number = f.winnerNumber == null ? "" : `Nº ${f.winnerNumber}`;
+  const fit = (text: string, sizes: number[], rows: number, family: string) => {
+    const { size, lines } = fitText(text, textWidth, rows, sizes, (value, px) => {
+      ctx.font = `800 ${px}px ${family}`;
+      return ctx.measureText(value).width;
+    });
+    return { lines, font: `800 ${size}px ${family}`, lineHeight: Math.ceil(size * 1.13) };
+  };
+  const name = fit(winner, [44, 39, 34, 29, 24], 2, DISPLAY);
+  const prize = fit(f.prize, [29, 26, 23, 20], 2, DISPLAY);
+  const merchant = fit(f.merchant, [25, 22, 19], 2, SANS);
+  const linesHeight = (block: typeof name) => block.lines.length * block.lineHeight;
+  const badges = [f.roundLabel, number].filter(Boolean);
+  const padding = 32;
+  const trophyHeight = 68;
+  const headingHeight = 30;
+  const badgeHeight = 38;
+  const badgeGap = 10;
+  const fixedHeight = padding * 2 + trophyHeight + 14 + headingHeight + 12
+    + 20 + 22 + 24 + 6 + 20 + 24;
+  const height = fixedHeight + badges.length * (badgeHeight + badgeGap)
+    + linesHeight(name) + linesHeight(prize) + linesHeight(merchant);
+  const entrance = elapsedMs === undefined ? 1 : winnerEntryProgress(elapsedMs);
+  const scale = Math.min(1, 554 / height) * (0.96 + 0.04 * entrance);
+  const left = center - width / 2;
+  const top = WHEEL_Y - height / 2;
+
+  ctx.save();
+  ctx.translate(center, WHEEL_Y + 11 * (1 - entrance));
+  ctx.scale(scale, scale);
+  ctx.translate(-center, -WHEEL_Y);
+  ctx.globalAlpha = 0.65 + 0.35 * entrance;
+  const surface = ctx.createLinearGradient(left, top, left + width, top + height);
+  surface.addColorStop(0, c.card);
+  surface.addColorStop(1, c.bg);
+  ctx.fillStyle = surface;
+  ctx.strokeStyle = "#facb4b26";
+  ctx.lineWidth = 13;
+  roundRect(ctx, left, top, width, height, 38);
+  ctx.stroke();
+  ctx.fill();
+  ctx.strokeStyle = c.goldDeep;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  let y = top + padding;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const write = (text: string, rowHeight: number) => {
+    ctx.fillText(text, center, y + rowHeight / 2, textWidth);
+    y += rowHeight;
+  };
+  const writeBlock = (block: typeof name, color: string) => {
+    ctx.font = block.font;
+    ctx.fillStyle = color;
+    block.lines.forEach((line) => write(line, block.lineHeight));
+  };
+  paintWinnerTrophy(ctx, c, center, y + trophyHeight / 2);
+  y += trophyHeight + 14;
+  ctx.fillStyle = c.gold;
+  ctx.font = `800 23px ${SANS}`;
+  write("GANHADOR(A)", headingHeight);
+  for (const badge of badges) {
+    y += badgeGap;
+    ctx.font = `800 23px ${SANS}`;
+    const badgeWidth = ctx.measureText(badge).width + 36;
+    ctx.fillStyle = "#f4d19012";
+    ctx.strokeStyle = "#f4d19062";
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, center - badgeWidth / 2, y, badgeWidth, badgeHeight, 19);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = c.gold;
+    write(badge, badgeHeight);
+  }
+  y += 12;
+  writeBlock(name, c.ink);
+  y += 20;
+  const divider = ctx.createLinearGradient(center - 180, y, center + 180, y);
+  divider.addColorStop(0, "#f4d19000");
+  divider.addColorStop(0.5, c.goldDeep);
+  divider.addColorStop(1, "#f4d19000");
+  ctx.fillStyle = divider;
+  ctx.fillRect(center - 180, y, 360, 2);
+  y += 22;
+  ctx.fillStyle = c.muted;
+  ctx.font = `800 18px ${SANS}`;
+  write("CORTESIA", 24);
+  y += 6;
+  writeBlock(prize, c.gold);
+  y += 20;
+  ctx.fillStyle = c.muted;
+  ctx.font = `700 18px ${SANS}`;
+  write("Oferecimento", 24);
+  writeBlock(merchant, c.ink);
+  ctx.restore();
+}
+
+function paintWinnerTrophy(ctx: CanvasRenderingContext2D, c: Palette, x: number, y: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.arc(0, 0, 34, 0, Math.PI * 2);
+  ctx.fillStyle = "#f4d1901f";
+  ctx.fill();
+  ctx.strokeStyle = "#f4d19070";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = c.gold;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(-10, -16);
+  ctx.lineTo(10, -16);
+  ctx.lineTo(10, -5);
+  ctx.quadraticCurveTo(10, 5, 0, 5);
+  ctx.quadraticCurveTo(-10, 5, -10, -5);
+  ctx.closePath();
+  ctx.moveTo(-10, -12);
+  ctx.quadraticCurveTo(-22, -14, -14, -5);
+  ctx.lineTo(-10, -5);
+  ctx.moveTo(10, -12);
+  ctx.quadraticCurveTo(22, -14, 14, -5);
+  ctx.lineTo(10, -5);
+  ctx.moveTo(0, 5);
+  ctx.lineTo(0, 12);
+  ctx.moveTo(-12, 16);
+  ctx.lineTo(12, 16);
+  ctx.moveTo(-6, 16);
+  ctx.quadraticCurveTo(-5, 12, 0, 12);
+  ctx.quadraticCurveTo(5, 12, 6, 16);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
