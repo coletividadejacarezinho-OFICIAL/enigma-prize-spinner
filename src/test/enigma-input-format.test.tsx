@@ -10,6 +10,11 @@ import { cleanWhatsapp, maskWhatsapp } from "@/lib/enigma/partners";
 
 afterEach(cleanup);
 
+function PhoneField() {
+  const [value, setValue] = useState("");
+  return <WhatsappInput value={value} onValueChange={setValue} />;
+}
+
 describe("formatação dos campos", () => {
   it("normaliza nomes digitados ou colados mantendo acentos e formatos próprios", () => {
     expect(formatPersonName("  MARIA    das  DORES ")).toBe("Maria das Dores");
@@ -56,11 +61,7 @@ describe("formatação dos campos", () => {
   });
 
   it("formata ao digitar ou colar e permite apagar através do hífen", () => {
-    function Field() {
-      const [value, setValue] = useState("");
-      return <WhatsappInput value={value} onValueChange={setValue} />;
-    }
-    render(<Field />);
+    render(<PhoneField />);
     const phone = screen.getByRole<HTMLInputElement>("textbox");
     fireEvent.input(phone, { target: { value: "439" }, inputType: "insertText" });
     expect(phone.value).toBe("(43) 9");
@@ -71,5 +72,30 @@ describe("formatação dos campos", () => {
       inputType: "deleteContentBackward",
     });
     expect(phone.value).toBe("(43) 3330-000");
+  });
+
+  it("distingue DDD 55 e código do Brasil quando o número é digitado aos poucos", () => {
+    render(<PhoneField />);
+    const phone = screen.getByRole<HTMLInputElement>("textbox");
+    const type = (value: string) => {
+      for (const digit of value) {
+        fireEvent.input(phone, { target: { value: phone.value + digit }, inputType: "insertText" });
+      }
+    };
+    type("55999990000");
+    expect(phone.value).toBe("(55) 99999-0000");
+    fireEvent.input(phone, { target: { value: "" }, inputType: "deleteContentBackward" });
+    type("5543999990000");
+    expect(phone.value).toBe("+55 (43) 99999-0000");
+    expect(cleanWhatsapp(phone.value)).toBe("43999990000");
+  });
+
+  it("mantém o DDD explícito entre parênteses ao editar um número colado", () => {
+    render(<PhoneField />);
+    const phone = screen.getByRole<HTMLInputElement>("textbox");
+    fireEvent.input(phone, { target: { value: "(55) 99999-0000" }, inputType: "insertFromPaste" });
+    fireEvent.input(phone, { target: { value: phone.value + "1" }, inputType: "insertText" });
+    expect(phone.value).toBe("(55) 99999-00001");
+    expect(cleanWhatsapp(phone.value)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useRef, type ChangeEvent } from "react";
 import { digits, maskWhatsapp } from "@/lib/enigma/partners";
 import { fieldClass } from "./fields";
 
@@ -9,12 +9,19 @@ export function WhatsappInput({
   value: string;
   onValueChange: (value: string) => void;
 }) {
+  const explicitNational = useRef(value.trimStart().startsWith("("));
+
   function change(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const raw = input.value;
     const caret = input.selectionStart ?? raw.length;
     let position = digits(raw.slice(0, caret)).length;
     const inputType = (event.nativeEvent as InputEvent).inputType;
+    const text = raw.trimStart();
+    if (!text || text.startsWith("+")) explicitNational.current = false;
+    else if (!value || inputType === "insertFromPaste" || inputType === "insertReplacementText") {
+      explicitNational.current = text.startsWith("(");
+    }
     let next = raw;
     // Backspace and Delete should pass through the parentheses, space and hyphen.
     const original = digits(value);
@@ -34,7 +41,12 @@ export function WhatsappInput({
         position = index;
       }
     }
-    const formatted = maskWhatsapp(next);
+    // Parentheses generated as the user types do not signal an explicit national format.
+    const formatted = maskWhatsapp(
+      !explicitNational.current && next.trimStart().startsWith("(") && digits(next).length >= 12
+        ? digits(next)
+        : next,
+    );
     let cursor = 0;
     for (let seen = 0; cursor < formatted.length && seen < position; cursor++) {
       if (/\d/.test(formatted[cursor] ?? "")) seen++;
