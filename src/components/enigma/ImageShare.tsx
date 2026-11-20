@@ -1,4 +1,4 @@
-import { Download, ImageIcon, Loader2, Share2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ImageIcon, Loader2, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { GoldButton } from "./GoldButton";
@@ -52,6 +52,8 @@ export function ImageShareDialog({
   const [cards, setCards] = useState<CardImage[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const makeRef = useRef(make);
   makeRef.current = make;
 
@@ -62,12 +64,16 @@ export function ImageShareDialog({
     setCards(null);
     setFailed(false);
     setStatus("idle");
+    setPreviewIndex(0);
+    touchStartRef.current = null;
     makeRef
       .current()
       .then((c) => {
         made = c;
-        if (alive) setCards(c);
-        else releaseCards(c);
+        if (alive) {
+          if (c.length > 0) setCards(c);
+          else setFailed(true);
+        } else releaseCards(c);
       })
       .catch(() => alive && setFailed(true));
     return () => {
@@ -79,6 +85,11 @@ export function ImageShareDialog({
   const files = cards?.map((c) => new File([c.blob], c.filename, { type: "image/png" })) ?? [];
   const shareable = files.length > 0 && canShareFiles(files);
   const many = (cards?.length ?? 0) > 1;
+  const activeIndex = Math.min(previewIndex, Math.max(0, (cards?.length ?? 1) - 1));
+  const activeCard = cards?.[activeIndex];
+  const changePreview = (step: -1 | 1) => {
+    setPreviewIndex((current) => Math.max(0, Math.min(current + step, (cards?.length ?? 1) - 1)));
+  };
 
   const share = async () => {
     if (!shareable) return setStatus("fallback");
@@ -136,37 +147,82 @@ export function ImageShareDialog({
 
         <div className="rounded-2xl bg-card p-2" data-testid="image-preview">
           {failed ? (
-            <p className="flex h-[48dvh] items-center justify-center p-4 text-center text-muted-foreground">
+            <p className="flex h-[44dvh] items-center justify-center p-4 text-center text-muted-foreground" role="status">
               Não deu para preparar a imagem. Feche e tente de novo.
             </p>
           ) : !cards ? (
-            <p className="flex h-[48dvh] items-center justify-center gap-2 text-muted-foreground" role="status">
+            <p className="flex h-[44dvh] items-center justify-center gap-2 text-muted-foreground" role="status">
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Preparando a imagem…
             </p>
-          ) : (
+          ) : activeCard ? (
             <>
-              <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto">
-                {cards.map((c, i) => (
-                  <figure key={c.url} className="shrink-0 snap-center">
-                    <img
-                      src={c.url}
-                      alt={many ? `Imagem ${i + 1} de ${cards.length}` : title}
-                      className="h-[48dvh] w-auto rounded-xl"
-                    />
-                    {many && (
-                      <figcaption className="pt-1 text-center text-xs font-bold text-muted-foreground">
-                        Imagem {i + 1} de {cards.length}
-                      </figcaption>
-                    )}
-                  </figure>
-                ))}
+              {many && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-background/70 px-3 py-2">
+                  <span className="text-sm font-extrabold text-gold" role="status" aria-live="polite">
+                    Imagem {activeIndex + 1} de {cards.length}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground">Prévia</span>
+                </div>
+              )}
+              <div
+                className="flex items-center justify-center overflow-hidden rounded-xl touch-pan-y"
+                role="region"
+                aria-label="Prévia da arte"
+                onTouchStart={(event) => {
+                  const touch = event.changedTouches[0];
+                  if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+                }}
+                onTouchEnd={(event) => {
+                  const start = touchStartRef.current;
+                  touchStartRef.current = null;
+                  const end = event.changedTouches[0];
+                  if (!many || !start || !end) return;
+                  const dx = end.clientX - start.x;
+                  const dy = end.clientY - start.y;
+                  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                    changePreview(dx < 0 ? 1 : -1);
+                  }
+                }}
+                onTouchCancel={() => { touchStartRef.current = null; }}
+              >
+                <img
+                  key={activeCard.url}
+                  src={activeCard.url}
+                  alt={many ? "Imagem " + (activeIndex + 1) + " de " + cards.length : title}
+                  className="mx-auto block h-[44dvh] w-auto max-w-full rounded-xl object-contain"
+                />
               </div>
               {many && (
-                <p className="pt-1 text-center text-xs text-muted-foreground">
-                  São {cards.length} imagens. Arraste para o lado para ver todas.
-                </p>
+                <>
+                  <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => changePreview(-1)}
+                      disabled={activeIndex === 0}
+                      className="flex h-11 items-center justify-center gap-1 rounded-xl border border-gold/30 bg-secondary px-2 text-sm font-bold disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Anterior
+                    </button>
+                    <span className="text-xs font-extrabold tabular-nums text-gold" aria-hidden="true">
+                      {activeIndex + 1} / {cards.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => changePreview(1)}
+                      disabled={activeIndex === cards.length - 1}
+                      className="flex h-11 items-center justify-center gap-1 rounded-xl border border-gold/30 bg-secondary px-2 text-sm font-bold disabled:opacity-40"
+                    >
+                      Próxima <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
+                    Arraste a imagem para o lado ou use as setas. Compartilhar ou salvar inclui todas as {cards.length} imagens.
+                  </p>
+                </>
               )}
             </>
+          ) : (
+            <p role="status" className="p-4 text-center text-muted-foreground">Nenhuma imagem disponível.</p>
           )}
         </div>
 
