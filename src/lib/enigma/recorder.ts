@@ -6,8 +6,9 @@ import { useSyncExternalStore } from "react";
 
 import { pickType, recordedMusicLevel, type Needs } from "./capture";
 import { fitText } from "./cards";
+import type { CountdownStep } from "./jingle";
 import { segmentAtPointer } from "./logic";
-import { audioContext, setRecordTap } from "./sound";
+import { audioContext, prefersReducedMotion, setRecordTap } from "./sound";
 import type { RecordingMode } from "./types";
 import { pointerNudge, wheelFontSize, wheelLabel } from "./wheel-visual";
 
@@ -85,6 +86,7 @@ export type RecFrame = {
   names: string[];
   rotation: number;
   spinning: boolean;
+  countdown?: { step: CountdownStep; startedAt: number } | null;
   winner: string | null;
   /** Public number of the winner in the confirmed list (E06). */
   winnerNumber?: number | null;
@@ -522,6 +524,31 @@ function paint(s: Session) {
     }
   }
 
+  if (f.countdown) {
+    const { step, startedAt } = f.countdown;
+    const elapsed = Math.max(0, performance.now() - startedAt);
+    const pulse = prefersReducedMotion() ? 0 : Math.max(0, 1 - elapsed / 260);
+    const width = step === "VALENDO!" ? 340 : 156;
+    ctx.save();
+    ctx.translate(W / 2, 660);
+    ctx.scale(1 + 0.1 * pulse, 1 + 0.1 * pulse);
+    ctx.fillStyle = c.bg;
+    ctx.strokeStyle = c.gold;
+    ctx.lineWidth = 4;
+    ctx.shadowColor = c.gold;
+    ctx.shadowBlur = 8 + 12 * pulse;
+    roundRect(ctx, -width / 2, -74, width, 148, 36);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = c.gold;
+    ctx.font = `800 ${step === "VALENDO!" ? 53 : 104}px ${DISPLAY}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(step), 0, 0, width - 30);
+    ctx.restore();
+  }
+
   const infoWidth = s.video ? 414 : W - 60;
   const infoLeft = W - 30 - infoWidth;
   const infoCenter = infoLeft + infoWidth / 2;
@@ -558,7 +585,7 @@ function paint(s: Session) {
   } else {
     ctx.fillStyle = c.muted;
     ctx.font = `800 32px ${DISPLAY}`;
-    ctx.fillText(f.spinning ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", infoCenter, 1110, infoTextWidth);
+    ctx.fillText(f.spinning ? "Girando…" : f.summary ? "Sorteio encerrado" : f.countdown ? "Contagem regressiva" : "Valendo!", infoCenter, 1110, infoTextWidth);
     ctx.font = `700 24px ${SANS}`;
     ctx.fillText(
       `${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`,

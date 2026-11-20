@@ -134,6 +134,11 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(initialCrop).toEqual([video, 0, 80, 480, 480, -111, -111, 222, 222]);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
 
+  setRecFrame({ ...frame, countdown: { step: 3, startedAt: performance.now() } });
+  vi.advanceTimersByTime(40);
+  expect(fillText).toHaveBeenCalledWith("3", 0, 0, 126);
+  expect(drawImage.mock.lastCall).toEqual(initialCrop);
+
   setRecFrame({ ...frame, spinning: true });
   setRecMotion({ rotation: 270, progress: 0.9, zoom: 1.5 });
   vi.advanceTimersByTime(900);

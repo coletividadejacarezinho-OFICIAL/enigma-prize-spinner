@@ -597,6 +597,36 @@
   flex: 1 1 0%;
 }
 
+.enigma-countdown-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  min-width: 4rem;
+  min-height: 4rem;
+  padding-inline: 0.8rem;
+  border: 2px solid var(--gold);
+  border-radius: 1.1rem;
+  background: var(--background);
+  box-shadow: 0 0 1.2rem color-mix(in oklab, var(--gold) 35%, transparent);
+  color: var(--gold);
+  font-size: 2rem;
+  font-weight: 800;
+  animation: enigma-countdown-pulse 260ms ease-out both;
+  pointer-events: none;
+}
+
+@keyframes enigma-countdown-pulse {
+  from { scale: 1.1; }
+  to { scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enigma-countdown-badge { animation: none; }
+}
+
 @keyframes enigma-hold-fill {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }

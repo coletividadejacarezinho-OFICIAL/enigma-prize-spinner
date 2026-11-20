@@ -1,5 +1,5 @@
 /** Browser-only sound. Every function is safe when the device blocks audio: it just stays silent. */
-import { BASS, MELODY, REVEAL, noteCount, spinNoteTimes } from "./jingle";
+import { BASS, MELODY, REVEAL, noteCount, spinNoteTimes, type CountdownStep } from "./jingle";
 
 let ctx: AudioContext | null = null;
 
@@ -108,6 +108,16 @@ export function startSpinTrack(durationMs: number, volume: number): () => void {
     note(a, g, MELODY[i % MELODY.length]!, t0 + t, 0.16, 0.16, "triangle");
     if (i % 4 === 0) note(a, g, BASS[(i / 4) % BASS.length]!, t0 + t, 0.3, 0.22, "sine");
   });
+  return stop;
+}
+
+/** Each countdown beat uses the same mix as the wheel music. */
+export function playCountdownCue(step: CountdownStep, volume: number): () => void {
+  const a = volume > 0 ? audio() : null;
+  if (!a) return () => undefined;
+  const { g, stop } = master(a, volume);
+  const frequency = step === "VALENDO!" ? 880 : [659.25, 587.33, 523.25][step - 1]!;
+  note(a, g, frequency, a.currentTime + 0.01, 0.19, 0.2, "triangle");
   return stop;
 }
 

@@ -30,3 +30,5 @@ export function noteCount(durationMs: number): number {
 export function clampVolume(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.7;
 }
+
+export type CountdownStep = 3 | 2 | 1 | "VALENDO!";

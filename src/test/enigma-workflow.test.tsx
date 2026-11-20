@@ -220,9 +220,10 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
   expect(screen.getByText("Rua Dois, 20")).toBeTruthy();
   expect(screen.getByText("(43) 3333-0000")).toBeTruthy();
   expect(screen.queryByText("Rua Um, 100")).toBeNull();
-  const button = screen.getByRole("button", { name: "Segure para iniciar" });
+  const startButton = () => screen.getByRole("button", { name: "Segure para iniciar" });
+  const button = startButton();
   function pointerEvent(type: string) {
-    fireEvent(button, Object.assign(new MouseEvent(type, { bubbles: true, button: 0 }), {
+    fireEvent(startButton(), Object.assign(new MouseEvent(type, { bubbles: true, button: 0 }), {
       isPrimary: true,
       pointerId: 1,
     }));
@@ -244,7 +245,22 @@ it("libera a segunda cortesia quando resta um participante elegível", async () 
     expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
 
     pointerEvent("pointerdown");
-    await act(async () => vi.advanceTimersByTime(1500));
+    act(() => vi.advanceTimersByTime(1500));
+    expect(screen.getByRole("status")).toHaveTextContent("3");
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole("status")).toHaveTextContent("2");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar início" }));
+    act(() => vi.advanceTimersByTime(4000));
+    expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+
+    pointerEvent("pointerdown");
+    act(() => vi.advanceTimersByTime(1500));
+    for (const step of ["2", "1", "VALENDO!"]) {
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByRole("status")).toHaveTextContent(step);
+      expect(currentDraw(saved()).extraPrizes?.[0]?.result).toBeUndefined();
+    }
+    await act(async () => vi.advanceTimersByTime(500));
     expect(currentDraw(saved()).extraPrizes?.[0]?.result?.winner).toBe("Bia");
   } finally {
     vi.useRealTimers();
