@@ -513,31 +513,35 @@ function Roleta() {
         )}
       </div>
 
-      <div className="wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
-        <div ref={cameraHostRef} className="enigma-live-camera" />
+      <div className={rec ? "enigma-recording-dock" : "hidden"}>
         {rec && (
-          <div className="absolute left-4 top-1 z-20">
-            <div className="flex items-center gap-1.5">
+          <div className="enigma-recording-status flex min-w-0 items-center gap-2 rounded-xl px-2">
+            <div className="min-w-0">
               <RecIndicator startedAt={rec.startedAt} />
-              <span className="rounded-full bg-nav/90 px-2 py-1 text-xs font-bold">
+              <p className="truncate text-[11px] font-semibold text-muted-foreground">
                 {rec.mode === "voz" ? "Só voz" : rec.mode === "roleta-camera" ? "Com rosto" : "Só roleta"}
                 {rec.mode !== "voz" && !rec.mic ? " · sem micro" : ""}
-              </span>
-              <button
-                onClick={() => {
-                  if (window.confirm("Cancelar a gravação? O vídeo será descartado. O resultado do sorteio continua salvo.")) {
-                    cancelRecording();
-                    toast("Gravação cancelada.");
-                  }
-                }}
-                disabled={spinning || stopping}
-                className="rounded-full bg-nav/90 px-2 py-1 text-xs font-bold text-muted-foreground underline disabled:opacity-50"
-              >
-                Cancelar
-              </button>
+              </p>
             </div>
+            <button
+              type="button"
+              aria-label="Cancelar gravação"
+              onClick={() => {
+                if (window.confirm("Cancelar a gravação? O vídeo será descartado. O resultado do sorteio continua salvo.")) {
+                  cancelRecording();
+                  toast("Gravação cancelada.");
+                }
+              }}
+              disabled={spinning || stopping}
+              className="ml-auto min-h-11 shrink-0 px-1 text-xs font-bold text-muted-foreground underline underline-offset-2 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
           </div>
         )}
+        <div ref={cameraHostRef} className="enigma-live-camera" />
+      </div>
+      <div className="wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
         <Wheel
           key={`${draw.id}-${ri}`}
           names={pool}
@@ -565,7 +569,7 @@ function Roleta() {
           className={
             showRecordButton
               ? recording
-                ? "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2"
+                ? "grid grid-cols-[minmax(0,45fr)_minmax(0,55fr)] gap-2"
                 : "grid grid-cols-[auto_minmax(0,1fr)] gap-2"
               : ""
           }
@@ -575,9 +579,9 @@ function Roleta() {
               <button
                 onClick={() => void handleEndRecording()}
                 disabled={spinning || stopping}
-                className="enigma-record-button enigma-record-button--active flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-rec bg-card px-2 text-base font-extrabold leading-tight disabled:opacity-50"
+                className="enigma-record-button enigma-record-button--active flex h-14 items-center justify-center gap-1 rounded-2xl border-2 border-rec bg-card px-1 font-extrabold leading-tight disabled:opacity-50"
               >
-                <Square className="h-4 w-4 shrink-0 fill-rec text-rec" aria-hidden="true" />
+                <Square className="h-3.5 w-3.5 shrink-0 fill-rec text-rec" aria-hidden="true" />
                 <span>{stopping ? "Encerrando…" : "Encerrar gravação"}</span>
               </button>
             ) : (

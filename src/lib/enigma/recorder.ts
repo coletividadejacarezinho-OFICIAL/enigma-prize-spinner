@@ -7,6 +7,7 @@
 import { useSyncExternalStore } from "react";
 
 import { pickType, recordedMusicLevel, type Needs } from "./capture";
+import { fitText } from "./cards";
 import { wheelEase } from "./jingle";
 import { segmentAtPointer } from "./logic";
 import { audioContext, setRecordTap } from "./sound";
@@ -518,43 +519,52 @@ function paint(s: Session) {
   }
 
   // Bottom row: winner box on the left, face on the right.
+  const infoWidth = s.video ? 414 : W - 60;
+  const infoCenter = 30 + infoWidth / 2;
+  const infoTextWidth = infoWidth - 44;
   ctx.fillStyle = c.card;
-  roundRect(ctx, 30, 1000, 450, 240, 28);
+  roundRect(ctx, 30, 1000, infoWidth, 240, 28);
   ctx.fill();
   ctx.textAlign = "center";
   if (f.winner && !f.spin) {
     ctx.strokeStyle = c.gold;
     ctx.lineWidth = 5;
-    roundRect(ctx, 30, 1000, 450, 240, 28);
+    roundRect(ctx, 30, 1000, infoWidth, 240, 28);
     ctx.stroke();
     ctx.fillStyle = c.gold;
     ctx.font = `800 28px ${SANS}`;
     ctx.fillText(
       f.winnerNumber ? `🏆 GANHADOR(A) · Nº ${f.winnerNumber}` : "🏆 GANHADOR(A)",
-      255,
+      infoCenter,
       1050,
+      infoTextWidth,
     );
     ctx.fillStyle = c.ink;
-    ctx.font = `800 46px ${DISPLAY}`;
-    const lines = wrap(ctx, f.winner, 410, 3);
-    let wy = lines.length === 1 ? 1135 : lines.length === 2 ? 1115 : 1100;
-    for (const line of lines) {
-      ctx.fillText(line, 255, wy);
-      wy += 50;
-    }
+    const { size, lines } = fitText(f.winner, infoTextWidth, 3, [46, 40, 34, 28, 22], (text, px) => {
+      ctx.font = `800 ${px}px ${DISPLAY}`;
+      return ctx.measureText(text).width;
+    });
+    const lineHeight = Math.min(size * 1.14, 136 / lines.length);
+    ctx.font = `800 ${Math.min(size, lineHeight / 1.08)}px ${DISPLAY}`;
+    ctx.textBaseline = "middle";
+    lines.forEach((line, i) =>
+      ctx.fillText(line, infoCenter, 1145 + (i - (lines.length - 1) / 2) * lineHeight, infoTextWidth),
+    );
+    ctx.textBaseline = "alphabetic";
   } else {
     ctx.fillStyle = c.muted;
     ctx.font = `800 32px ${DISPLAY}`;
-    ctx.fillText(f.spin ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", 255, 1110);
+    ctx.fillText(f.spin ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", infoCenter, 1110, infoTextWidth);
     ctx.font = `700 24px ${SANS}`;
     ctx.fillText(
       `${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`,
-      255,
+      infoCenter,
       1155,
+      infoTextWidth,
     );
   }
 
-  if (s.video) paintFace(s, s.video, ctx, 600, 1120, 100);
+  if (s.video) paintFace(s, s.video, ctx, 575, 1120, 111);
 }
 
 function paintWheel(
@@ -756,9 +766,13 @@ function paintFace(
     ctx.drawImage(video, sx, sy, side, side, -r, -r, r * 2, r * 2);
   }
   ctx.restore();
+  ctx.save();
   ctx.strokeStyle = c.gold;
-  ctx.lineWidth = 6;
+  ctx.lineWidth = 4;
+  ctx.shadowColor = c.bg;
+  ctx.shadowBlur = 12;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
 }

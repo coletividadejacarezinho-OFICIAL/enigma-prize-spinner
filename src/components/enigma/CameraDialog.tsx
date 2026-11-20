@@ -202,7 +202,7 @@ export function CameraDialog({
         {(view.kind === "asking" || view.kind === "ready") && (
           <>
             {choice.mode === "roleta-camera" && (
-              <div className="mx-auto flex aspect-square w-48 items-center justify-center overflow-hidden rounded-full border-4 border-gold bg-card">
+              <div className="enigma-camera-frame mx-auto flex aspect-square w-48 items-center justify-center">
                 {view.kind === "ready" ? (
                   <video
                     ref={videoRef}
@@ -216,6 +216,11 @@ export function CameraDialog({
                   <Loader2 className="h-8 w-8 animate-spin text-gold" aria-hidden="true" />
                 )}
               </div>
+            )}
+            {choice.mode === "roleta-camera" && view.kind === "ready" && (
+              <p className="text-center text-xs font-semibold text-muted-foreground">
+                Centralize o rosto no círculo.
+              </p>
             )}
             {view.kind === "asking" && choice.mode !== "roleta-camera" && (
               <p className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">

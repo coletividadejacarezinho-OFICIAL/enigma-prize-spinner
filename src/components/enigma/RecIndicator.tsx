@@ -10,11 +10,12 @@ export function RecIndicator({ startedAt }: { startedAt: number }) {
   }, []);
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full bg-nav/90 px-2.5 py-1 text-xs font-bold tabular-nums"
+      className="inline-flex items-center gap-1.5 text-xs font-extrabold tabular-nums"
       role="timer"
       aria-label="Tempo de gravação"
     >
-      <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rec" aria-hidden="true" />
+      <span className="h-2 w-2 rounded-full bg-rec" aria-hidden="true" />
+      Gravando
       {formatDuration(now - startedAt)}
     </span>
   );

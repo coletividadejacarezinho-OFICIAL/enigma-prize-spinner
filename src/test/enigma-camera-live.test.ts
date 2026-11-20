@@ -22,9 +22,15 @@ const frame: RecFrame = {
 };
 
 const drawImage = vi.fn();
+const fillText = vi.fn();
+const translate = vi.fn();
+const scale = vi.fn();
 const canvasContext = new Proxy(
   {
     drawImage,
+    fillText,
+    translate,
+    scale,
     measureText: (text: string) => ({ width: text.length * 10 }),
     createLinearGradient: () => ({ addColorStop: vi.fn() }),
   },
@@ -47,6 +53,9 @@ const source = () => {
 beforeEach(() => {
   vi.useFakeTimers();
   drawImage.mockClear();
+  fillText.mockClear();
+  translate.mockClear();
+  scale.mockClear();
   host = document.createElement("div");
   document.body.appendChild(host);
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
@@ -102,16 +111,30 @@ it("uses the visible camera video in the recording, through the spin and the res
   expect(video.playsInline).toBe(true);
   Object.defineProperties(video, { videoWidth: { value: 480 }, videoHeight: { value: 640 } });
 
+  vi.advanceTimersByTime(40);
+  const initialCrop = drawImage.mock.lastCall;
+  expect(initialCrop).toEqual([video, 0, 80, 480, 480, -111, -111, 222, 222]);
+  expect(translate.mock.lastCall).toEqual([575, 1120]);
+
   setRecFrame({
     ...frame,
     spin: { from: 0, to: 360, startedAt: performance.now(), durationMs: 1000, zoom: true },
   });
-  vi.advanceTimersByTime(40);
-  expect(drawImage.mock.lastCall?.[0]).toBe(video);
-  setRecFrame({ ...frame, winner: "Ana" });
+  vi.advanceTimersByTime(900);
+  expect(scale.mock.calls.some(([x, y]) => x > 1 && y === x)).toBe(true);
+  expect(drawImage.mock.lastCall).toEqual(initialCrop);
+  expect(translate.mock.lastCall).toEqual([575, 1120]);
+
+  const winner = "Maria Clara dos Santos de Almeida Pereira Rodrigues da Conceição Ferreira";
+  setRecFrame({ ...frame, winner });
+  fillText.mockClear();
   vi.advanceTimersByTime(40);
   expect(host.querySelector("video")).toBe(video);
-  expect(drawImage.mock.lastCall?.[0]).toBe(video);
+  expect(drawImage.mock.lastCall).toEqual(initialCrop);
+  expect(translate.mock.lastCall).toEqual([575, 1120]);
+  const nameLines = fillText.mock.calls.filter(([, x, y]) => x === 237 && y > 1050);
+  expect(nameLines.map(([line]) => line).join(" ")).toBe(winner);
+  expect(nameLines.every(([, x, , width]) => x + width / 2 < 575 - 111)).toBe(true);
 
   await stopRecording();
   expect(host.childElementCount).toBe(0);
