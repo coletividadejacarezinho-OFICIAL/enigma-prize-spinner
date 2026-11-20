@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, Loader2, Mic, MicOff, RotateCcw } from "lucide-react";
+import { AlertTriangle, Camera, Disc3, Loader2, Mic, MicOff, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { GoldButton, SecondaryButton } from "./GoldButton";
@@ -102,7 +102,7 @@ export function CameraDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
+      <DialogContent className="enigma-camera-dialog max-h-[92dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Gravar comigo</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -116,19 +116,32 @@ export function CameraDialog({
 
         {view.kind === "choose" && (
           <>
-            <div role="radiogroup" aria-label="Modo de gravação" className="space-y-2">
+            <div role="radiogroup" aria-label="Modo de gravação" className="enigma-capture-modes space-y-2">
               {MODE_ORDER.map((m) => (
                 <button
                   key={m}
                   role="radio"
                   aria-checked={choice.mode === m}
                   onClick={() => setChoice((c) => ({ mode: m, mic: m === "voz" ? true : c.mic }))}
-                  className={`w-full rounded-2xl border-2 p-3 text-left ${
+                  className={`enigma-capture-option w-full rounded-2xl border-2 p-3 text-left ${
                     choice.mode === m ? "border-gold bg-card" : "border-border bg-secondary"
                   }`}
                 >
-                  <span className="block text-lg font-extrabold">{label(m)}</span>
-                  <span className="block text-sm text-muted-foreground">{HELP[m]}</span>
+                  <span className="flex min-w-0 items-start gap-3">
+                    <span className="enigma-capture-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
+                      {m === "roleta-camera" ? (
+                        <Camera className="h-5 w-5 text-gold" />
+                      ) : m === "roleta-voz" ? (
+                        <Disc3 className="h-5 w-5 text-gold" />
+                      ) : (
+                        <Mic className="h-5 w-5 text-gold" />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-lg font-extrabold leading-tight">{label(m)}</span>
+                      <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">{HELP[m]}</span>
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -137,7 +150,7 @@ export function CameraDialog({
                 role="switch"
                 aria-checked={choice.mic}
                 onClick={() => setChoice((c) => ({ ...c, mic: !c.mic }))}
-                className="flex h-12 w-full items-center justify-between rounded-xl bg-secondary px-3 font-bold"
+                className="enigma-capture-mic flex h-12 w-full items-center justify-between rounded-xl bg-secondary px-3 font-bold"
               >
                 <span className="flex items-center gap-2">
                   {choice.mic ? (
@@ -153,7 +166,7 @@ export function CameraDialog({
               </button>
             )}
             <GoldButton onClick={() => void ask(choice)}>Continuar</GoldButton>
-            <SecondaryButton onClick={onClose}>Cancelar</SecondaryButton>
+            <SecondaryButton onClick={onClose} className="enigma-capture-cancel">Cancelar</SecondaryButton>
           </>
         )}
 
