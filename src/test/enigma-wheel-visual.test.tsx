@@ -68,6 +68,27 @@ it("shows longer names where the wheel has space, without changing the original"
   expect(full).toBe("Mariana Marcial Barbosa de Almeida");
 });
 
+it("keeps the gold rim visible and the zoom focus clear of the wheel hub", () => {
+  const { container } = render(<Wheel names={names.slice(0, 75)} rotation={0} />);
+  const halo = container.querySelector(".wheel-stage-halo");
+  const rim = container.querySelector(".wheel-rim");
+  const bulbs = container.querySelector(".wheel-bulb-track");
+  const disc = container.querySelector('svg[aria-label="Roleta"]')?.parentElement;
+  const pointerAura = container.querySelector(".wheel-pointer-aura");
+  const focus = container.querySelector<HTMLDivElement>(".wheel-focus");
+
+  expect(halo?.getAttribute("aria-hidden")).toBe("true");
+  expect(rim).toBeTruthy();
+  expect(bulbs?.classList.contains("z-[2]")).toBe(true);
+  expect(disc?.classList.contains("z-0")).toBe(true);
+  expect(bulbs?.querySelectorAll(".wheel-bulb")).toHaveLength(24);
+  expect(pointerAura?.getAttribute("aria-hidden")).toBe("true");
+  expect(focus?.hidden).toBe(true);
+  expect(focus?.classList.contains("top-[72%]")).toBe(true);
+  expect(focus?.classList.contains("truncate")).toBe(false);
+  expect(focus?.classList.contains("z-20")).toBe(true);
+});
+
 it("zooms late, keeps the pointer fixed and displays the saved name at the end of the spin", () => {
   let frame: FrameRequestCallback = () => {};
   vi.spyOn(performance, "now").mockReturnValue(0);
