@@ -490,13 +490,25 @@ function paint(s: Session) {
     paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, !!spin, !!spin && progress < 1, !!f.winner || (!!spin && progress >= 1));
     const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
     if (focus) {
-      ctx.fillStyle = c.bg;
-      roundRect(ctx, 56, 918, W - 112, 50, 25);
-      ctx.fill();
+      // Match the interface's raised zoom label, clear of the wheel hub.
+      ctx.save();
       ctx.textAlign = "center";
-      ctx.fillStyle = c.ink;
       ctx.font = `800 27px ${DISPLAY}`;
-      ctx.fillText(focus, W / 2, 952, W - 152);
+      const lines = wrap(ctx, focus, W - 164, 2);
+      const h = lines.length > 1 ? 92 : 62;
+      const top = 805;
+      ctx.fillStyle = c.bg;
+      ctx.shadowColor = c.goldDeep;
+      ctx.shadowBlur = 12;
+      roundRect(ctx, 56, top, W - 112, h, 25);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = c.gold;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = c.ink;
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, top + 40 + i * 30, W - 164));
+      ctx.restore();
     }
   }
 
