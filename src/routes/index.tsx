@@ -243,11 +243,16 @@ function Roleta() {
     winnerNumber: showResult ? resultNumber : null,
     summary:
       summaryOpen && done
-        ? rounds.map((r) => ({
-            prize: r.prize,
-            merchant: r.merchantName,
-            winner: r.result?.winner ?? "",
-          }))
+        ? rounds.map((r) => {
+            // Same public number as the summary window and the winner art.
+            const number = winnerNumber(draw, r.result);
+            return {
+              prize: r.prize,
+              merchant: r.merchantName,
+              winner: r.result?.winner ?? "",
+              ...(number !== null ? { number } : {}),
+            };
+          })
         : null,
   };
 

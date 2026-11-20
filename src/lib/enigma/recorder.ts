@@ -88,7 +88,7 @@ export type RecFrame = {
   winner: string | null;
   /** Public number of the winner in the confirmed list (E06). */
   winnerNumber?: number | null;
-  summary: { prize: string; merchant: string; winner: string }[] | null;
+  summary: { prize: string; merchant: string; winner: string; number?: number }[] | null;
 };
 
 type WheelMotion = { rotation: number; zoom: number; progress: number };
@@ -769,7 +769,7 @@ function paintWheel(
 function paintSummary(
   ctx: CanvasRenderingContext2D,
   c: Palette,
-  rows: { prize: string; merchant: string; winner: string }[],
+  rows: { prize: string; merchant: string; winner: string; number?: number }[],
 ) {
   ctx.fillStyle = c.card;
   roundRect(ctx, 30, 340, W - 60, 630, 28);
@@ -791,7 +791,8 @@ function paintSummary(
     );
     ctx.fillStyle = c.ink;
     ctx.font = `800 ${Math.min(40, rowH / 3)}px ${DISPLAY}`;
-    ctx.fillText(wrap(ctx, `🎉 ${row.winner}`, W - 120, 1)[0] ?? "", 60, y + rowH * 0.7);
+    const label = row.number !== undefined ? `Nº ${row.number} · ${row.winner}` : row.winner;
+    ctx.fillText(wrap(ctx, `🎉 ${label}`, W - 120, 1)[0] ?? "", 60, y + rowH * 0.7);
   });
 }
 

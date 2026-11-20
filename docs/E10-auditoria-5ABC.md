@@ -17,5 +17,9 @@
 - Aviso "Versão nova do aplicativo · Atualizar" e cartão "Versão do aplicativo" em Ajustes (mostra a versão do aparelho e procura atualização).
 - Setas/arrastar passam de uma arte para a outra; a aba escolhida rola para ficar visível.
 
-## Observação
-- Durante uma gravação o resumo aparece desenhado no vídeo (estilo da gravação), não na janela da 5A. Não foi alterado.
+## Outras telas conferidas
+- Roleta (janela de resumo e artes): corrigida e testada.
+- Sorteio salvo (Sorteios → abrir sorteio): ganhou a linha "Todas as N cortesias sorteadas" e logos inteiras; artes com as mesmas setas.
+- Resumo desenhado na gravação: agora mostra o número público de cada ganhador (Nº X), como a janela e as artes.
+- Lista de nomes, Listão e artes da rodada: usam a mesma prévia; as setas aparecem quando a arte tem várias imagens.
+- Aviso de versão nova: aparece em todas as telas, inclusive Abertura, Recuperação de dados e Primeiro uso.
