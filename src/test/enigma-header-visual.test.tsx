@@ -17,6 +17,7 @@ it("highlights the registered group logo and participant count only on the wheel
   expect(container.querySelector(".enigma-brand-header")).toBeTruthy();
   expect(container.querySelector(".enigma-brand-count")).toBeTruthy();
   expect(screen.getByAltText("Logo do grupo").getAttribute("src")).toBe(logo);
+  expect(screen.getByAltText("Logo do grupo").classList.contains("object-contain")).toBe(true);
 });
 
 it("keeps the original compact header on other screens", () => {
@@ -41,6 +42,7 @@ it("preserves the exact merchant logo and prize while distinguishing courtesy 4 
   );
 
   expect(screen.getByAltText("Logo do comércio").getAttribute("src")).toBe(logo);
+  expect(screen.getByAltText("Logo do comércio").classList.contains("object-contain")).toBe(true);
   expect(screen.getByText("Curto Burguer")).toBeTruthy();
   expect(screen.getByText("Prêmio 4 de 7")).toBeTruthy();
   expect(screen.getByTestId("prize-label").textContent).toBe("Combo especial com acompanhamentos");
