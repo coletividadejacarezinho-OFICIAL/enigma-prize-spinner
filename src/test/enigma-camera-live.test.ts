@@ -130,6 +130,8 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   const text = fillText.mock.calls.map(([line]) => line).join(" ");
   expect(text).toContain(frame.address);
   expect(text).toContain(frame.phone);
+  expect(fillText).toHaveBeenCalledWith("Sorteio prestes a começar", 483, 1110, 370);
+  expect(fillText).toHaveBeenCalledWith(frame.phone, 656, 266);
   const video = host.querySelector("video")!;
   expect(video.srcObject).toBe(stream);
   expect(video.muted).toBe(true);
@@ -167,6 +169,7 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   setRecFrame({
     ...frame,
     winner,
+    winnerNumber: 21,
     winnerIndex: 0,
     rotation: 270,
     celebrationAt: performance.now() - 200,
@@ -178,6 +181,7 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
   expect(arc).toHaveBeenCalledWith(360, 660, 300, Math.PI, Math.PI * 2);
+  expect(fillText).toHaveBeenCalledWith("Nº 21", expect.any(Number), 1050);
   const nameLines = fillText.mock.calls.filter(([, x, y]) => x === 483 && y > 1050);
   expect(nameLines.map(([line]) => line).join(" ")).toBe(winner);
   expect(nameLines.every(([, x, , width]) => x - width / 2 > 145 + 111)).toBe(true);
