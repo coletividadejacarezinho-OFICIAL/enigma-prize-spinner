@@ -211,6 +211,8 @@ export type StartOptions = {
   mic: boolean;
   stream: MediaStream | null;
   drawId: string;
+  /** Optional on-screen host for the same video element used by the recorder. */
+  cameraHost?: HTMLElement | null;
   frame: RecFrame;
   sound: boolean;
   volume: number;
@@ -240,27 +242,13 @@ export function startRecording(o: StartOptions): boolean {
       mix.end();
       return false;
     }
-    if (o.mode === "roleta-camera" && o.stream?.getVideoTracks().length) {
-      // The face preview has to be in the page for some phones to keep decoding it.
-      video = document.createElement("video");
-      video.muted = true;
-      video.playsInline = true;
-      video.setAttribute("playsinline", "");
-      video.srcObject = o.stream;
-      Object.assign(video.style, {
-        position: "fixed",
-        width: "2px",
-        height: "2px",
-        opacity: "0",
-        pointerEvents: "none",
-        left: "0",
-        top: "0",
-      });
-      document.body.appendChild(video);
-      void video.play().catch(() => undefined);
+    try {
+      out = canvas.captureStream(30);
+      mix.tracks.forEach((t) => out.addTrack(t));
+    } catch {
+      mix.end();
+      return false;
     }
-    out = canvas.captureStream(30);
-    mix.tracks.forEach((t) => out.addTrack(t));
   }
   let recorder: MediaRecorder;
   try {
@@ -268,9 +256,25 @@ export function startRecording(o: StartOptions): boolean {
     if (!audioOnly) opts.videoBitsPerSecond = 2_500_000;
     recorder = new MediaRecorder(out, opts);
   } catch {
-    video?.remove();
     mix.end();
     return false;
+  }
+  if (o.mode === "roleta-camera" && o.stream?.getVideoTracks().length) {
+    video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = o.stream;
+    video.setAttribute("aria-label", "Câmera ao vivo");
+    // The live view and the saved canvas share a single decoder and camera stream.
+    if (o.cameraHost) o.cameraHost.appendChild(video);
+    else {
+      Object.assign(video.style, {
+        position: "fixed", width: "2px", height: "2px", opacity: "0",
+        pointerEvents: "none", left: "0", top: "0",
+      });
+      document.body.appendChild(video);
+    }
+    void video.play().catch(() => undefined);
   }
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {
@@ -293,16 +297,14 @@ export function startRecording(o: StartOptions): boolean {
     timer: null,
     mixEnd: mix.end,
   };
-  if (ctx) {
-    s.timer = setInterval(() => paint(s), 1000 / 30);
-    paint(s);
-  }
   try {
+    paint(s);
     recorder.start(1000);
   } catch {
     release(s);
     return false;
   }
+  if (ctx) s.timer = setInterval(() => paint(s), 1000 / 30);
   session = s;
   snapshot = { drawId: o.drawId, startedAt: s.startedAt, mode: o.mode, mic: o.mic };
   emit();
@@ -317,11 +319,14 @@ export function isRecording(): boolean {
   return session !== null;
 }
 
-/** Frees the camera and microphone, the hidden face video and the audio mix. */
+/** Frees the camera and microphone, the live preview and the audio mix. */
 function release(s: Session) {
   if (s.timer) clearInterval(s.timer);
   stopStream(s.stream);
-  s.video?.remove();
+  if (s.video) {
+    s.video.srcObject = null;
+    s.video.remove();
+  }
   s.mixEnd();
 }
 
