@@ -201,6 +201,7 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
     ...frame,
     winner,
     winnerNumber: 21,
+    roundLabel: "Prêmio 7 de 11",
     winnerIndex: 0,
     rotation: 270,
     celebrationAt: performance.now() - 200,
@@ -212,10 +213,15 @@ it("records the visible canvas with sponsor contacts, the same spin motion and t
   expect(drawImage.mock.lastCall).toEqual(initialCrop);
   expect(translate.mock.lastCall).toEqual([145, 1120]);
   expect(arc).toHaveBeenCalledWith(360, 660, 300, Math.PI, Math.PI * 2);
-  expect(fillText).toHaveBeenCalledWith("Nº 21", expect.any(Number), 1050);
-  const nameLines = fillText.mock.calls.filter(([, x, y]) => x === 483 && y > 1050);
-  expect(nameLines.map(([line]) => line).join(" ")).toBe(winner);
-  expect(nameLines.every(([, x, , width]) => x - width / 2 > 145 + 111)).toBe(true);
+  const centered = fillText.mock.calls.filter(([, x, , width]) => x === 360 && width === 456);
+  expect(centered.slice(0, 3).map(([line]) => line)).toEqual(["GANHADOR(A)", "Prêmio 7 de 11", "Nº 21"]);
+  const courtesy = centered.findIndex(([line]) => line === "CORTESIA");
+  expect(centered.slice(3, courtesy).map(([line]) => line).join(" ")).toBe(winner);
+  expect(centered.slice(courtesy).map(([line]) => line)).toEqual([
+    "CORTESIA", frame.prize, "Oferecimento", frame.merchant,
+  ]);
+  expect(centered.every(([, , y]) => y > 344 && y < 976)).toBe(true);
+  expect(fillText).not.toHaveBeenCalledWith(winner, 483, expect.any(Number), expect.any(Number));
   expect(rect).toHaveBeenCalledWith(44, 344, 632, 632);
   expect(bezierCurveTo).toHaveBeenCalled();
   vi.advanceTimersByTime(1800);
@@ -360,8 +366,8 @@ it("keeps rendering the countdown and result if the camera loses a frame", () =>
   setRecFrame({ ...frame, winner: "Ana", winnerNumber: 1 });
   fillText.mockClear();
   vi.advanceTimersByTime(33);
-  expect(fillText).toHaveBeenCalledWith("Nº 1", expect.any(Number), 1050);
-  expect(fillText).toHaveBeenCalledWith("Ana", 483, 1145, 370);
+  expect(fillText).toHaveBeenCalledWith("Nº 1", 360, expect.any(Number), 456);
+  expect(fillText).toHaveBeenCalledWith("Ana", 360, expect.any(Number), 456);
   expect(fillText).not.toHaveBeenCalledWith("Câmera sem imagem", expect.any(Number), expect.any(Number), expect.any(Number));
   expect(publishFrame).toHaveBeenCalledTimes(2);
 });
