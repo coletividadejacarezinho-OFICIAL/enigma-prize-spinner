@@ -24,6 +24,7 @@ import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { SponsorCard } from "@/components/enigma/SponsorCard";
+import { SummaryResultsDialog } from "@/components/enigma/SummaryResultsDialog";
 import { WinnerAnnouncement } from "@/components/enigma/WinnerAnnouncement";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
 import { ImageButton } from "@/components/enigma/ImageShare";
@@ -733,49 +734,21 @@ function Roleta() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!videoRecording && summaryOpen && done && !spinning} onOpenChange={setSummaryOpen}>
-        <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto rounded-2xl border-border bg-background p-4 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Resumo do sorteio</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {formatDateBR(draw.date)} · {total} cortesias
-            </DialogDescription>
-          </DialogHeader>
-          <ol className="space-y-2" data-testid="summary">
-            {rounds.map((r) => (
-              <li key={r.index} className="rounded-2xl bg-card p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Prêmio {r.index + 1} · {r.merchantName}
-                </p>
-                <p className="font-display font-bold text-gold">{r.prize}</p>
-                <p className="mt-1 flex items-center gap-1.5 font-display text-xl font-extrabold">
-                  <Trophy className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />{" "}
-                  {winnerNumber(draw, r.result) !== null && (
-                    <span className="text-gold">Nº {winnerNumber(draw, r.result)}</span>
-                  )}
-                  {r.result?.winner}
-                </p>
-              </li>
-            ))}
-          </ol>
-          <GoldButton
-            className="px-3 text-lg"
-            onClick={() => {
-              setSummaryOpen(false);
-              setShareOpen(true);
-            }}
-          >
-            <MessageCircle aria-hidden="true" /> Compartilhar no WhatsApp
-          </GoldButton>
-          <ImageButton
-            label="Compartilhar arte do ganhador"
-            onClick={() => {
-              setSummaryOpen(false);
-              setArt("resumo");
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      <SummaryResultsDialog
+        open={!videoRecording && summaryOpen && done && !spinning}
+        onClose={() => setSummaryOpen(false)}
+        date={formatDateBR(draw.date)}
+        draw={draw}
+        rounds={rounds}
+        onShareText={() => {
+          setSummaryOpen(false);
+          setShareOpen(true);
+        }}
+        onShareArt={() => {
+          setSummaryOpen(false);
+          setArt("resumo");
+        }}
+      />
 
       <ResultShareDialog
         text={shareOpen ? message : null}
