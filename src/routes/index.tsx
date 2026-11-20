@@ -21,7 +21,7 @@ import { AppHeader } from "@/components/enigma/AppHeader";
 import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
-import { MerchantLogo } from "@/components/enigma/Logos";
+import { SponsorCard } from "@/components/enigma/SponsorCard";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
 import { ImageButton } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
@@ -74,7 +74,6 @@ import {
   needsRepeatAnswer,
   poolFor,
   roundIdOf,
-  roundLabel,
   roundsOf,
   shownRound,
   withRoundResult,
@@ -446,22 +445,16 @@ function Roleta() {
       <AppHeader
         logo={state.groupLogo}
         subtitle={`${count} ${count === 1 ? "participante" : "participantes"}`}
+        premium
       />
 
-      <section className="mx-4 flex items-center gap-3 rounded-2xl bg-card p-3">
-        <MerchantLogo src={round.merchantLogo} className="h-12 w-12" />
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-muted-foreground">
-            Oferecimento: <span className="font-bold text-foreground">{round.merchantName}</span>
-          </p>
-          <p
-            className="font-display text-lg font-bold leading-snug text-gold"
-            data-testid="prize-label"
-          >
-            {multi ? roundLabel(ri, total, round.prize) : round.prize}
-          </p>
-        </div>
-      </section>
+      <SponsorCard
+        logo={round.merchantLogo}
+        merchantName={round.merchantName}
+        prize={round.prize}
+        roundIndex={ri}
+        roundTotal={total}
+      />
 
       <div className="mt-1 flex min-h-9 flex-wrap items-center justify-end gap-1.5 px-4 text-xs text-muted-foreground">
         <p className="mr-auto flex min-h-9 min-w-0 items-center gap-1.5">
