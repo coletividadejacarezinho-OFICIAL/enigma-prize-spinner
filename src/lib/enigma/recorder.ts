@@ -109,6 +109,7 @@ const H = 1280;
 const WHEEL_Y = 660;
 const WHEEL_RADIUS = 300;
 const WHEEL_BEZEL = 16;
+const LABEL_SCALE = 2;
 const COURTESY_INTRO_MS = 1250;
 const SUMMARY_ROWS_PER_PAGE = 6;
 const SUMMARY_PAGE_MS = 5500;
@@ -119,6 +120,7 @@ type Session = {
   canvas: HTMLCanvasElement | null;
   canvasTracks: MediaStreamTrack[];
   picture: { stage: CanvasRenderingContext2D; output: CanvasRenderingContext2D } | null;
+  wheelLabels: { names: string[]; fontReady: boolean; canvas: HTMLCanvasElement } | null;
   video: HTMLVideoElement | null;
   stream: MediaStream | null;
   recorder: MediaRecorder;
@@ -314,6 +316,7 @@ export function startRecording(o: StartOptions): boolean {
     canvas,
     canvasTracks: canvas ? out.getVideoTracks() : [],
     picture,
+    wheelLabels: null,
     video,
     stream: o.stream,
     recorder,
@@ -567,7 +570,7 @@ function paintScene(s: Session, ctx: CanvasRenderingContext2D) {
     const zoom = motion?.zoom ?? 1;
     const winnerVisible = !!f.winner || landed;
     paintWheel(
-      ctx, c, f.names, rotation, W / 2, WHEEL_Y, WHEEL_RADIUS, zoom, motion?.pointerTilt ?? 0,
+      ctx, c, f.names, wheelLabels(s), rotation, zoom, motion?.pointerTilt ?? 0,
       winnerVisible, winnerVisible ? f.winnerIndex : undefined, reducedMotion,
     );
     if (f.winner && celebrationMs !== undefined) {
@@ -895,14 +898,57 @@ function paintSponsor(
   ctx.restore();
 }
 
+function wheelLabels(s: Session): HTMLCanvasElement | null {
+  const { names } = s.frame;
+  if (names.length === 0) return null;
+  const font = wheelLabelFont(names.length);
+  const fontReady = document.fonts?.check(font) ?? true;
+  const cached = s.wheelLabels;
+  if (cached && cached.fontReady === fontReady && cached.names.length === names.length &&
+      names.every((name, index) => name === cached.names[index])) return cached.canvas;
+
+  // Rasterize the names before the animated transform so zoom can reuse the same pixels.
+  const diameter = 2 * WHEEL_RADIUS;
+  const canvas = document.createElement("canvas");
+  canvas.width = diameter * LABEL_SCALE;
+  canvas.height = diameter * LABEL_SCALE;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.scale(LABEL_SCALE, LABEL_SCALE);
+  ctx.translate(WHEEL_RADIUS, WHEEL_RADIUS);
+  paintWheelLabels(ctx, s.colors, names);
+  s.wheelLabels = { names: [...names], fontReady, canvas };
+  return canvas;
+}
+
+function wheelLabelFont(count: number) {
+  return `800 ${wheelFontSize(count) * (WHEEL_RADIUS / 100)}px ${SANS}`;
+}
+
+function paintWheelLabels(ctx: CanvasRenderingContext2D, c: Palette, names: string[]) {
+  const count = names.length;
+  ctx.font = wheelLabelFont(count);
+  ctx.textBaseline = "middle";
+  names.forEach((name, i) => {
+    if (!name) return;
+    const center = count === 1 ? 0 : (i + 0.5) * 360 / count;
+    const color = colorIndex(i, count);
+    const flip = center > 180;
+    ctx.save();
+    ctx.rotate((-90 + center + (flip ? 180 : 0)) * Math.PI / 180);
+    ctx.fillStyle = count > 1 && (color === 1 || color === 4) ? c.inkDark : c.ink;
+    ctx.textAlign = flip ? "left" : "right";
+    ctx.fillText(wheelLabel(name, count), (flip ? -1 : 1) * WHEEL_RADIUS * 0.88, 0);
+    ctx.restore();
+  });
+}
+
 function paintWheel(
   ctx: CanvasRenderingContext2D,
   c: Palette,
   names: string[],
+  labels: HTMLCanvasElement | null,
   rotation: number,
-  cx: number,
-  cy: number,
-  r: number,
   zoom: number,
   pointerTilt: number,
   pointerHighlighted: boolean,
@@ -910,6 +956,9 @@ function paintWheel(
   steadyLamps: boolean,
 ) {
   const count = names.length;
+  const cx = W / 2;
+  const cy = WHEEL_Y;
+  const r = WHEEL_RADIUS;
   ctx.save();
   if (zoom > 1) {
     const top = cy - r - WHEEL_BEZEL;
@@ -985,30 +1034,12 @@ function paintWheel(
     ctx.restore();
   }
   if (count > 0) {
-    const size = wheelFontSize(count) * (r / 100);
-    ctx.font = `800 ${size}px ${SANS}`;
-    ctx.textBaseline = "middle";
-    names.forEach((name, i) => {
-      if (!name) return;
-      const center = count === 1 ? 0 : (i + 0.5) * seg;
-      const light = count > 1 && (colorIndex(i, count) === 1 || colorIndex(i, count) === 4);
-      const flip = center > 180;
-      const label = wheelLabel(name, count);
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rad(-90 + center + rotation));
-      ctx.fillStyle = light ? c.inkDark : c.ink;
-      if (flip) {
-        ctx.rotate(Math.PI);
-        ctx.textAlign = "left";
-        ctx.fillText(label, -r * 0.88, 0);
-      } else {
-        ctx.textAlign = "right";
-        ctx.fillText(label, r * 0.88, 0);
-      }
-      ctx.restore();
-    });
-    ctx.textBaseline = "alphabetic";
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rad(rotation));
+    if (labels) ctx.drawImage(labels, -r, -r, 2 * r, 2 * r);
+    else paintWheelLabels(ctx, c, names);
+    ctx.restore();
   }
   // Hub and pointer
   ctx.fillStyle = c.gold;
