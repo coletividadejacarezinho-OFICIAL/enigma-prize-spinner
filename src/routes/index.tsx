@@ -441,8 +441,8 @@ function Roleta() {
     <div
       className={
         full
-          ? "flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-          : "flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col"
+          ? "enigma-roleta-screen flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+          : "enigma-roleta-screen flex h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom)_-_env(safe-area-inset-top))] flex-col"
       }
     >
       <AppHeader
@@ -500,7 +500,7 @@ function Roleta() {
         )}
       </div>
 
-      <div className="wheel-box relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
+      <div className="wheel-box enigma-roleta-stage relative flex min-h-0 flex-1 items-center justify-center px-4 pb-2 pt-4">
         {rec && (
           <div className="absolute left-4 top-1 z-20">
             <div className="flex items-center gap-1.5">
