@@ -10,6 +10,7 @@ import { SoundCard } from "@/components/enigma/SoundCard";
 import { BotTestCard } from "@/components/enigma/BotTestCard";
 import { GoldButton } from "@/components/enigma/GoldButton";
 import { InstallCard } from "@/components/enigma/InstallCard";
+import { VersionCard } from "@/components/enigma/VersionCard";
 import { GroupLogo } from "@/components/enigma/Logos";
 import { fileToSmallDataUrl } from "@/lib/enigma/image";
 import { report } from "@/lib/enigma/feedback";
@@ -119,6 +120,8 @@ function Ajustes() {
         <RestoreCard />
 
         <InstallCard />
+
+        <VersionCard />
 
         <p className="flex items-start gap-2 px-1 text-sm text-muted-foreground">
           <Smartphone className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

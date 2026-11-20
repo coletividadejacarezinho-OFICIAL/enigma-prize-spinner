@@ -87,9 +87,29 @@ export function ImageShareDialog({
   const many = (cards?.length ?? 0) > 1;
   const activeIndex = Math.min(previewIndex, Math.max(0, (cards?.length ?? 1) - 1));
   const activeCard = cards?.[activeIndex];
+  // Several arts (Resumo, Prêmio 1, 2…): the arrows and swipe also step from one art to the next.
+  const artList = choices && choices.length > 1 ? choices : [];
+  const artIndex = artList.findIndex((c) => c.id === choice);
+  const browseArts = artIndex >= 0 && !!onChoice;
+  const imageCount = cards?.length ?? 0;
+  const canPrev = activeIndex > 0 || (browseArts && artIndex > 0);
+  const canNext = activeIndex < imageCount - 1 || (browseArts && artIndex < artList.length - 1);
+  const showNav = many || browseArts;
   const changePreview = (step: -1 | 1) => {
-    setPreviewIndex((current) => Math.max(0, Math.min(current + step, (cards?.length ?? 1) - 1)));
+    const nextImage = activeIndex + step;
+    if (nextImage >= 0 && nextImage < imageCount) {
+      setPreviewIndex(nextImage);
+      return;
+    }
+    const nextArt = browseArts ? artList[artIndex + step] : undefined;
+    if (nextArt) onChoice?.(nextArt.id);
   };
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  useEffect(() => {
+    if (!open || !choice) return;
+    // Keeps the chosen art's button visible on narrow phones.
+    tabRefs.current.get(choice)?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }, [open, choice]);
 
   const share = async () => {
     if (!shareable) return setStatus("fallback");
@@ -131,6 +151,10 @@ export function ImageShareDialog({
             {choices.map((c) => (
               <button
                 key={c.id}
+                ref={(el) => {
+                  if (el) tabRefs.current.set(c.id, el);
+                  else tabRefs.current.delete(c.id);
+                }}
                 role="tab"
                 aria-selected={c.id === choice}
                 onClick={() => onChoice?.(c.id)}
@@ -156,12 +180,16 @@ export function ImageShareDialog({
             </p>
           ) : activeCard ? (
             <>
-              {many && (
+              {showNav && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-background/70 px-3 py-2">
                   <span className="text-sm font-extrabold text-gold" role="status" aria-live="polite">
-                    Imagem {activeIndex + 1} de {cards.length}
+                    {many
+                      ? `Imagem ${activeIndex + 1} de ${cards.length}`
+                      : `Arte ${artIndex + 1} de ${artList.length}`}
                   </span>
-                  <span className="text-xs font-bold text-muted-foreground">Prévia</span>
+                  <span className="min-w-0 truncate text-xs font-bold text-muted-foreground">
+                    {browseArts ? artList[artIndex]?.label : "Prévia"}
+                  </span>
                 </div>
               )}
               <div
@@ -176,7 +204,7 @@ export function ImageShareDialog({
                   const start = touchStartRef.current;
                   touchStartRef.current = null;
                   const end = event.changedTouches[0];
-                  if (!many || !start || !end) return;
+                  if (!showNav || !start || !end) return;
                   const dx = end.clientX - start.x;
                   const dy = end.clientY - start.y;
                   if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
@@ -192,31 +220,33 @@ export function ImageShareDialog({
                   className="mx-auto block h-[44dvh] w-auto max-w-full rounded-xl object-contain"
                 />
               </div>
-              {many && (
+              {showNav && (
                 <>
                   <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                     <button
                       type="button"
                       onClick={() => changePreview(-1)}
-                      disabled={activeIndex === 0}
+                      disabled={!canPrev}
                       className="flex h-11 items-center justify-center gap-1 rounded-xl border border-gold/30 bg-secondary px-2 text-sm font-bold disabled:opacity-40"
                     >
                       <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Anterior
                     </button>
                     <span className="text-xs font-extrabold tabular-nums text-gold" aria-hidden="true">
-                      {activeIndex + 1} / {cards.length}
+                      {many ? `${activeIndex + 1} / ${cards.length}` : `${artIndex + 1} / ${artList.length}`}
                     </span>
                     <button
                       type="button"
                       onClick={() => changePreview(1)}
-                      disabled={activeIndex === cards.length - 1}
+                      disabled={!canNext}
                       className="flex h-11 items-center justify-center gap-1 rounded-xl border border-gold/30 bg-secondary px-2 text-sm font-bold disabled:opacity-40"
                     >
                       Próxima <ChevronRight className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                   <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
-                    Arraste a imagem para o lado ou use as setas. Compartilhar ou salvar inclui todas as {cards.length} imagens.
+                    {many
+                      ? `Arraste a imagem para o lado ou use as setas. Compartilhar ou salvar inclui todas as ${cards.length} imagens.`
+                      : "Arraste a imagem para o lado ou use as setas para ver cada arte. Compartilhar ou salvar envia só a arte que está na tela."}
                   </p>
                 </>
               )}

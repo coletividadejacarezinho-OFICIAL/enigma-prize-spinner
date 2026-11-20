@@ -17,6 +17,7 @@ import { BottomNav } from "../components/enigma/BottomNav";
 import { DataRecovery } from "../components/enigma/DataRecovery";
 import { FirstRun, Opening } from "../components/enigma/FirstRun";
 import { OfflineNotice } from "../components/enigma/OfflineNotice";
+import { UpdateNotice } from "../components/enigma/UpdateNotice";
 import { useSnapshot } from "../lib/enigma/repo";
 import { initInstallPrompt } from "../lib/enigma/install";
 import { settleOnOpen } from "../lib/enigma/restore-import";
@@ -216,6 +217,7 @@ function RootComponent() {
           <Outlet />
         )}
         <OfflineNotice />
+        <UpdateNotice />
       </div>
       {recovery === "ready" && !isViewerPage && !presenting && store !== null && !broken && <BottomNav />}
       <Toaster

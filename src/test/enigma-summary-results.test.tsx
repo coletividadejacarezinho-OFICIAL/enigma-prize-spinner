@@ -107,7 +107,7 @@ it("holds eight courtesies in a scrollable list while keeping share controls out
 
 it("does not claim unfinished rounds have winners or offer final sharing", () => {
   const draw = completedDraw(2);
-  const unfinished = { ...draw, extraPrizes: draw.extraPrizes?.map(({ result: _result, ...prize }) => prize) };
+  const unfinished = { ...draw, extraPrizes: (draw.extraPrizes ?? []).map(({ result: _result, ...prize }) => prize) };
   render(
     <SummaryResultsDialog
       open
