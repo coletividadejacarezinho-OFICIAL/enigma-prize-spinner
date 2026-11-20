@@ -24,6 +24,7 @@ import { CameraDialog } from "@/components/enigma/CameraDialog";
 import { GoldButton, SecondaryButton } from "@/components/enigma/GoldButton";
 import { InviteDialog } from "@/components/enigma/InviteDialog";
 import { SponsorCard } from "@/components/enigma/SponsorCard";
+import { WinnerAnnouncement } from "@/components/enigma/WinnerAnnouncement";
 import { RecIndicator } from "@/components/enigma/RecIndicator";
 import { ImageButton } from "@/components/enigma/ImageShare";
 import { ResultShareDialog } from "@/components/enigma/ResultShare";
@@ -534,30 +535,14 @@ function Roleta() {
           onSpinEnd={handleSpinEnd}
         />
         {showResult && result && (
-          <div className="absolute inset-0 flex items-center justify-center px-6">
-            <div
-              className="w-full max-w-xs rounded-3xl border-2 border-gold bg-background/90 p-5 text-center shadow-2xl backdrop-blur-sm animate-in fade-in zoom-in-90 duration-500"
-              role="status"
-            >
-              <p className="flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wide text-gold">
-                <Trophy className="h-4 w-4" aria-hidden="true" /> Ganhador(a)
-                {multi ? ` · Prêmio ${ri + 1} de ${total}` : ""}
-              </p>
-              <p
-                className="mt-1 break-words font-display text-4xl font-extrabold leading-tight"
-                data-testid="winner"
-              >
-                {resultNumber !== null && (
-                  <span className="block text-2xl text-gold" data-testid="winner-number">
-                    Nº {resultNumber}
-                  </span>
-                )}
-                {result.winner}
-              </p>
-              <p className="mt-3 font-display text-lg font-bold text-gold">{round.prize}</p>
-              <p className="text-sm text-muted-foreground">Oferecimento: {round.merchantName}</p>
-            </div>
-          </div>
+          <WinnerAnnouncement
+            winner={result.winner}
+            winnerNumber={resultNumber}
+            prize={round.prize}
+            merchantName={round.merchantName}
+            roundIndex={ri}
+            roundTotal={total}
+          />
         )}
       </div>
 
