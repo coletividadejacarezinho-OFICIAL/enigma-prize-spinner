@@ -127,3 +127,34 @@ it("resets the preview to the first image when the selected artwork changes", as
   await screen.findByText("Imagem 1 de 2");
   expect(screen.getByRole("img", { name: "Imagem 1 de 2" })).toBeTruthy();
 });
+
+it("saving all parts still downloads every file even when previewing the middle image", async () => {
+  const saved: string[] = [];
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+    saved.push(this.download);
+  });
+  await show(images(3));
+  fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+  fireEvent.click(screen.getByRole("button", { name: "Salvar imagens (3)" }));
+  expect(saved).toEqual([
+    "enigma-resumo-parte-1.png",
+    "enigma-resumo-parte-2.png",
+    "enigma-resumo-parte-3.png",
+  ]);
+});
+
+it("shows an explicit error and keeps sharing disabled if no image was generated", async () => {
+  render(
+    <ImageShareDialog
+      open
+      onClose={vi.fn()}
+      title="Arte dos ganhadores"
+      description="Confira."
+      renderKey="vazio"
+      make={async () => []}
+    />,
+  );
+  expect(await screen.findByText("Não deu para preparar a imagem. Feche e tente de novo.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Compartilhar imagem" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Salvar imagem" }).hasAttribute("disabled")).toBe(true);
+});
