@@ -55,6 +55,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
     if (!el || !rim || !focus) return;
     focus.hidden = true;
     rim.style.transform = "";
+    pointerRef.current?.classList.remove("wheel-pointer--landed");
     if (!spin) {
       if (!idle || count === 0) {
         el.style.transform = `rotate(${rotation}deg)`;
@@ -77,6 +78,9 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
     const total = rotation - from;
     let lastSeg = Math.floor(from / seg);
     let lastFocus = -1;
+    let lastPointerTick = -Infinity;
+    let pointerAnimation: Animation | null = null;
+    const animatePointer = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     const frame = (now: number) => {
       const t = Math.max(0, Math.min(1, (now - start) / spin.durationMs));
@@ -93,17 +97,39 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
         }
       }
       const s = Math.floor(r / seg);
-      if (s !== lastSeg) {
+      if (t < 1 && s !== lastSeg) {
         lastSeg = s;
         onTickRef.current?.();
+        // A brief mechanical click, capped at eight per second on dense wheels.
+        if (count > 1 && animatePointer && now - lastPointerTick >= 125) {
+          const tip = pointerTipRef.current;
+          if (tip?.animate) {
+            pointerAnimation?.cancel();
+            pointerAnimation = tip.animate(
+              [
+                { transform: "rotate(0deg)", offset: 0 },
+                { transform: "rotate(-6deg)", offset: 0.32 },
+                { transform: "rotate(2deg)", offset: 0.68 },
+                { transform: "rotate(0deg)", offset: 1 },
+              ],
+              { duration: 170, easing: "ease-out", iterations: 1 },
+            );
+            lastPointerTick = now;
+          }
+        }
       }
+      if (t >= 1) pointerRef.current?.classList.add("wheel-pointer--landed");
       // Hold the finished close-up for five seconds so the audience can read it.
       if (t < 1 || (spin.zoom && now - start < spin.durationMs + 5000))
         raf = requestAnimationFrame(frame);
       else onEndRef.current?.();
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      pointerAnimation?.cancel();
+      pointerRef.current?.classList.remove("wheel-pointer--landed");
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spin?.key, rotation, idle, count]);
 
