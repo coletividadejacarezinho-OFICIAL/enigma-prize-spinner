@@ -172,6 +172,40 @@ it("zooms late, keeps the pointer fixed and displays the saved name at the end o
   expect(focus.hidden).toBe(true);
 });
 
+it("holds the result briefly in the full wheel without enlarging the slices", () => {
+  let frame: FrameRequestCallback = () => {};
+  vi.spyOn(performance, "now").mockReturnValue(0);
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const onSpinFrame = vi.fn();
+  const onSpinLand = vi.fn();
+  const onSpinEnd = vi.fn();
+  const { container } = render(
+    <Wheel
+      names={names.slice(0, 6)}
+      rotation={targetRotation(0, 3, 6, 0.5)}
+      spin={{ from: 0, durationMs: 1000, key: 1, zoom: false, holdMs: 1200 }}
+      winnerIndex={3}
+      onSpinFrame={onSpinFrame}
+      onSpinLand={onSpinLand}
+      onSpinEnd={onSpinEnd}
+    />,
+  );
+
+  act(() => frame(1000));
+  expect(onSpinLand).toHaveBeenCalledOnce();
+  expect(onSpinFrame.mock.lastCall?.[0]).toMatchObject({ progress: 1, zoom: 1 });
+  expect(container.querySelector(".wheel-rim")).toHaveAttribute("data-landed");
+  expect(container.querySelector(".wheel-focus")).toHaveAttribute("hidden");
+  act(() => frame(2199));
+  expect(onSpinEnd).not.toHaveBeenCalled();
+  act(() => frame(2200));
+  expect(onSpinEnd).toHaveBeenCalledOnce();
+});
+
 it("scales dense labels and skips zoom with reduced motion", () => {
   expect(wheelFontSize(75)).toBeGreaterThan(wheelFontSize(101));
   expect(wheelFontSize(250)).toBeLessThan(wheelFontSize(101));
