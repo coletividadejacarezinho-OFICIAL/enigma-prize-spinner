@@ -28,7 +28,7 @@ type View =
 
 const MODE_ORDER: RecordingMode[] = ["roleta-camera", "roleta-voz", "voz"];
 const HELP: Record<RecordingMode, string> = {
-  "roleta-camera": "Vídeo com a roleta, seu rosto num círculo e sua voz.",
+  "roleta-camera": "Roleta, rosto em círculo e voz.",
   "roleta-voz": "Vídeo só com a roleta e o resultado.",
   voz: "Arquivo de áudio com a sua voz.",
 };
