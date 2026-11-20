@@ -1,18 +1,15 @@
 /**
- * Real recording (stage 8): the front camera and microphone plus a drawing of the
- * Roleta, all in one video. The Roleta sends what is on screen with `setRecFrame()`;
- * this module paints it on a canvas (wheel, prize, winner, face in a small circle)
- * and records that canvas with the voice. Browser-only and kept in memory.
+ * The canvas is the live presentation during video recording and feeds the file
+ * directly. The wheel supplies the current angle and zoom; audio is mixed separately.
  */
 import { useSyncExternalStore } from "react";
 
 import { pickType, recordedMusicLevel, type Needs } from "./capture";
 import { fitText } from "./cards";
-import { wheelEase } from "./jingle";
 import { segmentAtPointer } from "./logic";
 import { audioContext, setRecordTap } from "./sound";
 import type { RecordingMode } from "./types";
-import { pointerNudge, wheelFontSize, wheelLabel, wheelZoom } from "./wheel-visual";
+import { pointerNudge, wheelFontSize, wheelLabel } from "./wheel-visual";
 
 export type CameraProblem = "denied" | "missing" | "busy" | "unsupported" | "other";
 
@@ -82,15 +79,19 @@ export type RecFrame = {
   roundLabel: string;
   prize: string;
   merchant: string;
+  merchantLogo?: string | undefined;
+  address?: string | undefined;
+  phone?: string | undefined;
   names: string[];
   rotation: number;
-  /** Same animation as the on-screen wheel, timed with performance.now(). */
-  spin: { from: number; to: number; startedAt: number; durationMs: number; zoom: boolean } | null;
+  spinning: boolean;
   winner: string | null;
   /** Public number of the winner in the confirmed list (E06). */
   winnerNumber?: number | null;
   summary: { prize: string; merchant: string; winner: string }[] | null;
 };
+
+type WheelMotion = { rotation: number; zoom: number; progress: number };
 
 const W = 720;
 const H = 1280;
@@ -99,6 +100,7 @@ type Session = {
   mode: RecordingMode;
   mic: boolean;
   canvas: HTMLCanvasElement | null;
+  canvasTracks: MediaStreamTrack[];
   ctx: CanvasRenderingContext2D | null;
   video: HTMLVideoElement | null;
   stream: MediaStream | null;
@@ -109,6 +111,8 @@ type Session = {
   drawId: string;
   timer: ReturnType<typeof setInterval> | null;
   frame: RecFrame;
+  motion: WheelMotion | null;
+  logo: HTMLImageElement | null;
   colors: Palette;
   /** Mix of microphone + spin music; disconnected at the end. */
   mixEnd: () => void;
@@ -212,15 +216,15 @@ export type StartOptions = {
   mic: boolean;
   stream: MediaStream | null;
   drawId: string;
-  /** Optional on-screen host for the same video element used by the recorder. */
-  cameraHost?: HTMLElement | null;
+  /** The on-screen host displays the exact canvas passed to captureStream. */
+  previewHost: HTMLElement | null;
   frame: RecFrame;
   sound: boolean;
   volume: number;
 };
 
 export function startRecording(o: StartOptions): boolean {
-  if (session) return false;
+  if (session || (o.mode !== "voz" && !o.previewHost)) return false;
   const audioOnly = o.mode === "voz";
   const mimeType = pickType(audioOnly, (t) => MediaRecorder.isTypeSupported(t));
   const mix = buildAudio(
@@ -238,6 +242,7 @@ export function startRecording(o: StartOptions): boolean {
     canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
+    canvas.setAttribute("aria-hidden", "true");
     ctx = canvas.getContext("2d");
     if (!ctx) {
       mix.end();
@@ -257,6 +262,7 @@ export function startRecording(o: StartOptions): boolean {
     if (!audioOnly) opts.videoBitsPerSecond = 2_500_000;
     recorder = new MediaRecorder(out, opts);
   } catch {
+    if (canvas) out.getVideoTracks().forEach((track) => track.stop());
     mix.end();
     return false;
   }
@@ -265,16 +271,10 @@ export function startRecording(o: StartOptions): boolean {
     video.muted = true;
     video.playsInline = true;
     video.srcObject = o.stream;
-    video.setAttribute("aria-label", "Câmera ao vivo");
-    // The live view and the saved canvas share a single decoder and camera stream.
-    if (o.cameraHost) o.cameraHost.appendChild(video);
-    else {
-      Object.assign(video.style, {
-        position: "fixed", width: "2px", height: "2px", opacity: "0",
-        pointerEvents: "none", left: "0", top: "0",
-      });
-      document.body.appendChild(video);
-    }
+    // Keep the decoder active on mobile. The shared canvas shows its cropped frames.
+    video.className = "enigma-recording-camera-source";
+    video.setAttribute("aria-hidden", "true");
+    o.previewHost?.appendChild(video);
     void video.play().catch(() => undefined);
   }
   const chunks: Blob[] = [];
@@ -285,6 +285,7 @@ export function startRecording(o: StartOptions): boolean {
     mode: o.mode,
     mic: o.mic,
     canvas,
+    canvasTracks: canvas ? out.getVideoTracks() : [],
     ctx,
     video,
     stream: o.stream,
@@ -294,11 +295,14 @@ export function startRecording(o: StartOptions): boolean {
     startedAt: Date.now(),
     drawId: o.drawId,
     frame: o.frame,
+    motion: null,
+    logo: loadLogo(o.frame.merchantLogo),
     colors: ctx ? readPalette(ctx) : FALLBACK,
     timer: null,
     mixEnd: mix.end,
   };
   try {
+    if (canvas) o.previewHost?.appendChild(canvas);
     paint(s);
     recorder.start(1000);
   } catch {
@@ -313,7 +317,27 @@ export function startRecording(o: StartOptions): boolean {
 }
 
 export function setRecFrame(frame: RecFrame) {
-  if (session) session.frame = frame;
+  if (!session) return;
+  if (session.frame.merchantLogo !== frame.merchantLogo)
+    session.logo = loadLogo(frame.merchantLogo);
+  if (!frame.spinning) session.motion = null;
+  session.frame = frame;
+}
+
+export function setRecMotion(motion: WheelMotion) {
+  if (session?.frame.spinning) session.motion = motion;
+}
+
+export function setRecIdleRotation(rotation: number) {
+  if (session && !session.frame.spinning && !session.frame.winner) session.frame.rotation = rotation;
+}
+
+function loadLogo(src: string | undefined) {
+  if (!src) return null;
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.src = src;
+  return image;
 }
 
 export function isRecording(): boolean {
@@ -324,6 +348,8 @@ export function isRecording(): boolean {
 function release(s: Session) {
   if (s.timer) clearInterval(s.timer);
   stopStream(s.stream);
+  s.canvasTracks.forEach((track) => track.stop());
+  s.canvas?.remove();
   if (s.video) {
     s.video.srcObject = null;
     s.video.remove();
@@ -458,42 +484,20 @@ function paint(s: Session) {
   ctx.textAlign = "center";
   ctx.fillStyle = c.gold;
   ctx.font = `800 34px ${DISPLAY}`;
-  ctx.fillText(f.group, W / 2, 62);
+  ctx.fillText(f.group, W / 2, 62, W - 60);
   ctx.fillStyle = c.muted;
   ctx.font = `700 26px ${SANS}`;
   ctx.fillText(`Enigma Premiado · ${f.date}`, W / 2, 100);
 
-  // Prize card: always readable, never covered by the face.
-  ctx.fillStyle = c.card;
-  roundRect(ctx, 30, 124, W - 60, 190, 28);
-  ctx.fill();
-  ctx.textAlign = "left";
-  let y = 168;
-  if (f.roundLabel) {
-    ctx.fillStyle = c.gold;
-    ctx.font = `800 28px ${SANS}`;
-    ctx.fillText(f.roundLabel, 56, y);
-    y += 44;
-  }
-  ctx.fillStyle = c.ink;
-  ctx.font = `800 38px ${DISPLAY}`;
-  for (const line of wrap(ctx, f.prize, W - 112, f.roundLabel ? 1 : 2)) {
-    ctx.fillText(line, 56, y);
-    y += 44;
-  }
-  ctx.fillStyle = c.muted;
-  ctx.font = `700 26px ${SANS}`;
-  ctx.fillText(wrap(ctx, `Oferecimento: ${f.merchant}`, W - 112, 1)[0] ?? "", 56, Math.max(y, 290));
+  paintSponsor(ctx, c, f, s.logo);
 
   if (f.summary) paintSummary(ctx, c, f.summary);
   else {
-    const spin = f.spin;
-    const progress = spin
-      ? Math.max(0, Math.min(1, (performance.now() - spin.startedAt) / spin.durationMs))
-      : 0;
-    const rotation = spin ? spin.from + (spin.to - spin.from) * wheelEase(progress) : f.rotation;
-    const zoom = wheelZoom(progress, spin?.zoom ?? false);
-    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, !!spin, !!spin && progress < 1, !!f.winner || (!!spin && progress >= 1));
+    const motion = f.spinning ? s.motion : null;
+    const rotation = motion?.rotation ?? f.rotation;
+    const zoom = motion?.zoom ?? 1;
+    const landed = motion?.progress === 1;
+    paintWheel(ctx, c, f.names, rotation, W / 2, 660, 300, zoom, f.spinning, f.spinning && !landed, !!f.winner || landed);
     const focus = zoom > 1 ? f.names[segmentAtPointer(rotation, f.names.length)] : undefined;
     if (focus) {
       // Match the interface's raised zoom label, clear of the wheel hub.
@@ -518,18 +522,18 @@ function paint(s: Session) {
     }
   }
 
-  // Bottom row: winner box on the left, face on the right.
   const infoWidth = s.video ? 414 : W - 60;
-  const infoCenter = 30 + infoWidth / 2;
+  const infoLeft = W - 30 - infoWidth;
+  const infoCenter = infoLeft + infoWidth / 2;
   const infoTextWidth = infoWidth - 44;
   ctx.fillStyle = c.card;
-  roundRect(ctx, 30, 1000, infoWidth, 240, 28);
+  roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
   ctx.fill();
   ctx.textAlign = "center";
-  if (f.winner && !f.spin) {
+  if (f.winner && !f.spinning) {
     ctx.strokeStyle = c.gold;
     ctx.lineWidth = 5;
-    roundRect(ctx, 30, 1000, infoWidth, 240, 28);
+    roundRect(ctx, infoLeft, 1000, infoWidth, 240, 28);
     ctx.stroke();
     ctx.fillStyle = c.gold;
     ctx.font = `800 28px ${SANS}`;
@@ -554,7 +558,7 @@ function paint(s: Session) {
   } else {
     ctx.fillStyle = c.muted;
     ctx.font = `800 32px ${DISPLAY}`;
-    ctx.fillText(f.spin ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", infoCenter, 1110, infoTextWidth);
+    ctx.fillText(f.spinning ? "Girando…" : f.summary ? "Sorteio encerrado" : "Valendo!", infoCenter, 1110, infoTextWidth);
     ctx.font = `700 24px ${SANS}`;
     ctx.fillText(
       `${f.names.length} ${f.names.length === 1 ? "nome" : "nomes"} na roleta`,
@@ -564,7 +568,59 @@ function paint(s: Session) {
     );
   }
 
-  if (s.video) paintFace(s, s.video, ctx, 575, 1120, 111);
+  if (s.video) paintFace(s, s.video, ctx, 145, 1120, 111);
+}
+
+function paintSponsor(
+  ctx: CanvasRenderingContext2D,
+  c: Palette,
+  f: RecFrame,
+  logo: HTMLImageElement | null,
+) {
+  ctx.fillStyle = c.card;
+  roundRect(ctx, 30, 124, W - 60, 190, 24);
+  ctx.fill();
+
+  const hasLogo = !!logo?.naturalWidth && !!logo?.naturalHeight;
+  const x = logo ? 176 : 54;
+  const width = W - x - 54;
+  if (hasLogo && logo) {
+    const scale = Math.min(100 / logo.naturalWidth, 112 / logo.naturalHeight);
+    const w = logo.naturalWidth * scale;
+    const h = logo.naturalHeight * scale;
+    ctx.drawImage(logo, 105 - w / 2, 219 - h / 2, w, h);
+  }
+
+  ctx.font = `800 20px ${SANS}`;
+  ctx.fillStyle = c.muted;
+  ctx.textAlign = "left";
+  ctx.fillText("OFERECIMENTO", x, 153, width);
+  if (f.roundLabel) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = c.gold;
+    ctx.fillText(f.roundLabel, W - 54, 153, Math.max(110, width - 190));
+    ctx.textAlign = "left";
+  }
+
+  ctx.font = `800 27px ${SANS}`;
+  ctx.fillStyle = c.ink;
+  ctx.fillText(f.merchant, x, 183, width);
+
+  ctx.font = `800 33px ${DISPLAY}`;
+  ctx.fillStyle = c.gold;
+  wrap(ctx, f.prize, width, 2).forEach((line, i) => ctx.fillText(line, x, 216 + i * 29, width));
+
+  ctx.fillStyle = c.muted;
+  const contact = [f.address, f.phone].filter(Boolean).join(" · ");
+  if (contact) {
+    const { size, lines } = fitText(contact, width, 2, [23, 21, 19, 17], (line, px) => {
+      ctx.font = `700 ${px}px ${SANS}`;
+      return ctx.measureText(line).width;
+    });
+    const lineHeight = Math.min(size + 2, 49 / lines.length);
+    ctx.font = `700 ${Math.min(size, lineHeight - 1)}px ${SANS}`;
+    lines.forEach((line, i) => ctx.fillText(line, x, 273 + i * lineHeight, width));
+  }
 }
 
 function paintWheel(

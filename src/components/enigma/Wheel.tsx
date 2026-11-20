@@ -27,11 +27,12 @@ type Props = {
   idle?: boolean;
   winner?: boolean;
   onIdleRotation?: (rotation: number) => void;
+  onSpinFrame?: (motion: { rotation: number; zoom: number; progress: number }) => void;
   onTick?: () => void;
   onSpinEnd?: () => void;
 };
 
-export function Wheel({ names, rotation, spin, idle = false, winner = false, onIdleRotation, onTick, onSpinEnd }: Props) {
+export function Wheel({ names, rotation, spin, idle = false, winner = false, onIdleRotation, onSpinFrame, onTick, onSpinEnd }: Props) {
   // The whole <svg> turns (its centre is symmetric), so the browser can move it as one layer.
   const groupRef = useRef<SVGSVGElement>(null);
   const rimRef = useRef<HTMLDivElement>(null);
@@ -44,6 +45,8 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
   const onTickRef = useRef(onTick);
   const onEndRef = useRef(onSpinEnd);
   const onIdleRef = useRef(onIdleRotation);
+  const onSpinFrameRef = useRef(onSpinFrame);
+  onSpinFrameRef.current = onSpinFrame;
   onTickRef.current = onTick;
   onEndRef.current = onSpinEnd;
   onIdleRef.current = onIdleRotation;
@@ -87,6 +90,7 @@ export function Wheel({ names, rotation, spin, idle = false, winner = false, onI
       const r = from + total * wheelEase(t);
       el.style.transform = `rotate(${r}deg)`;
       const zoom = wheelZoom(t, spin.zoom);
+      onSpinFrameRef.current?.({ rotation: r, zoom, progress: t });
       if (zoom > 1) {
         rim.style.transform = `scale(${zoom})`;
         const index = segmentAtPointer(r, count);
