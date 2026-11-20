@@ -27,6 +27,8 @@ const frame: RecFrame = {
 const arc = vi.fn();
 const drawImage = vi.fn();
 const publishFrame = vi.fn();
+const stampLabels = vi.fn();
+const writeLabel = vi.fn();
 const fillText = vi.fn();
 const translate = vi.fn();
 const scale = vi.fn();
@@ -35,7 +37,8 @@ const rect = vi.fn();
 const canvasContext = new Proxy(
   {
     arc,
-    drawImage,
+    drawImage: (source: CanvasImageSource, ...args: number[]) =>
+      (source instanceof HTMLCanvasElement ? stampLabels : drawImage)(source, ...args),
     fillText,
     translate,
     scale,
@@ -72,6 +75,8 @@ beforeEach(() => {
   capturedTrack.stop.mockClear();
   drawImage.mockReset();
   publishFrame.mockClear();
+  stampLabels.mockClear();
+  writeLabel.mockClear();
   fillText.mockClear();
   translate.mockClear();
   scale.mockClear();
@@ -84,6 +89,11 @@ beforeEach(() => {
     _type: string,
     settings?: CanvasRenderingContext2DSettings,
   ) {
+    if (this.width === 1200) {
+      return new Proxy({ fillText: writeLabel }, {
+        get: (target, key) => Reflect.get(target, key) ?? (() => {}),
+      }) as unknown as CanvasRenderingContext2D;
+    }
     if (settings?.willReadFrequently) {
       Object.assign(canvasContext, { canvas: this });
       return canvasContext as unknown as CanvasRenderingContext2D;
@@ -355,4 +365,31 @@ it("keeps the last complete frame if a drawing operation throws and retries on t
   expect(publishFrame).not.toHaveBeenCalled();
   vi.advanceTimersByTime(33);
   expect(publishFrame).toHaveBeenCalledOnce();
+});
+
+it("reuses rasterized names through rotation and zoom, then rebuilds them for a new list", () => {
+  const names = Array.from({ length: 51 }, (_, i) => `Participante ${i + 1}`);
+  expect(startRecording({
+    ...options(),
+    frame: { ...frame, names },
+    mode: "roleta-voz",
+    stream: null,
+  })).toBe(true);
+  expect(writeLabel).toHaveBeenCalledTimes(51);
+  const initialLayer = stampLabels.mock.lastCall?.[0];
+  expect(initialLayer).toBeInstanceOf(HTMLCanvasElement);
+
+  setRecFrame({ ...frame, names: [...names], spinning: true });
+  setRecMotion({ rotation: 270, progress: 1, zoom: 1.9, pointerTilt: 0 });
+  vi.advanceTimersByTime(100);
+  expect(stampLabels).toHaveBeenLastCalledWith(initialLayer, -300, -300, 600, 600);
+  expect(writeLabel).toHaveBeenCalledTimes(51);
+  expect(fillText).toHaveBeenCalledWith("Participante 13", 360, 845, 556);
+
+  setRecFrame({ ...frame, names: names.slice(1), roundLabel: "Prêmio 2 de 11" });
+  writeLabel.mockClear();
+  vi.advanceTimersByTime(33);
+  expect(writeLabel).toHaveBeenCalledTimes(50);
+  expect(writeLabel).not.toHaveBeenCalledWith("Participante 1", expect.any(Number), 0);
+  expect(stampLabels.mock.lastCall?.[0]).not.toBe(initialLayer);
 });
